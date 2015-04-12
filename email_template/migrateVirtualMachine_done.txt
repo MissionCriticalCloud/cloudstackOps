@@ -1,0 +1,12 @@
+Dear FIRSTNAME LASTNAME,
+<P>
+We completed migrating the VM <b>'VMNAME'</b> that belongs to your domain <b>'DOMAIN'</b> to cluster <b>'TOCLUSTER'</b>.
+<BR>The instance id of this VM is <b>'INSTANCENAME'</b> and before maintenance the state was <b>'STATE'</b>.
+<P>
+Your VM has been started on the new cluster and should be up again soon.
+<P>
+Please contact us in case of any problems.
+<P>
+Kind Regards,
+<BR>
+<BR>ORGANIZATION

@@ -1,0 +1,11 @@
+Dear FIRSTNAME LASTNAME,
+<P>
+We will now upgrade the virtual router VM that belongs to your domain <b>'ROUTERDOMAIN'</b> (ROUTERNAME).
+<P>
+During this reboot your VMs will have no network connectivity. Expected downtime is 1~3 minutes.
+<P>
+Please contact us in case of any problems.
+<P>
+Kind Regards,
+<BR>
+<BR>The IaaS Team.

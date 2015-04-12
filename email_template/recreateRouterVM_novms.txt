@@ -1,0 +1,11 @@
+Dear FIRSTNAME LASTNAME,
+<P>
+We have succesfully destroyed your router, but because there were no VMs running we did not create a new one.
+<P>
+A new router will be created automatically the next time you start a VM in your domain <b>'ROUTERDOMAIN'</b>. 
+<P>
+Please contact us in case of any problems.
+<P>
+Kind Regards,
+<BR>
+<BR>ORGANIZATION

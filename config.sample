@@ -1,0 +1,21 @@
+# Config file for CloudStack Operations scripts
+
+[cloudstackOps]
+organization = The Iaas Team 
+
+[mail]
+smtpserver = localhost
+mail_from = cloudstackOps@invalid
+errors_to = cloudstackOps@invalid
+
+[config]
+username = admin
+apikey = whMTYFZh3n7C4M8VCSpwEhpqZjYkzhYTufcpaLPH9hInYGTx4fOnrJ3dgL-3AZC_STMBUeTFQgqlETPEile4_A
+url = http://127.0.0.1:8080/client/api
+expires = 600
+secretkey = 9Z0S5-ryeoCworyp2x_tuhw5E4bAJ4JTRrpNaftTiAl488q5rvUt8_pG7LxAeg3m_VY-AafXQj-tVhkn9tFv1Q
+timeout = 3600
+password = password
+
+[mysqlhostname]
+mysqlpassword = password

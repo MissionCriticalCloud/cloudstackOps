@@ -1,0 +1,14 @@
+Dear FIRSTNAME LASTNAME,
+<P>
+This is an overview of the enabled admin users in your domain <strong>DOMAIN</strong>:
+<P>
+USERTABLE
+<P>
+The domain path in CloudStack is <strong>PATH</strong>.
+<P>
+Please review and adjust where applicable. 
+In case of issues: please contact us via EMAILADRESS.
+<P>
+Kind Regards,
+<BR>
+<BR>ORGANIZATION

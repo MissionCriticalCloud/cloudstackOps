@@ -1,0 +1,18 @@
+Dear FIRSTNAME LASTNAME,
+<P>
+We completed migrating the VM <b>'VMNAME'</b> that belongs to your domain <b>'DOMAIN'</b> to cluster <b>'TOCLUSTER'</b>.
+<BR>The instance id of this VM is <b>'INSTANCENAME'</b> and before maintenance the state was <b>'STATE'</b>.
+<P>
+Note: your VM has NOT been started because it was not running before maintenance.
+<P>
+Do <b>NOT</b> start it via the CloudStack GUI or else it will be migrated back to the old storage and start on the last hypervisor it was running on.
+<P>
+Start the VM using <b>CloudMonkey</b>:
+<P>
+CLOUDMONKEYCMD
+<P>
+If you're unsure how to proceed, please contact us and we'll start the VM for you.
+<P>
+Kind Regards,
+<BR>
+<BR>ORGANIZATION

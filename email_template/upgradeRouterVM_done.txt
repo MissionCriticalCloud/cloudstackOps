@@ -1,0 +1,9 @@
+Dear FIRSTNAME LASTNAME,
+<P>
+We have upgraded the virtual router VM that belongs to your domain <b>'ROUTERDOMAIN'</b> (ROUTERNAME).
+<P>
+Please contact us in case of any problems.
+<P>
+Kind Regards,
+<BR>
+<BR>ORGANIZATION

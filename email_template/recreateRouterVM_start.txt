@@ -1,0 +1,13 @@
+Dear FIRSTNAME LASTNAME,
+<P>
+We are about to migrate/recreate the virtual router VM that belongs to your domain <b>'ROUTERDOMAIN'</b> (ROUTERNAME).
+<P>
+During this your VMs will not have network connectivity. To trigger creation of a new router, we will deploy a new VM in your network, and then delete it again.
+<P>
+You will receive another e-mail when maintenance is finished.
+<P>
+Please contact us in case of any problems.
+<P>
+Kind Regards,
+<BR>
+<BR>ORGANIZATION
