@@ -3,6 +3,9 @@
 [cloudstackOps]
 organization = The Iaas Team 
 
+[core]
+profile = config
+
 [mail]
 smtpserver = localhost
 mail_from = cloudstackOps@invalid
