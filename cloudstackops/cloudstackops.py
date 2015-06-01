@@ -112,8 +112,8 @@ class CloudStackOps(CloudStackOpsBase):
             print colored.yellow("Warning: Cannot read or parse CloudMonkey profile '" + self.configProfileName + "'. Trying local config file..")
             tryLocal = True
 
-       if self.configProfileName == "config":
-          tryLocal = True
+        if self.configProfileName == "config":
+           tryLocal = True
 
         if tryLocal:
             # Read config for CloudStack API credentials
