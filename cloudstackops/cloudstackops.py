@@ -76,6 +76,7 @@ class CloudStackOps(CloudStackOpsBase):
         self.configfile = os.getcwd() + '/config'
         self.pp = pprint.PrettyPrinter(depth=6)
         self.ssh = None
+        self.xenserver = None
 
         self.printWelcome()
         self.checkScreen()
@@ -1304,8 +1305,7 @@ class CloudStackOps(CloudStackOpsBase):
                          "Resource state",
                          "State",
                          "# VMs",
-                         "Bond Status",
-                         "Heartbeat Status"])
+                         "Bond Status"])
 
         for clusterhost in clusterHostsData:
 
@@ -1316,10 +1316,7 @@ class CloudStackOps(CloudStackOpsBase):
             if not poolmaster:
                 if self.DEBUG == 1:
                     print "Debug: Looking for poolmaster"
-                retval, poolmaster = self.ssh.getPoolmaster(
-                    clusterhost.ipaddress)
-                if retval > 0:
-                    poolmaster = False
+                poolmaster = xenserver.get_poolmaster(clusterhost)
 
             # Poolmaster
             if clusterhost.name == poolmaster.strip():
@@ -1330,24 +1327,18 @@ class CloudStackOps(CloudStackOpsBase):
             # Check bonds
             if checkBonds is True:
                 try:
-                    retcode, bondstatus = self.ssh.getBondStatus(
-                        clusterhost.ipaddress)
+                    bondstatus = self.xenserver.get_bond_status(
+                        clusterhost)
                 except:
                     bondstatus = "UNKNOWN"
             else:
                 bondstatus = "UNTESTED"
 
             try:
-                retcode, vmcount = self.ssh.getXapiVmCount(
-                    clusterhost.ipaddress)
+                vmcount = self.xenserver.host_get_vms(
+                    clusterhost)
             except:
                 vmcount = "UNKNOWN"
-
-            try:
-                retcode, heartbeatstatus = self.ssh.getHeartbeatStatus(
-                    clusterhost.ipaddress)
-            except:
-                heartbeatstatus = "UNKNOWN"
 
             # Table
             t.add_row([clusterhost.name,
@@ -1355,8 +1346,7 @@ class CloudStackOps(CloudStackOpsBase):
                        clusterhost.resourcestate,
                        clusterhost.state,
                        vmcount,
-                       bondstatus,
-                       heartbeatstatus])
+                       bondstatus])
 
         # Remove progress indication
         sys.stdout.write("\033[F")
@@ -1370,15 +1360,24 @@ class CloudStackOps(CloudStackOpsBase):
                          "Allocation state",
                          "Managed state",
                          "Hypervisortype",
+                         "XenServer HA",
                          "Pod name",
                          "Zone name"])
         t.align["Cluster name"] = "l"
+
+        try:
+            clusterHostsData = self.getAllHostsFromCluster(clusterID)
+            xenserver_ha_state = self.xenserver.pool_ha_check(
+                clusterHostsData[0])
+        except:
+            xenserver_ha_state = "N/A"
 
         for cluster in clusterData:
             t.add_row([cluster.name,
                        cluster.allocationstate,
                        cluster.managedstate,
                        cluster.hypervisortype,
+                       xenserver_ha_state,
                        cluster.podname,
                        cluster.zonename])
         # Print table
