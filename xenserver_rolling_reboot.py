@@ -34,6 +34,7 @@ from cloudstackops import xenserver
 from fabric.api import *
 from fabric import api as fab
 from fabric import *
+from fabric.network import disconnect_all
 
 
 # Handle arguments passed
@@ -132,6 +133,7 @@ clusterID = c.checkCloudStackName(
     {'csname': clustername, 'csApiCall': 'listClusters'})
 if clusterID == 1:
     print "Error: Could not find cluster '" + clustername + "'."
+    disconnect_all()
     sys.exit(1)
 
 # Get cluster hosts
@@ -146,6 +148,7 @@ c.printCluster(clusterID)
 poolmaster_name = x.get_poolmaster(first_host)
 if not poolmaster_name:
     print "Error: unable to figure out the poolmaster while talking to " + first_hostname
+    disconnect_all()
     sys.exit(1)
 print "Note: The poolmaster of cluster " + clustername + " is " + poolmaster_name
 
@@ -181,6 +184,8 @@ if DRYRUN == 1:
     print "Then the reboot cyclus for " + clustername + " is done!"
     print
     print "To kick it off, run with the --exec flag."
+    print
+    disconnect_all()
     sys.exit(1)
 
 # Start time
@@ -193,12 +198,14 @@ clusterUpdateReturn = c.updateCluster(
 
 if clusterUpdateReturn == 1 or clusterUpdateReturn is None:
     print "Error: Unmanaging cluster " + clustername + " failed. Halting."
+    disconnect_all()
     sys.exit(1)
 
 # Check HA of Cluster
 pool_ha = x.pool_ha_check(poolmaster)
 if pool_ha == "Error":
     print "Error: Unable to get the current HA state of cluster " + clustername
+    disconnect_all()
     sys.ext(1)
 print "Note: The state of HA on cluster " + clustername + " is " + str(pool_ha)
 
@@ -207,6 +214,7 @@ if pool_ha:
     pool_ha_result = x.pool_ha_disable(poolmaster)
     if pool_ha_result == "Error":
         print "Error: Unable to set the HA state to Disabled for cluster " + clustername
+        disconnect_all()
         sys.exit(1)
     pool_ha = x.pool_ha_check(poolmaster)
     print "Note: The state of HA on cluster " + clustername + " is " + str(pool_ha)
@@ -219,9 +227,11 @@ if vm_count:
     if reboot_result is False:
         print "Error: Stopping sequence, as a reboot failed. Please investigate."
         x.roll_back(poolmaster)
+        disconnect_all()
         sys.exit(1)
 else:
     print "Error: Unable to contact the poolmaster " + poolmaster.name
+    disconnect_all()
     sys.exit(1)
 
 # Print overview
@@ -240,10 +250,12 @@ for h in cluster_hosts:
         if reboot_result is False:
             print "Error: Stopping sequence, as a reboot failed. Please investigate."
             x.roll_back(h)
+            disconnect_all()
             sys.exit(1)
     else:
         print "Error: Unable to get vm_count from host " + h.name
         x.roll_back(h)
+        disconnect_all()
         sys.exit(1)
     print "Note: We completed host " + h.name + " successfully."
 
@@ -260,6 +272,7 @@ if pool_ha_result is False:
 pool_ha = x.pool_ha_check(poolmaster)
 if pool_ha == "Error":
     print "Error: Unable to get the current HA state of cluster " + clustername
+    disconnect_all()
     sys.ext(1)
 print "Note: The state of HA on cluster " + clustername + " is " + str(pool_ha)
 
@@ -269,14 +282,15 @@ clusterUpdateReturn = c.updateCluster(
 
 if clusterUpdateReturn == 1 or clusterUpdateReturn is None:
     print "Error: Managing cluster " + clustername + " failed. Please check manually."
+    disconnect_all()
     sys.exit(1)
 
 # Print cluster info
 print "Note: Some info about cluster '" + clustername + "':"
 c.printCluster(clusterID)
 
-# Let the SSH connections cleanup before the main tread stops
-time.sleep(5)
+# Disconnect
+disconnect_all()
 
 # Done
 print "Note: We're done with cluster " + clustername
