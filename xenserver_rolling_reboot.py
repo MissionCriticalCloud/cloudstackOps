@@ -113,7 +113,10 @@ if DEBUG == 1:
 # Set user/passwd for fabric ssh
 env.user = 'root'
 env.password = 'password'
+env.forward_agent = True
+env.disable_known_hosts = True
 env.parallel = False
+env.pool_size = 1
 
 # Supress Fabric output by default, we will enable when needed
 output['debug'] = False
