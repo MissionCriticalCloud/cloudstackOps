@@ -64,7 +64,9 @@ class xenserver():
     def get_patch_level(self, host):
         try:
             with settings(host_string=self.ssh_user + "@" + host.ipaddress):
-                return fab.run(" xe patch-list | grep XS | awk {'print $4'} | sort | tr '\n' ' '")
+                return fab.run("for p in $(xe patch-list | grep XS | awk {'print $4'} | tr -d \" \" |\
+                sort | tr '\n' ' '); do echo -n $p \"(\"; xe patch-list name-label=$p params=hosts |\
+                awk -F: {'print $2'} | tr -cd , | awk {'print $1 \",\"'} | tr -d '\n' | wc -c | tr -d '\n'; echo -n \") \"; done")
         except:
             return False
 
