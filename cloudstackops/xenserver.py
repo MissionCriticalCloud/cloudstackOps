@@ -60,6 +60,14 @@ class xenserver():
         except:
             return False
 
+    # Get current patchlevel
+    def get_patch_level(self, host):
+        try:
+            with settings(host_string=self.ssh_user + "@" + host.ipaddress):
+                return fab.run(" xe patch-list | grep XS | awk {'print $4'} | sort | tr '\n' ' '")
+        except:
+            return False
+
     def check_patch(self):
         pass
 

@@ -1361,9 +1361,11 @@ class CloudStackOps(CloudStackOpsBase):
                          "Managed state",
                          "Hypervisortype",
                          "XenServer HA",
+                         "Patch level",
                          "Pod name",
                          "Zone name"])
         t.align["Cluster name"] = "l"
+        t.max_width["Patch level"] = 44
 
         try:
             clusterHostsData = self.getAllHostsFromCluster(clusterID)
@@ -1372,12 +1374,22 @@ class CloudStackOps(CloudStackOpsBase):
         except:
             xenserver_ha_state = "N/A"
 
+        try:
+            if not clusterHostsData:
+                clusterHostsData = self.getAllHostsFromCluster(clusterID)
+            xenserver_patch_level = self.xenserver.get_patch_level(
+                clusterHostsData[0])
+        except:
+            xenserver_patch_level = "N/A"
+
+
         for cluster in clusterData:
             t.add_row([cluster.name,
                        cluster.allocationstate,
                        cluster.managedstate,
                        cluster.hypervisortype,
                        xenserver_ha_state,
+                       xenserver_patch_level,
                        cluster.podname,
                        cluster.zonename])
         # Print table
