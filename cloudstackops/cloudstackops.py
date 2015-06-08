@@ -1359,13 +1359,12 @@ class CloudStackOps(CloudStackOpsBase):
         t = PrettyTable(["Cluster name",
                          "Allocation state",
                          "Managed state",
-                         "Hypervisortype",
                          "XenServer HA",
                          "Patch level",
                          "Pod name",
                          "Zone name"])
         t.align["Cluster name"] = "l"
-        t.max_width["Patch level"] = 44
+        t.max_width["Patch level"] = 32
 
         try:
             clusterHostsData = self.getAllHostsFromCluster(clusterID)
@@ -1387,7 +1386,6 @@ class CloudStackOps(CloudStackOpsBase):
             t.add_row([cluster.name,
                        cluster.allocationstate,
                        cluster.managedstate,
-                       cluster.hypervisortype,
                        xenserver_ha_state,
                        xenserver_patch_level,
                        cluster.podname,
