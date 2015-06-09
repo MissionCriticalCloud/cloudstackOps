@@ -47,7 +47,7 @@ class xenserver():
             time.sleep(5)
         # Remove progress indication
         sys.stdout.write("\033[F")
-        print "Note: Host " + host.name + " is alive again!"
+        print "Note: Host " + host.name + " is alive again!                             "
         print "Note: Waiting a bit before moving on to allow everything to start fully.."
         time.sleep(30)
         return True
