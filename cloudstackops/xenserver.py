@@ -74,7 +74,6 @@ class xenserver():
 
     # Check if we are really offline
     def check_offline(self, host):
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         print "Note: Waiting for " + host.name + " to go offline"
         while os.system("ping -c 1 " + host.ipaddress + " 2>&1 >/dev/null") == 0:
             # Progress indication
