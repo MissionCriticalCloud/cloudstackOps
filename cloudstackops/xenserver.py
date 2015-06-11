@@ -200,7 +200,7 @@ class xenserver():
         print "Note: Enabling HA"
         try:
             with settings(host_string=self.ssh_user + "@" + host.ipaddress):
-                return fab.run("xe pool-ha-enable heartbeat-sr-uuids=$(xe sr-list type=nfs params=uuid --minimal) ha-config:timeout=180")
+                return fab.run("xe pool-ha-enable heartbeat-sr-uuids=$(xe sr-list type=nfs params=uuid --minimal) ha-config:timeout=180 ha-config:ha-host-failures-to-tolerate=1")
         except:
             return False
 
