@@ -160,6 +160,12 @@ for h in cluster_hosts:
     if h.name == poolmaster_name:
         poolmaster = h
 
+# Eject CDs
+if DRYRUN == 0:
+    eject_result = x.eject_cds(poolmaster)
+    if eject_result == False:
+        print "Warning: Ejecting CDs failed. Continuing anyway."
+
 # Print overview
 checkBonds = True
 c.printHypervisors(clusterID, poolmaster.name, checkBonds)

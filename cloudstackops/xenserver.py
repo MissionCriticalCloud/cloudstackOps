@@ -217,9 +217,19 @@ class xenserver():
             print "Warning: Could not upload check scripts to host " + host.name + ". Continuing anyway."
             return False
 
+    # Eject CDs
+    def eject_cds(self, host):
+        print "Note: We're ejecting all mounted CDs on this cluster."
+        try:
+            with settings(host_string=self.ssh_user + "@" + host.ipaddress):
+                return fab.run("for vm in $(xe vbd-list type=CD empty=false params=vm-uuid --minimal |\
+                    tr \",\" \" \"); do echo \"xe vm-cd-eject uuid=\"$vm; done | sh")
+        except:
+            return False
+
     # Fake PV tools
     def fake_pv_tools(self, host):
-        print "Note: We're faking the presence of PV tools of all vm's reporting no tools on hypervisor '" + host.name
+        print "Note: We're faking the presence of PV tools of all vm's reporting no tools on hypervisor " + host.name
         try:
             with settings(host_string=self.ssh_user + "@" + host.ipaddress):
                 return fab.run("xe vm-list PV-drivers-up-to-date='<not in database>' is-control-domain=false\
