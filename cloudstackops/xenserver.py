@@ -23,6 +23,7 @@
 import socket
 import sys
 import time
+import os
 
 # Fabric
 from fabric.api import *
@@ -47,10 +48,42 @@ class xenserver():
             time.sleep(5)
         # Remove progress indication
         sys.stdout.write("\033[F")
-        print "Note: Host " + host.name + " is alive again!                             "
-        print "Note: Waiting a bit before moving on to allow everything to start fully.."
-        time.sleep(30)
+        print "Note: Host " + host.name + " responds to SSH again!                           "
+        print "Note: Waiting until we can successfully run a XE command against the cluster.."
+        while self.check_xapi(host) > 0:
+            # Progress indication
+            sys.stdout.write(".")
+            sys.stdout.flush()
+            time.sleep(5)
+        # Remove progress indication
+        sys.stdout.write("\033[F")
+        print "Note: Host " + host.name + " is able to do XE stuff again!                                  "
         return True
+
+    # Check if we can use xapi
+    def check_xapi(self, host):
+        try:
+            with settings(host_string=self.ssh_user + "@" + host.ipaddress):
+                result_code = fab.run("xe host-list")
+                if result_code == 0:
+                    return True
+                else:
+                    return False
+        except:
+            return False
+
+    # Check if we are really offline
+    def check_offline(self, host):
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        print "Note: Waiting for " + host.name + " to go offline"
+        while os.system("ping -c 1 " + host.ipaddress + " 2>&1 >/dev/null") == 0:
+            # Progress indication
+            sys.stdout.write(".")
+            sys.stdout.flush()
+            time.sleep(5)
+        # Remove progress indication
+        sys.stdout.write("\033[F")
+        print "Note: Host " + host.name + " is now offline!                           "
 
     # Return host of poolmaster
     def get_poolmaster(self, host):
@@ -143,9 +176,8 @@ class xenserver():
             print "Error: Rebooting host " + host.name + " failed."
             return False
 
-        # Wait for the host to shutdown
-        print "Note: Waiting 30s to allow the host to shutdown."
-        time.sleep(30)
+        # Check the host is really offline
+        self.check_offline(host)
 
         # Wait until the host is back
         self.check_connect(host)
