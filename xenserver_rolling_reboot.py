@@ -139,6 +139,7 @@ output['running'] = False
 output['stdout'] = False
 output['stdin'] = False
 output['output'] = False
+output['warnings'] = False
 
 # Check cloudstack IDs
 if DEBUG == 1:
