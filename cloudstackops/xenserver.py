@@ -50,7 +50,7 @@ class xenserver():
         sys.stdout.write("\033[F")
         print "Note: Host " + host.name + " responds to SSH again!                           "
         print "Note: Waiting until we can successfully run a XE command against the cluster.."
-        while self.check_xapi(host) > 0:
+        while self.check_xapi(host) is False:
             # Progress indication
             sys.stdout.write(".")
             sys.stdout.flush()
@@ -64,9 +64,9 @@ class xenserver():
     def check_xapi(self, host):
         try:
             with settings(host_string=self.ssh_user + "@" + host.ipaddress):
-                with settings(warn_only=True):
-                    result_code = fab.run("xe host-enable host=host.name")
-                if result_code == 0:
+                with warn_only():
+                    result = fab.run("xe host-enable host=" + host.name)
+                if result.return_code == 0:
                     return True
                 else:
                     return False
