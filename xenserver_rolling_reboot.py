@@ -49,18 +49,23 @@ def handleArguments(argv):
     configProfileName = ''
     global force
     force = 0
+    global ignoreHostList
+    ignoreHostList = ""
+    global ignoreHosts
+    ignoreHosts = ''
 
     # Usage message
     help = "Usage: ./" + os.path.basename(__file__) + ' [options]' + \
         '\n  --config-profile -c <profilename>\t\tSpecify the CloudMonkey profile name to get the credentials from (or specify in ./config file)' + \
         '\n  --clustername -n <clustername> \t\tName of the cluster to work with' + \
+        '\n  --ignore-hosts <list>\t\t\t\tSkip work on the specified hosts (for example if you need to resume): Example: --ignore-hosts="host1, host2" ' + \
         '\n  --debug\t\t\t\t\tEnable debug mode' + \
         '\n  --exec\t\t\t\t\tExecute for real'
 
     try:
         opts, args = getopt.getopt(
             argv, "hc:n:", [
-                "credentials-file=", "clustername=", "debug", "exec", "force"])
+                "credentials-file=", "clustername=", "ignore-hosts=", "debug", "exec", "force"])
     except getopt.GetoptError as e:
         print "Error: " + str(e)
         print help
@@ -74,6 +79,8 @@ def handleArguments(argv):
             configProfileName = arg
         elif opt in ("-n", "--clustername"):
             clustername = arg
+        elif opt in ("--ignore-hosts"):
+            ignoreHostList = arg
         elif opt in ("--debug"):
             DEBUG = 1
         elif opt in ("--exec"):
@@ -85,6 +92,13 @@ def handleArguments(argv):
     if len(configProfileName) == 0:
         configProfileName = "config"
 
+    # Ignore host list
+    if len(ignoreHostList) > 0:
+        ignoreHosts = ignoreHostList.split(", ")
+    else:
+        ignoreHosts = []
+
+    # We need at least a cluster name
     if len(clustername) == 0:
         print help
         sys.exit(1)
@@ -143,6 +157,10 @@ first_host = cluster_hosts[0]
 # Print cluster info
 print "Note: Some info about cluster '" + clustername + "':"
 c.printCluster(clusterID)
+
+# Hosts to ignore
+if len(ignoreHosts) > 0:
+    print "Note: Ignoring these hosts: " + str(ignoreHosts)
 
 # Get poolmaster
 poolmaster_name = x.get_poolmaster(first_host)
@@ -226,19 +244,22 @@ if pool_ha:
     print "Note: The state of HA on cluster " + clustername + " is " + str(pool_ha)
 
 # Do the poolmaster first
-vm_count = x.host_get_vms(poolmaster)
-if vm_count:
-    print "Note: " + poolmaster.name + " (poolmaster) has " + vm_count + " VMs running."
-    reboot_result = x.host_reboot(poolmaster)
-    if reboot_result is False:
-        print "Error: Stopping sequence, as a reboot failed. Please investigate."
-        x.roll_back(poolmaster)
+if poolmaster.name not in ignoreHosts:
+    vm_count = x.host_get_vms(poolmaster)
+    if vm_count:
+        print "Note: " + poolmaster.name + " (poolmaster) has " + vm_count + " VMs running."
+        reboot_result = x.host_reboot(poolmaster)
+        if reboot_result is False:
+            print "Error: Stopping sequence, as a reboot failed. Please investigate."
+            x.roll_back(poolmaster)
+            disconnect_all()
+            sys.exit(1)
+    else:
+        print "Error: Unable to contact the poolmaster " + poolmaster.name
         disconnect_all()
         sys.exit(1)
 else:
-    print "Error: Unable to contact the poolmaster " + poolmaster.name
-    disconnect_all()
-    sys.exit(1)
+        print "Warning: Skipping " + poolmaster.name + " due to --ignore-hosts setting"
 
 # Print overview
 checkBonds = True
@@ -246,6 +267,10 @@ c.printHypervisors(clusterID, poolmaster.name, checkBonds)
 
 # Then the other hypervisors, one-by-one
 for h in cluster_hosts:
+    if h.name in ignoreHosts:
+        print "Warning: Skipping " + h.name + " due to --ignore-hosts setting"
+        continue
+
     if h.name == poolmaster.name:
         print "Note: Skipping poolmaster"
         continue
