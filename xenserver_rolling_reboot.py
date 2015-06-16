@@ -53,19 +53,22 @@ def handleArguments(argv):
     ignoreHostList = ""
     global ignoreHosts
     ignoreHosts = ''
+    global threads
+    threads = 5
 
     # Usage message
     help = "Usage: ./" + os.path.basename(__file__) + ' [options]' + \
         '\n  --config-profile -c <profilename>\t\tSpecify the CloudMonkey profile name to get the credentials from (or specify in ./config file)' + \
         '\n  --clustername -n <clustername> \t\tName of the cluster to work with' + \
         '\n  --ignore-hosts <list>\t\t\t\tSkip work on the specified hosts (for example if you need to resume): Example: --ignore-hosts="host1, host2" ' + \
+        '\n  --threads <nr>\t\t\t\tUse this number or concurrent migration threads" ' + \
         '\n  --debug\t\t\t\t\tEnable debug mode' + \
         '\n  --exec\t\t\t\t\tExecute for real'
 
     try:
         opts, args = getopt.getopt(
-            argv, "hc:n:", [
-                "credentials-file=", "clustername=", "ignore-hosts=", "debug", "exec", "force"])
+            argv, "hc:n:t:", [
+                "credentials-file=", "clustername=", "ignore-hosts=", "threads=", "debug", "exec", "force"])
     except getopt.GetoptError as e:
         print "Error: " + str(e)
         print help
@@ -79,6 +82,8 @@ def handleArguments(argv):
             configProfileName = arg
         elif opt in ("-n", "--clustername"):
             clustername = arg
+        elif opt in ("-t", "--threads"):
+            threads = arg
         elif opt in ("--ignore-hosts"):
             ignoreHostList = arg
         elif opt in ("--debug"):
@@ -111,7 +116,7 @@ if __name__ == '__main__':
 c = cloudstackops.CloudStackOps(DEBUG, DRYRUN)
 
 # Init XenServer class
-x = xenserver.xenserver()
+x = xenserver.xenserver('root', 2)
 c.xenserver = x
 
 # make credentials file known to our class

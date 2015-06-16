@@ -34,8 +34,9 @@ from fabric import *
 # Class to handle XenServer patching
 class xenserver():
 
-    def __init__(self, ssh_user='root'):
+    def __init__(self, ssh_user='root', threads = 5):
         self.ssh_user = ssh_user
+        self.threads = threads
 
     # Wait for hypervisor to become alive again
     def check_connect(self, host):
@@ -134,8 +135,7 @@ class xenserver():
         print "Note: Migration progress will appear here.."
         try:
             with settings(host_string=self.ssh_user + "@" + host.ipaddress):
-                fab.run("nohup xe host-evacuate host=" + host.name +
-                        " >& /dev/null < /dev/null &", pty=False)
+                fab.run("nohup python /tmp/xenserver_parallel_evacuate.py --exec --threads " + str(self.threads) + " >& /dev/null < /dev/null &", pty=False)
 
             while True:
                 numer_of_vms = self.host_get_vms(host)
@@ -244,6 +244,8 @@ class xenserver():
                     '/tmp/xenserver_check_bonds.py', mode=0755)
                 put('xenserver_fake_pvtools.sh',
                     '/tmp/xenserver_fake_pvtools.sh', mode=0755)
+                put('xenserver_parallel_evacuate.py',
+                    '/tmp/xenserver_parallel_evacuate.py', mode=0755)
             return True
         except:
             print "Warning: Could not upload check scripts to host " + host.name + ". Continuing anyway."
