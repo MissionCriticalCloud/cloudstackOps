@@ -131,7 +131,7 @@ class xenserver():
 
     # Live migrate all VMS off of a hypervisor
     def host_evacuate(self, host):
-        print "Note: Evacuating host " + host.name
+        print "Note: Evacuating host " + host.name + " @ " + time.strftime("%Y-%m-%d %H:%M")
         print "Note: Migration progress will appear here.."
         try:
             with settings(host_string=self.ssh_user + "@" + host.ipaddress):
@@ -145,6 +145,7 @@ class xenserver():
                 if int(numer_of_vms) == 0:
                     break
                 time.sleep(5)
+            print "Note: Done evacuating host " + host.name + " @ " + time.strftime("%Y-%m-%d %H:%M")
             return True
         except:
             return False

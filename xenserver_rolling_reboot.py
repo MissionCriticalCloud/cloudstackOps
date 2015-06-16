@@ -43,12 +43,12 @@ def handleArguments(argv):
     DEBUG = 0
     global DRYRUN
     DRYRUN = 1
+    global PREPARE
+    PREPARE = 0
     global clustername
     clustername = ''
     global configProfileName
     configProfileName = ''
-    global force
-    force = 0
     global ignoreHostList
     ignoreHostList = ""
     global ignoreHosts
@@ -63,12 +63,13 @@ def handleArguments(argv):
         '\n  --ignore-hosts <list>\t\t\t\tSkip work on the specified hosts (for example if you need to resume): Example: --ignore-hosts="host1, host2" ' + \
         '\n  --threads <nr>\t\t\t\tUse this number or concurrent migration threads" ' + \
         '\n  --debug\t\t\t\t\tEnable debug mode' + \
-        '\n  --exec\t\t\t\t\tExecute for real'
+        '\n  --exec\t\t\t\t\tExecute for real' + \
+        '\n  --prepare\t\t\t\t\tExecute some prepare commands'
 
     try:
         opts, args = getopt.getopt(
-            argv, "hc:n:t:", [
-                "credentials-file=", "clustername=", "ignore-hosts=", "threads=", "debug", "exec", "force"])
+            argv, "hc:n:t:p", [
+                "credentials-file=", "clustername=", "ignore-hosts=", "threads=", "debug", "exec", "prepare"])
     except getopt.GetoptError as e:
         print "Error: " + str(e)
         print help
@@ -90,8 +91,8 @@ def handleArguments(argv):
             DEBUG = 1
         elif opt in ("--exec"):
             DRYRUN = 0
-        elif opt in ("--force"):
-            force = 1
+        elif opt in ("--prepare"):
+            PREPARE = 1
 
     # Default to cloudmonkey default config file
     if len(configProfileName) == 0:
@@ -179,13 +180,13 @@ print "Note: The poolmaster of cluster " + clustername + " is " + poolmaster_nam
 # Put the scripts we need
 for h in cluster_hosts:
     x.put_scripts(h)
-    if DRYRUN == 0:
+    if DRYRUN == 0 or PREPARE == 1:
         x.fake_pv_tools(h)
     if h.name == poolmaster_name:
         poolmaster = h
 
 # Eject CDs
-if DRYRUN == 0:
+if DRYRUN == 0 or PREPARE == 1:
     eject_result = x.eject_cds(poolmaster)
     if eject_result == False:
         print "Warning: Ejecting CDs failed. Continuing anyway."
