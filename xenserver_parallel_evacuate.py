@@ -24,11 +24,8 @@
 
 # We depend on these modules
 import sys
-import socket
-import time
 import os
 import getopt
-import subprocess
 
 
 # Argument handling Class
@@ -185,23 +182,6 @@ class xenserver_parallel_evacuation(object):
                 return False
         except:
             return "Error"
-
-    # Put a host to service in XenServer
-    def host_enable(self):
-        print "Note: Enabling host "
-        try:
-            return self.run_local_command("xe host-enable host=$HOSTNAME")
-        except:
-            return False
-
-    # Put a host to maintenance in XenServer
-    def host_disable(self):
-        print "Note: Disabling host "
-        try:
-            return self.run_local_command("xe host-disable host=$HOSTNAME")
-        except:
-            print "Warning: host_disable returned false"
-            return False
 
     # Check the current state of HA
     def pool_ha_check(self):
