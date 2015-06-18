@@ -127,10 +127,17 @@ class xenserver_parallel_evacuation(object):
 
     # Generate migration plan
     def generate_migration_plan(self):
+        # Make sure host is disabled
         if self.is_host_enabled() is not False:
             print "Error: Host should be disabled first."
             return False
 
+        # Make sure pool HA is turned off
+        if self.pool_ha_check() is not False:
+            print "Error: Pool HA should be disabled first."
+            return False
+
+        # Generate migration plan
         migration_cmds = ""
         if self.vmlist == False:
             self.vmlist = self.get_vms_with_memory_from_hypervisor()
