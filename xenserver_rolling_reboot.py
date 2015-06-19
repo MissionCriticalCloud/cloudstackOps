@@ -131,22 +131,6 @@ if DEBUG == 1:
     print "ApiKey: " + c.apikey
     print "SecretKey: " + c.secretkey
 
-# Set user/passwd for fabric ssh
-env.user = 'root'
-env.password = 'password'
-env.forward_agent = True
-env.disable_known_hosts = True
-env.parallel = False
-env.pool_size = 1
-
-# Supress Fabric output by default, we will enable when needed
-output['debug'] = False
-output['running'] = False
-output['stdout'] = False
-output['stdin'] = False
-output['output'] = False
-output['warnings'] = False
-
 # Check cloudstack IDs
 if DEBUG == 1:
     print "Note: Checking CloudStack IDs of provided input.."

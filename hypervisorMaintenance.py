@@ -28,6 +28,7 @@ import sys
 import getopt
 from cloudstackops import cloudstackops
 from cloudstackops import cloudstackopsssh
+from cloudstackops import xenserver
 import os.path
 from random import choice
 import subprocess
@@ -108,6 +109,8 @@ if __name__ == "__main__":
 c = cloudstackops.CloudStackOps(DEBUG, DRYRUN)
 ssh = cloudstackopsssh.CloudStackOpsSSH(DEBUG, DRYRUN)
 c.ssh = ssh
+x = xenserver.xenserver()
+c.xenserver = x
 
 if DEBUG == 1:
     print "Warning: Debug mode is enabled!"

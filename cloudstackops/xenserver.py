@@ -30,6 +30,21 @@ from fabric.api import *
 from fabric import api as fab
 from fabric import *
 
+# Set user/passwd for fabric ssh
+env.user = 'root'
+env.password = 'password'
+env.forward_agent = True
+env.disable_known_hosts = True
+env.parallel = False
+env.pool_size = 1
+
+# Supress Fabric output by default, we will enable when needed
+output['debug'] = False
+output['running'] = False
+output['stdout'] = False
+output['stdin'] = False
+output['output'] = False
+output['warnings'] = False
 
 # Class to handle XenServer patching
 class xenserver():
