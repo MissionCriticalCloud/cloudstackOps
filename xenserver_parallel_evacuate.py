@@ -161,10 +161,11 @@ class xenserver_parallel_evacuation(object):
                     self.poolmember[to_hv['name']]['memory_free'] -= int(mem)
                     # Prepare migration command
                     migration_cmds += "xe vm-migrate vm=" + vm + " host=" + to_hv['name'] + ";\n"
+                    print "OK, found migration destination for " + vm
                     break
                 else:
                     # Unable to empty this hv
-                    print "Error: not enough memory (need: " + str(mem)  + ") on host with the most free memory!"
+                    print "Error: not enough memory (need: " + str(mem)  + ") on any hypervisor to migrate vm " + vm + ". This means N+1 rule is not met, please investigate!"
                     return False
         return migration_cmds
 
