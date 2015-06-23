@@ -32,6 +32,7 @@ import subprocess
 from subprocess import Popen, PIPE
 import pprint
 import re
+
 # Marvin
 try:
     from marvin.cloudstackConnection import cloudConnection
@@ -356,8 +357,8 @@ class CloudStackOps(CloudStackOpsBase):
 
         return csnameID
 
-    # Find storagePool for Cluster
-    def getStoragePool(self, clusterID):
+    # Find Random storagePool for Cluster
+    def getRandomStoragePool(self, clusterID):
         apicall = listStoragePools.listStoragePoolsCmd()
         apicall.clusterid = str(clusterID)
         apicall.listAll = "true"
@@ -372,7 +373,19 @@ class CloudStackOps(CloudStackOpsBase):
             print "DEBUG: Selected storage pool: " + targetStorageID + " (" + toStorageData.name + ")" + " for cluster " + clusterID
 
         return targetStorageID
+    
+    # Find storagePool for Cluster
+    def getStoragePool(self, clusterID):
+        apicall = listStoragePools.listStoragePoolsCmd()
+        apicall.clusterid = str(clusterID)
+        apicall.listAll = "true"
 
+        # Call CloudStack API
+        data = self._callAPI(apicall)
+        # Select a random storage pool that belongs to this cluster
+
+        return data
+    
     # Get storagePool data
     def getStoragePoolData(self, storagepoolID):
         apicall = listStoragePools.listStoragePoolsCmd()
@@ -998,6 +1011,37 @@ class CloudStackOps(CloudStackOpsBase):
         targetStoragePoolData = self.getStoragePoolData(targetStorageID)
         return targetStoragePoolData[0].tags
 
+    def getZoneId(self, zonename):
+        
+        apicall = listZones.listZonesCmd()
+        apicall.name = zonename
+        
+        # Call CloudStack API
+        result = self._callAPI(apicall)    
+       
+        if result is not None:
+            return result[0].id
+        else:
+            return None
+        
+    def getDetachedVolumes(self, storagepoolid):
+  
+        volumes = self.listVolumes(storagepoolid,False)
+              
+        orphans = []   
+        
+        if volumes is not None:
+            # sort results by domain
+            volumes.sort(key=lambda vol: vol.domain, reverse=True)
+        
+            # select volumes with no vmname attached
+            for volume in volumes:
+                if volume.vmname is None:
+                    orphans.append(volume)
+            
+        #return selected detached volumes
+        return orphans      
+        
     # Check zone
     def checkZone(self, routerClusterID, toClusterID):
         routerClusterData = self.listClusters({'clusterid': routerClusterID})
