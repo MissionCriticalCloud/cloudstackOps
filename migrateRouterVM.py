@@ -348,7 +348,7 @@ mysqlResult = s.getRouterRootVolumeUUID(router.id)
 if DEBUG == 1:
     print mysqlResult
 
-targetStorageID = c.getStoragePool(toClusterID)
+targetStorageID = c.getRandomStoragePool(toClusterID)
 
 for (volid, volumename, vm_instancename) in mysqlResult:
     print "Note: router " + router.name + " has ROOT volume with name " + volumename + " and uuid " + volid
