@@ -18,8 +18,9 @@
 #      KIND, either express or implied.  See the License for the
 #      specific language governing permissions and limitations
 #      under the License.
- 
-# Script to search primary storage pools for 'orphaned disks' and remove them to free up space
+
+# Script to search primary storage pools for 'orphaned disks' and remove
+# them to free up space
 
 import sys
 import getopt
@@ -33,18 +34,19 @@ from cloudstackops.cloudstackstorage import StorageHelper
 from prettytable import PrettyTable
 
 
-
-def get_physicalvolumesize(file_uuid_in_cloudstack, *filelist):
+def get_volume_filesize(file_uuid_in_cloudstack, *filelist):
     filelist, = filelist
     size = None
     for filepath in filelist.keys():
         file_uuid_on_storagepool = filepath.split('/')[-1].split('.')[:1][0]
-            
+
         if file_uuid_in_cloudstack == file_uuid_on_storagepool:
             size = int(filelist[filepath])
     return size
-        
+
 # Function to handle our arguments
+
+
 def handle_arguments(argv):
     global DEBUG
     DEBUG = 0
@@ -61,17 +63,18 @@ def handle_arguments(argv):
 
     # Usage message
     help = "Usage: " + os.path.basename(__file__) + ' [options] ' + \
-        '\n  --config-profile -c <profilename>\t\tSpecify the CloudMonkey profile name to get the credentials from (or specify in ./config file)' + \
-        '\n  --zone -z <zonename>\t\t\t' + \
-        '\n  --cluster -t <clustername>\t\t\t' + \
-        '\n  --debug\t\t\t\t\tEnable debug mode'
+        '\n  --config-profile -c <profilename>\t\tSpecify the CloudMonkey profile name to get the credentials from (or specify in ./config file) [required]' + \
+        '\n  --zone -z <zonename>\t\t\t\tZone Name [required]\t' + \
+        '\n  --cluster -t <clustername>\t\t\tCluster Name [optional]\t' + \
+        '\n  --debug\t\t\t\t\tEnable debug mode [optional]'
     try:
-        opts, args = getopt.getopt(argv, "hc:z:t:", ["config-profile=", "zone=", "clusterarg=", "debug"])
-    
+        opts, args = getopt.getopt(
+            argv, "hc:z:t:", ["config-profile=", "zone=", "clusterarg=", "debug"])
+
     except getopt.GetoptError as e:
         print "Error: " + str(e)
         sys.exit(2)
-    
+
     for opt, arg in opts:
         if opt == '-h':
             print help
@@ -85,8 +88,8 @@ def handle_arguments(argv):
         elif opt in ("-t", "--cluster"):
             clusterarg = arg
 
-    # Default to cloudmonkey default config file
-    if len(configProfileName) == 0:
+    # Print help if required options not provided
+    if len(configProfileName) == 0 or len(zone) == 0:
         print help
         exit(1)
 
@@ -95,7 +98,7 @@ def handle_arguments(argv):
 # Parse arguments
 if __name__ == "__main__":
     handle_arguments(sys.argv[1:])
-    
+
 # Init our classes
 c = cloudstackops.CloudStackOps(DEBUG, DRYRUN, FORCE)
 cs = cloudstackopsssh.CloudStackOpsSSH()
@@ -124,86 +127,91 @@ if zoneid is None:
 
 # get all clusters in zone if no cluster is given as input
 if clusterarg is None or clusterarg == '':
-    
-    clusters = c.listClusters({'zoneid': zoneid, 'listall': 'true' })
+
+    clusters = c.listClusters({'zoneid': zoneid, 'listall': 'true'})
 
 else:
-    
-    clusters = c.listClusters({'zoneid': zoneid, 'name': clusterarg, 'listall': 'true' })
+
+    clusters = c.listClusters(
+        {'zoneid': zoneid, 'name': clusterarg, 'listall': 'true'})
 
 # die if there are no clusters found (unlikely)
 if clusters is None:
     print "DEBUG: No clusters found in zone"
     exit(1)
 
-    
+
 # get a list of storage pools for each cluster
+t_storagepool = PrettyTable(["Cluster", "Storage Pool", "Number of Orphaned disks", "Real Space used (GB)"])
 
 for cluster in clusters:
-    storagepools = [] 
+    storagepools = []
     storagepools.append(c.getStoragePool(cluster.id))
     random_hypervisor = c.getHostsFromCluster(cluster.id).pop()
-    #flatten storagepool list
+    # flatten storagepool list
     storagepools = [y for x in storagepools for y in x]
-    
+
     # # if there are storage pools (should be)
     if len(storagepools) > 0:
-        
+
         storagehelper = StorageHelper(debug=DEBUG)
-        
-        t_storagepool = PrettyTable(["Cluster","Storage Pool","Number of Orphaned disks", "Real Space used (GB)"]) 
-         
-        for storagepool in storagepools: 
+
+
+        for storagepool in storagepools:
             used_space = 0
-            
+
             # Get list of orphaned cloudstack disks for storagepool
-            print "[INFO]: Retrieving list of orphans for storage pool", storagepool.name  
+            print "[INFO]: Retrieving list of orphans for storage pool", storagepool.name
             orphans = c.getDetachedVolumes(storagepool.id)
-            
-            storagepool_devicepath = storagepool.ipaddress + ":" + str(storagepool.path)
-            
-            # get filelist for storagepool via a 'random' hypervisor from cluster
-            primary_mountpoint = storagehelper.get_mountpoint(random_hypervisor.ipaddress, storagepool_devicepath)     
-            
+
+            storagepool_devicepath = storagepool.ipaddress + \
+                ":" + str(storagepool.path)
+
+            # get filelist for storagepool via a 'random' hypervisor from
+            # cluster
+            primary_mountpoint = storagehelper.get_mountpoint(
+                random_hypervisor.ipaddress, storagepool_devicepath)
+
             if primary_mountpoint is None:
                 print "[DEBUG]: no physical volume list retrieved for " + storagepool.name + " skipping"
-                continue   
-            else:
-                filelist = storagehelper.list_files(random_hypervisor.ipaddress, primary_mountpoint)
-
-            t = PrettyTable(["Domain","Account","Name","Path","Allocated Size (GB)", "Real Size (GB)", "Orphaned"])   
+                storagepool_filelist = None
             
+            else:
+                storagepool_filelist = storagehelper.list_files(random_hypervisor.ipaddress, primary_mountpoint)
+              
+            
+            t = PrettyTable(["Domain", "Account", "Name", "Cluster","Storagepool","Path",
+                             "Allocated Size (GB)", "Real Size (GB)", "Orphaned"])
+
             for orphan in orphans:
                 isorphaned = ''
+
+                orphan_allocated_sizeGB = (orphan.size / math.pow(1024, 3))
                 
-                orphan_allocated_sizeGB = (orphan.size/math.pow(1024, 3))             
-                orphan_real_sizeGB = get_physicalvolumesize(orphan.path, filelist)
-                
-                # when orphan volume file is not present on storagepool, report size and status n/a
-                if orphan_real_sizeGB is None:
+                if storagepool_filelist is None:
                     orphan_real_sizeGB = 'n/a'
-                    isorphaned = 'N'
+                    isorphaned = '?'      
                 
-                # when the volume file is present report size and status
-                else:                  
-                    used_space += (orphan_real_sizeGB / 1024)
-                    orphan_real_sizeGB = format((orphan_real_sizeGB / 1024), '.2f')
-                    isorphaned = 'Y'      
-                             
+                else:
+                    orphan_real_sizeGB = get_volume_filesize(orphan.path, storagepool_filelist)
+                    
+                    if orphan_real_sizeGB is not None:
+                        used_space += (orphan_real_sizeGB / 1024)
+                        orphan_real_sizeGB = format((orphan_real_sizeGB / 1024), '.2f')
+                        isorphaned = 'Y'
+                    
+                    else:
+                        orphan_real_sizeGB = 0
+                        isorphaned = 'N'
+
                 # add a row with orphan details
-                t.add_row([orphan.domain, orphan.account, orphan.name, orphan.path, orphan_allocated_sizeGB, orphan_real_sizeGB, isorphaned])
-     
+                t.add_row([orphan.domain, orphan.account, orphan.name, cluster.name, storagepool.name, orphan.path,
+                           orphan_allocated_sizeGB, orphan_real_sizeGB, isorphaned])
+
             # Print orphan table
             print t.get_string()
-            t_storagepool.add_row([cluster.name, storagepool.name, len(orphans), format(used_space, '.2f')])
-         
-        print "StoragePool Totals"
-        print t_storagepool.get_string()
-
-
-
-
-
-
-
-
+            t_storagepool.add_row(
+                [cluster.name, storagepool.name, len(orphans), format(used_space, '.2f')])
+        
+print "Storagepool Totals"
+print t_storagepool.get_string()
