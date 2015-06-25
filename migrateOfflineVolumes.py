@@ -129,8 +129,8 @@ toClusterID = c.checkCloudStackName(
     {'csname': toCluster, 'csApiCall': 'listClusters'})
 
 # Select storage pool
-fromStorageID = c.getStoragePool(fromClusterID)
-toStorageID = c.getStoragePool(toClusterID)
+fromStorageID = c.getRandomStoragePool(fromClusterID)
+toStorageID = c.getRandomStoragePool(toClusterID)
 
 # Get storage pool data
 result = c.getStoragePoolData(fromStorageID)
