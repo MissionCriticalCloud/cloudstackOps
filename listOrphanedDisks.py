@@ -165,14 +165,12 @@ for cluster in clusters:
             # get filelist for storagepool via a 'random' hypervisor from cluster
             primary_mountpoint = storagehelper.get_mountpoint(random_hypervisor.ipaddress, storagepool_devicepath)     
             
-            if primary_mountpoint is not None:   
-                filelist = storagehelper.list_files(random_hypervisor.ipaddress, primary_mountpoint)
-            
-            if filelist is None:
+            if primary_mountpoint is None:
                 print "[DEBUG]: no physical volume list retrieved for " + storagepool.name + " skipping"
-                break;
-                           
-            # Start orphan table
+                continue   
+            else:
+                filelist = storagehelper.list_files(random_hypervisor.ipaddress, primary_mountpoint)
+
             t = PrettyTable(["Domain","Account","Name","Path","Allocated Size (GB)", "Real Size (GB)", "Orphaned"])   
             
             for orphan in orphans:
