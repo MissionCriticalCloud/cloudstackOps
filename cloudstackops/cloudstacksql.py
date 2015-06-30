@@ -134,7 +134,22 @@ class CloudStackSQL(CloudStackOpsBase):
             return 1
 
         cursor = self.conn.cursor()
-        cursor.execute("SELECT networks.name, \
+        cursor.execute("SELECT \
+        vpc.name, \
+        'n/a' AS 'mac_address', \
+        user_ip_address.public_ip_address, \
+        'n/a' AS 'netmask', \
+        'n/a' AS 'broadcast_uri', \
+        networks.mode, \
+        user_ip_address.state, \
+        user_ip_address.allocated as 'created', \
+        'n/a' AS 'vm_instance' \
+        FROM cloud.user_ip_address \
+        LEFT JOIN vpc ON user_ip_address.vpc_id = vpc.id \
+        LEFT JOIN networks ON user_ip_address.source_network_id = networks.id \
+        WHERE public_ip_address like '%" + ipaddress  + "%' \
+        UNION \
+        SELECT networks.name, \
         nics.mac_address, \
         nics.ip4_address, \
         nics.netmask, \
