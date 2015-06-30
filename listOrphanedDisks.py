@@ -142,7 +142,8 @@ if clusters is None:
 
 
 # get a list of storage pools for each cluster
-t_storagepool = PrettyTable(["Cluster", "Storage Pool", "Number of Orphaned disks", "Real Space used (GB)"])
+t_storagepool = PrettyTable(
+    ["Cluster", "Storage Pool", "Number of Orphaned disks", "Real Space used (GB)"])
 
 for cluster in clusters:
     storagepools = []
@@ -155,7 +156,6 @@ for cluster in clusters:
     if len(storagepools) > 0:
 
         storagehelper = StorageHelper(debug=DEBUG)
-
 
         for storagepool in storagepools:
             used_space = 0
@@ -175,31 +175,33 @@ for cluster in clusters:
             if primary_mountpoint is None:
                 print "[DEBUG]: no physical volume list retrieved for " + storagepool.name + " skipping"
                 storagepool_filelist = None
-            
+
             else:
-                storagepool_filelist = storagehelper.list_files(random_hypervisor.ipaddress, primary_mountpoint)
-              
-            
-            t = PrettyTable(["Domain", "Account", "Name", "Cluster","Storagepool","Path",
+                storagepool_filelist = storagehelper.list_files(
+                    random_hypervisor.ipaddress, primary_mountpoint)
+
+            t = PrettyTable(["Domain", "Account", "Name", "Cluster", "Storagepool", "Path",
                              "Allocated Size (GB)", "Real Size (GB)", "Orphaned"])
 
             for orphan in orphans:
                 isorphaned = ''
 
                 orphan_allocated_sizeGB = (orphan.size / math.pow(1024, 3))
-                
+
                 if storagepool_filelist is None:
                     orphan_real_sizeGB = 'n/a'
-                    isorphaned = '?'      
-                
+                    isorphaned = '?'
+
                 else:
-                    orphan_real_sizeGB = get_volume_filesize(orphan.path, storagepool_filelist)
-                    
+                    orphan_real_sizeGB = get_volume_filesize(
+                        orphan.path, storagepool_filelist)
+
                     if orphan_real_sizeGB is not None:
                         used_space += (orphan_real_sizeGB / 1024)
-                        orphan_real_sizeGB = format((orphan_real_sizeGB / 1024), '.2f')
+                        orphan_real_sizeGB = format(
+                            (orphan_real_sizeGB / 1024), '.2f')
                         isorphaned = 'Y'
-                    
+
                     else:
                         orphan_real_sizeGB = 0
                         isorphaned = 'N'
@@ -212,6 +214,6 @@ for cluster in clusters:
             print t.get_string()
             t_storagepool.add_row(
                 [cluster.name, storagepool.name, len(orphans), format(used_space, '.2f')])
-        
+
 print "Storagepool Totals"
 print t_storagepool.get_string()
