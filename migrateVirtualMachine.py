@@ -143,7 +143,7 @@ if toClusterID == 1 or toClusterID is None:
     sys.exit(1)
 
 # Select storage pool
-targetStorageID = c.getStoragePool(toClusterID)
+targetStorageID = c.getRandomStoragePool(toClusterID)
 targetStoragePoolData = c.getStoragePoolData(targetStorageID)
 storagepooltags = targetStoragePoolData[0].tags
 
