@@ -46,7 +46,7 @@ Next, have a look at the config parameters. Example config:
 # Config file for CloudStack Operations scripts
 
 [cloudstackOps]
-organization = The Iaas Team 
+organization = The Iaas Team
 
 [mail]
 smtpserver = localhost
@@ -325,7 +325,7 @@ For usage, run:
 `./clusterMaintenance.py --clustername cluster001 --allocationstate Disabled --exec`
 
 * To enable it again:
-`./clusterMaintenance.py --clustername cluster001 --allocationstate Enabled --exec` 
+`./clusterMaintenance.py --clustername cluster001 --allocationstate Enabled --exec`
 
 
 Rolling reboot of XenServer cluster
@@ -352,7 +352,7 @@ This script will:
   - Finally, it sets the specified cluster to Managed again in CloudStack
   - CloudStack will update its admin according to the new situation
 Then the reboot cyclus for the specified cluster is done!
- 
+
 To kick it off, run with the --exec flag.
 
 For usage, run:
@@ -484,11 +484,11 @@ Put a hypervisor in Maintenance mode
 ------------------------------------
 This script will put a XenServer hypervisor in maintenance mode and is also able to cancel it. It makes sure only one host is in maintenance at the same time.
 
-In theory, all you have to do is use the `prepareHostForMaintenance()` API call. In practice, we learned that this will sometimes fail with a resourcestate `ErrorInMaintenance` or simply gets stuck in `PreparForMaintenance` state. 
+In theory, all you have to do is use the `prepareHostForMaintenance()` API call. In practice, we learned that this will sometimes fail with a resourcestate `ErrorInMaintenance` or simply gets stuck in `PreparForMaintenance` state.
 
 Another issue we had was when CloudStack and XenServer would disagree on the available resources. That's why we came up with a different approach. We look for all vm's running, migrate the away using separate calls and finally put the host in maintenance. If that does not work, we call XAPI to migrate it anyway. Our goal is to automatically empty a hypervisor to do automated maintenance without user impact. We used it to automatically patch XenServers, including reboots without downtime for the user.
 
-In DRY-RUN mode, a similation will be done of a manual migration of all vm's. This allows you to spot problems before-hand. 
+In DRY-RUN mode, a similation will be done of a manual migration of all vm's. This allows you to spot problems before-hand.
 
 For usage, run:
 `./hypervisorMaintenance.py`
@@ -514,7 +514,7 @@ This script will *migrate* the specified router VM to another cluster in the sam
 
 Please note: There is *no supported* way in CloudStack to move routers around, other than live-migrating them between the same cluster. For live-migration between clusters to work, both clusters need access to both primary storages and that is not the case in our setup.
 
-Another way is to destroy the router, and when a new VM is started a new router will also be created. This wasn't the way we wanted it wo work, as it would cause too much down time and also a lot of trouble with capacity limits etc. 
+Another way is to destroy the router, and when a new VM is started a new router will also be created. This wasn't the way we wanted it wo work, as it would cause too much down time and also a lot of trouble with capacity limits etc.
 
 We needed this, because we wanted to move from old to new clusters. We came up with a new way:
 
@@ -546,7 +546,7 @@ To be sure it all works as expected a lot of checks are done:
 - If a redundant router's peer router is in FAULT state (and thus a fail-over would fail) the script will not do the migration
 - Make sure the current cluster is Disabled and any tags are removed
 - Make sure the destination cluster has the required host and storags tags as defined in the Service Offering
- 
+
 When you do not specify the destination cluster, a random cluster within the same zone will be selected, that has the required tags, is in state 'Enabled' and is not the same cluster as the router's peer.
 
 **Connecting to the database**
