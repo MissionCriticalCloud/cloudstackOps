@@ -328,6 +328,54 @@ For usage, run:
 `./clusterMaintenance.py --clustername cluster001 --allocationstate Enabled --exec` 
 
 
+Rolling reboot of XenServer cluster
+------------------------------------
+The purpose of this script is to reboot all hypervisors in a XenServer cluster (aka pool) without impacting the uptime of the VMs running on the cluster. This requires a N+1 situation, where one hypervisor can be empty (this is a wise configuration anyway). The script will start with the poolmaster, live migrate all VMs to other hypervisors and then reboot. When it comes back, one-by-one all other hypervisors will be rebooted and VMs are live migrated around.
+
+Using the --prepare flag, some pre-work is done: ejecting CDs, faking XenTools and pushing some scripts.
+
+The script requires the following PIP modules: Marvin, clint, fabric.
+
+Overview of what it does:
+
+This script will:
+  - Set the specified cluster to unmanage in CloudStack
+  - Turn OFF XenServer poolHA for the specified cluster
+  - For any hypervisor it will do this (poolmaster first):
+      - put it to Disabled aka Maintenance in XenServer
+      - live migrate all VMs off of it using XenServer evacuate command
+      - when empty, it will reboot the hypervisor
+      - will wait for it to come back online (checks SSH connection)
+      - set the hypervisor to Enabled in XenServer
+      - continues to the next hypervisor
+  - When the rebooting is done, it enables XenServer poolHA again for the specified cluster
+  - Finally, it sets the specified cluster to Managed again in CloudStack
+  - CloudStack will update its admin according to the new situation
+Then the reboot cyclus for the specified cluster is done!
+ 
+To kick it off, run with the --exec flag.
+
+For usage, run:
+`./xenserver_rolling_reboot.py`
+
+**Examples:**
+
+* To display the above help message for 'CLUSTER-1':
+  `./xenserver_rolling_reboot.py --clustername CLUSTER-1`
+
+* To prepare the rolling reboot for 'CLUSTER-1':
+  `./xenserver_rolling_reboot.py --clustername CLUSTER-1 --prepare`
+
+* To start the rolling reboot for 'CLUSTER-1':
+  `./xenserver_rolling_reboot.py --clustername CLUSTER-1 --exec`
+
+* To start the rolling reboot for 'CLUSTER-1' and use 6 threads (instead of the default 5):
+  `./xenserver_rolling_reboot.py --clustername CLUSTER-1 --threads 6 --exec`
+
+* To start the rolling reboot for 'CLUSTER-1' but skip the host called 'host1':
+  `./xenserver_rolling_reboot.py --clustername CLUSTER-1 --ignore-hosts host1 --exec`
+
+
 Display the CloudStack HA-Worker table
 --------------------------------------
 This script lists all entries in the HA-Worker table. This is useful when a hypervisor failed and you need to know the impact (to send out a notification e-mail to customers for example).
