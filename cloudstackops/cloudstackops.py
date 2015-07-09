@@ -1360,7 +1360,7 @@ class CloudStackOps(CloudStackOpsBase):
             if not poolmaster:
                 if self.DEBUG == 1:
                     print "Debug: Looking for poolmaster"
-                poolmaster = xenserver.get_poolmaster(clusterhost)
+                poolmaster = self.xenserver.get_poolmaster(clusterhost)
 
             # Poolmaster
             if clusterhost.name == poolmaster.strip():
