@@ -1390,6 +1390,8 @@ class CloudStackOps(CloudStackOpsBase):
             # Check bonds
             if checkBonds is True:
                 try:
+                    bondscripts = self.xenserver.put_scripts(
+                        clusterhost)
                     bondstatus = self.xenserver.get_bond_status(
                         clusterhost)
                 except:
