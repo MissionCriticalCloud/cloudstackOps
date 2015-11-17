@@ -80,7 +80,7 @@ class CloudStackOps(CloudStackOpsBase):
         self.xenserver = None
 
         self.printWelcome()
-        self.checkScreen()
+        self.checkScreenAlike()
 
         signal.signal(signal.SIGINT, self.catch_ctrl_C)
 
@@ -90,10 +90,29 @@ class CloudStackOps(CloudStackOpsBase):
     # Check if we run in a screen session
     def checkScreen(self):
         try:
-            if len(os.environ['STY']) > 0 and self.DEBUG == 1:
-                print "DEBUG: We're running in screen."
+            if len(os.environ['STY']) > 0:
+                if self.DEBUG == 1:
+                    print "DEBUG: We're running in screen."
+                return True
         except:
-            print colored.red("Warning: You are NOT running inside screen. Please start a screen session to keep commands running in case you get disconnected!")
+            return False
+
+    # Check if we run in a tmux session
+    def checkTmux(self):
+        try:
+            if len(os.environ['TMUX']) > 0:
+                if self.DEBUG == 1:
+                    print "DEBUG: We're running in tmux."
+                return True
+        except:
+            return False
+
+    def checkScreenAlike(self):
+        if self.checkScreen():
+            return True
+        if self.checkTmux():
+            return True
+        print colored.red("Warning: You are NOT running inside screen/tmux. Please start a screen/tmux session to keep commands running in case you get disconnected!")
 
     # Handle unwanted CTRL+C presses
     def catch_ctrl_C(self, sig, frame):
