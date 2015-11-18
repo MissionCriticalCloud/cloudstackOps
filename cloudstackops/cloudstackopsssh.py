@@ -86,7 +86,11 @@ class CloudStackOpsSSH(CloudStackOpsBase):
 
     # Get xapi vm count
     def getXapiVmCount(self, hostname):
-        remoteCmd = "xl list-vm | grep -v UUID | wc -l"
+        remoteCmd = "xe vm-list resident-on=$(xe host-list params=uuid \
+                     name-label=$HOSTNAME --minimal) \
+                     params=name-label,memory-static-max is-control-domain=false | \
+                     tr '\\n' ' ' | sed 's/name-label/\\n/g' | \
+                     awk {'print $4 \",\" $8'} | sed '/^,$/d'| wc -l"
         return self.runSSHCommand(hostname, remoteCmd)
 
     # Migrate vm via xapi

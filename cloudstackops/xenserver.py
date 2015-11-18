@@ -207,7 +207,11 @@ class xenserver():
     def host_get_vms(self, host):
         try:
             with settings(host_string=self.ssh_user + "@" + host.ipaddress):
-                return fab.run("xl list-vm | grep -v UUID | wc -l")
+                return fab.run("xe vm-list resident-on=$(xe host-list params=uuid \
+                name-label=$HOSTNAME --minimal) \
+                params=name-label,memory-static-max is-control-domain=false | \
+                tr '\\n' ' ' | sed 's/name-label/\\n/g' | \
+                awk {'print $4 \",\" $8'} | sed '/^,$/d'| wc -l")
         except:
             return False
 
