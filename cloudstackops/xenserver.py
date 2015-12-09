@@ -220,7 +220,7 @@ class xenserver():
         print "Note: Enabling HA"
         try:
             with settings(host_string=self.ssh_user + "@" + host.ipaddress):
-                if fab.run("cat /etc/redhat-release | awk '{ $3 = substr($3,1,3); print $3 }'") == "6.2"
+                if fab.run("cat /etc/redhat-release | awk '{ $3 = substr($3,1,3); print $3 }'") == "6.2":
                     return fab.run("xe pool-ha-enable heartbeat-sr-uuids=$(xe sr-list type=nfs params=uuid --minimal) ha-config:timeout=180 ha-config:ha-host-failures-to-tolerate=1")
                 else:
                     return fab.run("xe pool-ha-enable heartbeat-sr-uuids=$(xe sr-list type=nfs params=uuid --minimal) ha-config:timeout=180; xe pool-param-set uuid=$(xe pool-list params=uuid --minimal) ha-host-failures-to-tolerate=1")
