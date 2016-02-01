@@ -235,6 +235,7 @@ def printVirtualmachine(args):
 
             # Display names
             vmname = (vm.name[:20] + '..') if len(vm.name) >= 22 else vm.name
+            vmtemplatedisplaytext = (vm.templatedisplaytext[:40] + '..') if len(vm.templatedisplaytext) >= 42 else vm.templatedisplaytext
             vmmemory = str(memory) + " GB"
             vmstoragesize = str(storageSize) + " GB"
 
@@ -244,6 +245,7 @@ def printVirtualmachine(args):
                     t.add_row([
                         vmname,
                         vmstoragesize,
+                        vmtemplatedisplaytext,
                         '-',
                         vmmemory,
                         vm.cpunumber,
@@ -256,6 +258,7 @@ def printVirtualmachine(args):
                     t.add_row([
                         vmname,
                         vmstoragesize,
+                        vmtemplatedisplaytext,
                         '-',
                         vmmemory,
                         vm.cpunumber,
@@ -421,6 +424,7 @@ for clusterid, clustername in clusters.items():
     t = PrettyTable([
         "VM",
         "Storage",
+        "Template",
         "Router nic count",
         "Memory",
         "Cores",
@@ -580,6 +584,7 @@ for clusterid, clustername in clusters.items():
                         t.add_row([
                             displayname,
                             '-',
+                            '-',
                             vmniccount,
                             memoryDisplay,
                             serviceOfferingData[0].cpunumber,
@@ -591,6 +596,7 @@ for clusterid, clustername in clusters.items():
                     except:
                         t.add_row([
                             displayname,
+                            '-',
                             '-',
                             vmniccount,
                             memoryDisplay,
@@ -605,6 +611,7 @@ for clusterid, clustername in clusters.items():
                         t.add_row([
                             displayname,
                             '-',
+                            '-',
                             vmniccount,
                             memoryDisplay,
                             serviceOfferingData[0].cpunumber,
@@ -616,6 +623,7 @@ for clusterid, clustername in clusters.items():
                     except:
                         t.add_row([
                             displayname,
+                            '-',
                             '-',
                             vmniccount,
                             memoryDisplay,
