@@ -252,7 +252,8 @@ def printVirtualmachine(args):
                         vm.instancename,
                         vm.hostname,
                         vm.domain,
-                        "Proj: " + " " + str(vm.project)
+                        "Proj: " + " " + str(vm.project),
+                        vm.created
                     ])
                 else:
                     t.add_row([
@@ -265,7 +266,8 @@ def printVirtualmachine(args):
                         vm.instancename,
                         vm.hostname,
                         vm.domain,
-                        vm.account
+                        vm.account,
+                        vm.created
                     ])
                 sys.stdout.write(".")
                 sys.stdout.flush()
@@ -361,7 +363,8 @@ if nonAdminCredentials == 1:
         "Instance",
         "Host",
         "Domain",
-        "Account"
+        "Account",
+        "Created"
     ])
     t.align["VM"] = "l"
 
@@ -431,7 +434,8 @@ for clusterid, clustername in clusters.items():
         "Instance",
         "Host",
         "Domain",
-        "Account"
+        "Account",
+        "Created"
     ])
     t.align["VM"] = "l"
 
@@ -591,7 +595,8 @@ for clusterid, clustername in clusters.items():
                             vm.name,
                             vm.hostname,
                             vm.domain,
-                            "Proj: " + " " + vm.project
+                            "Proj: " + " " + vm.project,
+                            vm.created
                         ])
                     except:
                         t.add_row([
@@ -604,7 +609,8 @@ for clusterid, clustername in clusters.items():
                             vm.name,
                             vm.hostname,
                             vm.domain,
-                            "Proj: " + " " + vm.project
+                            "Proj: " + " " + vm.project,
+                            vm.created
                         ])
                 else:
                     try:
@@ -618,7 +624,8 @@ for clusterid, clustername in clusters.items():
                             vm.name,
                             vm.hostname,
                             vm.domain,
-                            vm.account
+                            vm.account,
+                            vm.created
                         ])
                     except:
                         t.add_row([
@@ -631,7 +638,8 @@ for clusterid, clustername in clusters.items():
                             vm.name,
                             vm.hostname,
                             vm.domain,
-                            vm.account
+                            vm.account,
+                            vm.created
                         ])
 
                 sys.stdout.write(".")
