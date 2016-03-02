@@ -1627,3 +1627,28 @@ class CloudStackOps(CloudStackOpsBase):
                             sys.stdout.flush()
                             return False
         return True
+
+    # list oscategories
+    def listOsCategories(self,args):
+      args = self.remove_empty_values(args)
+
+      apicall = listOsCategories.listOsCategoriesCmd()
+      apicall.id = (str(args['id'])) if 'id' in args and len(args['id']) >0 else None
+      apicall.name = (str(args['name'])) if 'name' in args and len(args['name']) >0 else None
+      apicall.keyword = (str(args['keyword'])) if 'keyword' in args and len(args['keyword']) >0 else None
+
+      # Call CloudStack API
+      return self._callAPI(apicall)
+
+    # list ostypes
+    def listOsTypes(self,args):
+      args = self.remove_empty_values(args)
+
+      apicall = listOsTypes.listOsTypesCmd()
+      apicall.id = (str(args['id'])) if 'id' in args and len(args['id']) >0 else None
+      apicall.oscategoryid = (str(args['oscategoryid'])) if 'oscategoryid' in args and len(args['oscategoryid']) >0 else None
+      apicall.keyword = (str(args['keyword'])) if 'keyword' in args and len(args['keyword']) >0 else None
+
+      # Call CloudStack API
+      return self._callAPI(apicall)
+
