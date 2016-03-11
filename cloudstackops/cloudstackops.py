@@ -482,6 +482,8 @@ class CloudStackOps(CloudStackOpsBase):
         apicall = listRouters.listRoutersCmd()
         apicall.networkid = (
             str(args['networkid'])) if 'networkid' in args else None
+        apicall.vpcid = (
+            str(args['vpcid'])) if 'vpcid' in args else None
         apicall.name = (str(args['name'])) if 'name' in args else None
         apicall.listAll = (args['listAll']) if 'listAll' in args else 'true'
         apicall.requiresupgrade = (
@@ -864,23 +866,62 @@ class CloudStackOps(CloudStackOpsBase):
         # Call CloudStack API
         return self._callAPI(apicall)
 
-    # list networks
-    def listNetworks(self, networkid):
+  # list networks (all or one)
+    def listNetworks(self, networkid = None):
         apicall = listNetworks.listNetworksCmd()
         apicall.id = networkid
         apicall.listAll = "true"
 
-        # Call CloudStack API
-        return self._callAPI(apicall)
+        # get default.page.size
+        result = self.getConfiguration("default.page.size")
+        apicall.pagesize = result[0].value
+
+        # Call API multiple times to get all volumes
+        page = 0
+        apicall.page = page
+
+        # As long as we receive useful output, keep going
+        networks = []
+        while result is not None:
+            page = page + 1
+            apicall.page = page
+            result = self._callAPI(apicall)
+            if result is not None:
+                if 'networks' in locals():
+                    networks = networks + result
+                else:
+                    networks = result
+
+        return networks
+
 
     # list vpcs
-    def listVPCs(self, vpcid):
+    def listVPCs(self, vpcid = None):
         apicall = listVPCs.listVPCsCmd()
         apicall.id = vpcid
         apicall.listAll = "true"
 
-        # Call CloudStack API
-        return self._callAPI(apicall)
+        # get default.page.size
+        result = self.getConfiguration("default.page.size")
+        apicall.pagesize = result[0].value
+
+        # Call API multiple times to get all volumes
+        page = 0
+        apicall.page = page
+
+        # As long as we receive useful output, keep going
+        vpcs = []
+        while result is not None:
+            page = page + 1
+            apicall.page = page
+            result = self._callAPI(apicall)
+            if result is not None:
+                if 'vpcs' in locals():
+                    vpcs = vpcs + result
+                else:
+                    vpcs = result
+
+        return vpcs
 
     # Translate id to name, because of CLOUDSTACK-6542
     def translateIntervalType(self, intervaltype):
@@ -1652,3 +1693,27 @@ class CloudStackOps(CloudStackOpsBase):
       # Call CloudStack API
       return self._callAPI(apicall)
 
+
+    # restart network
+    def restartNetwork(self, networkId, cleanup=False):
+        apicall = restartNetwork.restartNetworkCmd()
+        apicall.id = networkId
+        apicall.cleanup = cleanup
+        
+        if self.DRYRUN:
+            print "[INFO] Skipping restartNetwork(%s), dryrun is on." % (networkId)
+            return None
+        
+        return self._callAPI(apicall)
+
+    # restart network
+    def restartVPC(self, vpcId, cleanup=False):
+        apicall = restartVPC.restartVPCCmd()
+        apicall.id = vpcId
+        apicall.cleanup = cleanup
+        
+        if self.DRYRUN:
+            print "[INFO] Skipping restartVPC(%s), dryrun is on." % (vpcId)
+            return None
+         
+        return self._callAPI(apicall)
