@@ -137,14 +137,17 @@ if DEBUG == 1:
   print "ApiKey: " + c.apikey
   print "SecretKey: " + c.secretkey
 
-fromClusterHostsData = c.getHostsFromCluster(clusterID)
-if fromClusterHostsData == 1 or fromClusterHostsData == None:
+# Fetch the list of hosts in a cluster which are not marked dedicated aka shared:
+fromClusterHostsData = c.getSharedHostsFromCluster(clusterID)
+if fromClusterHostsData == [] or fromClusterHostsData == None:
   print
   sys.stdout.write("\033[F")
-  print "No (enabled) hosts found on cluster " + clustername
+  print "No (enabled or non-dedicated) hosts found on cluster " + clusterName
+  print "Nothing to work on, exiting."
+  exit (1)
 
 # Settings
-minInstances = 10
+minInstances = 7
 maxInstances = 25
 osFamilies = []
 osFamilies.append('Windows')

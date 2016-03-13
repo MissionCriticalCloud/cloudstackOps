@@ -433,6 +433,36 @@ class CloudStackOps(CloudStackOpsBase):
         # Call CloudStack API
         return self._callAPI(apicall)
 
+    # Find enabled hosts in a given cluster excluding it's hosts which have been marked dedicated
+    def getSharedHostsFromCluster(self, clusterID):
+        apicall = listHosts.listHostsCmd()
+        apicall.clusterid = str(clusterID)
+        apicall.resourcestate = "Enabled"
+        apicall.listAll = "true"
+
+        # Call CloudStack API
+        clusterhostdetails  =  self._callAPI(apicall)
+
+        # Remove dedicated hosts from the results
+        dedicatedhosts = self.getDedicatedHosts()
+        clusterhostdetails_orig = list(clusterhostdetails)
+        if dedicatedhosts:
+            for h in clusterhostdetails_orig:
+                for d in dedicatedhosts:
+                    if h.name == d.name:
+                        if self.DEBUG == 1:
+                            print "Remove dedicated host from the list: " + str(d.name)
+                        clusterhostdetails.remove(h)
+        return clusterhostdetails
+
+    # Find dedicated hosts
+    def getDedicatedHosts(self):
+        apicall = listDedicatedHosts.listDedicatedHostsCmd()
+        apicall.listAll = "true"
+
+        # Call CloudStack API
+        return self._callAPI(apicall)
+
     # Generic listVirtualMachines function
     def listVirtualmachines(self, args):
         args = self.remove_empty_values(args)
