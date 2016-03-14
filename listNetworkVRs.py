@@ -54,10 +54,12 @@ def handleArguments(argv):
         '\n  --config-profile -c <profilename>\t\tSpecify the CloudMonkey profile name to get the credentials from (or specify in ./config file)' + \
         '\n  --debug\t\t\t\t\tEnable debug mode' + \
         '\n  --restart -r\t\t\t\t\tRestarts network w/ cleanup=True' + \
-        '\n    --type <networkType> \t\t\tApplies filter to operation, Possible networkTypes: Isolated,Shared,VPC,Isolated' + \
-        '\n    --onlyNoRR \t\t\t\t\Selects only non-redudant VR networks' + \
-        '\n    --onlyRR \t\t\t\t\Selects only redudant VR networks' + \
-        '\n  --exec\t\t\t\t\tExecute for real (not needed for list* scripts), default: dry-run'
+        '\n  --exec\t\t\t\t\tExecute for real (not needed for list* scripts), default: dry-run' + \
+        '\n' + \
+        '\n  Filters:' + \
+        '\n  --type <networkType> \t\t\tApplies filter to operation, Possible networkTypes: Isolated,Shared,VPC,Isolated' + \
+        '\n  --onlyNoRR \t\t\t\t\tSelects only non-redudant VR networks' + \
+        '\n  --onlyRR \t\t\t\t\tSelects only redudant VR networks'
 
     try:
         opts, args = getopt.getopt(
@@ -138,7 +140,8 @@ def getListNetworks(filter=None, filterNoRR=None):
                 if netsvc.capability:
                     for cap in netsvc.capability:
                         if cap.name == 'RedundantRouter':
-                            rr_type = True
+                            if cap.value == 'true':
+                                rr_type = True
 
         routersData = c.getRouterData({'networkid': network.id})
         routers = []
@@ -147,7 +150,7 @@ def getListNetworks(filter=None, filterNoRR=None):
                 routers = routers + [ r.name ]
 
         if ( (filter in [None, network.type]) and (filterNoRR in [None, rr_type]) ):
-            results = results + [{ 'id': network.id, 'type': network.type, 'name': network.name, 'domain': network.domain, 'rr_type': rr_type, 'restartrequired': network.restartrequired, 'state': network.state, 'vrs': routers }]
+            results = results + [{ 'id': network.id, 'type': network.type, 'name': network.name, 'domain': network.domain, 'rr_type': rr_type, 'restartrequired': network.restartrequired, 'state': network.state, 'vrs': ','.join(routers) }]
 
     vpcData = routers = c.listVPCs()
     for vpc in vpcData:
@@ -162,7 +165,7 @@ def getListNetworks(filter=None, filterNoRR=None):
                 routers = routers + [ r.name ]
 
         if ( (filter in [None, 'VPC']) and (filterNoRR in [None, rr_type]) ):
-             results = results + [{ 'id': vpc.id, 'type': 'VPC', 'name': vpc.name, 'domain': vpc.domain, 'rr_type': rr_type, 'restartrequired': vpc.restartrequired, 'state': vpc.state, 'vrs': routers }]
+             results = results + [{ 'id': vpc.id, 'type': 'VPC', 'name': vpc.name, 'domain': vpc.domain, 'rr_type': rr_type, 'restartrequired': vpc.restartrequired, 'state': vpc.state, 'vrs': ','.join(routers) }]
 
     return results
 
