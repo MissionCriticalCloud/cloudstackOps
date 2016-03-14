@@ -50,6 +50,8 @@ def handleArguments(argv):
     opFilterNoRR = None
     global opFilterName
     opFilterName = None
+    global plainDisplay
+    plainDisplay = 0
 
     # Usage message
     help = "Usage: ./" + os.path.basename(__file__) + ' [options] ' + \
@@ -57,17 +59,18 @@ def handleArguments(argv):
         '\n  --debug\t\t\t\t\tEnable debug mode' + \
         '\n  --restart -r\t\t\t\t\tRestarts network w/ cleanup=True' + \
         '\n  --exec\t\t\t\t\tExecute for real (not needed for list* scripts), default: dry-run' + \
+        '\n  --plain-display\t\t\t\tEnable plain display, no pretty tables' + \
         '\n' + \
         '\n  Filters:' + \
-        '\n  --type <networkType> \t\t\tApplies filter to operation, Possible networkTypes: Isolated,Shared,VPC,Isolated' + \
+        '\n  --type <networkType> \t\t\t\tApplies filter to operation, Possible networkTypes: Isolated,Shared,VPC,Isolated' + \
         '\n  --onlyNoRR \t\t\t\t\tSelects only non-redudant VR networks' + \
         '\n  --onlyRR \t\t\t\t\tSelects only redudant VR networks' + \
-        '\n  --name -n <name> \t\t\t\t\tSelects only the specified asset (VPC/network)'
+        '\n  --name -n <name> \t\t\t\tSelects only the specified asset (VPC/network)'
 
     try:
         opts, args = getopt.getopt(
             argv, "hc:rn:", [
-                "config-profile=", "debug", "exec", "restart", "type=", "onlyNoRR", "onlyRR", "name"])
+                "config-profile=", "debug", "exec", "restart", "type=", "onlyNoRR", "onlyRR", "name", "plain-display"])
     except getopt.GetoptError as e:
         print "Error: " + str(e)
         print help
@@ -97,6 +100,8 @@ def handleArguments(argv):
             opFilterNoRR = True
         elif opt in ("--name", "-n"):
             opFilterName = arg
+        elif opt in ("--plain-display"):
+            plainDisplay = 1
 
     # Default to cloudmonkey default config file
     if len(configProfileName) == 0:
@@ -187,6 +192,11 @@ def cmdListNetworks():
     print
     t = PrettyTable(["#", "Network", "Type", "ID", "Domain", "State", "Redundant?", "RestartReq?", "VRs"])
     #t.align["VM"] = "l"
+    
+    if plainDisplay == 1:
+        t.border = False
+        t.header = False
+        t.padding_width = 1
 
     for n in networkData:
         counter = counter + 1
