@@ -48,6 +48,8 @@ def handleArguments(argv):
     opFilter = None
     global opFilterNoRR
     opFilterNoRR = None
+    global opFilterName
+    opFilterName = None
 
     # Usage message
     help = "Usage: ./" + os.path.basename(__file__) + ' [options] ' + \
@@ -59,12 +61,13 @@ def handleArguments(argv):
         '\n  Filters:' + \
         '\n  --type <networkType> \t\t\tApplies filter to operation, Possible networkTypes: Isolated,Shared,VPC,Isolated' + \
         '\n  --onlyNoRR \t\t\t\t\tSelects only non-redudant VR networks' + \
-        '\n  --onlyRR \t\t\t\t\tSelects only redudant VR networks'
+        '\n  --onlyRR \t\t\t\t\tSelects only redudant VR networks' + \
+        '\n  --name -n <name> \t\t\t\t\tSelects only the specified asset (VPC/network)'
 
     try:
         opts, args = getopt.getopt(
-            argv, "hc:r", [
-                "config-profile=", "debug", "exec", "restart", "type=", "onlyNoRR", "onlyRR"])
+            argv, "hc:rn:", [
+                "config-profile=", "debug", "exec", "restart", "type=", "onlyNoRR", "onlyRR", "name"])
     except getopt.GetoptError as e:
         print "Error: " + str(e)
         print help
@@ -92,6 +95,8 @@ def handleArguments(argv):
             opFilterNoRR = False
         elif opt in ("--onlyRR"):
             opFilterNoRR = True
+        elif opt in ("--name", "-n"):
+            opFilterName = arg
 
     # Default to cloudmonkey default config file
     if len(configProfileName) == 0:
@@ -127,7 +132,7 @@ if DEBUG == 1:
     print "SecretKey: " + c.secretkey
 
 
-def getListNetworks(filter=None, filterNoRR=None):
+def getListNetworks(filter=None, filterNoRR=None, assetName=None):
     results = []
     if DEBUG == 1:
         print '[d] getListNetworks() - networkType = %s, rrType = %s' % (opFilter, opFilterNoRR)
@@ -149,7 +154,7 @@ def getListNetworks(filter=None, filterNoRR=None):
             for r in routersData:
                 routers = routers + [ r.name ]
 
-        if ( (filter in [None, network.type]) and (filterNoRR in [None, rr_type]) ):
+        if ( (filter in [None, network.type]) and (filterNoRR in [None, rr_type]) and (assetName in [None, network.name]) ):
             results = results + [{ 'id': network.id, 'type': network.type, 'name': network.name, 'domain': network.domain, 'rr_type': rr_type, 'restartrequired': network.restartrequired, 'state': network.state, 'vrs': ','.join(routers) }]
 
     vpcData = routers = c.listVPCs()
@@ -164,14 +169,14 @@ def getListNetworks(filter=None, filterNoRR=None):
             for r in routersData:
                 routers = routers + [ r.name ]
 
-        if ( (filter in [None, 'VPC']) and (filterNoRR in [None, rr_type]) ):
+        if ( (filter in [None, 'VPC']) and (filterNoRR in [None, rr_type]) and (assetName in [None, vpc.name]) ):
              results = results + [{ 'id': vpc.id, 'type': 'VPC', 'name': vpc.name, 'domain': vpc.domain, 'rr_type': rr_type, 'restartrequired': vpc.restartrequired, 'state': vpc.state, 'vrs': ','.join(routers) }]
 
     return results
 
 
 def cmdListNetworks():
-    networkData = getListNetworks(opFilter, opFilterNoRR)
+    networkData = getListNetworks(opFilter, opFilterNoRR, opFilterName)
     counter = 0
 
 #    import pprint
@@ -192,7 +197,7 @@ def cmdListNetworks():
     print t
 
 def cmdRestartNetworks():
-    networkData = getListNetworks(opFilter, opFilterNoRR)
+    networkData = getListNetworks(opFilter, opFilterNoRR, opFilterName)
 
     print
     import pprint
