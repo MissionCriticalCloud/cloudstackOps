@@ -177,7 +177,10 @@ def getListNetworks(filter=None, filterNoRR=None, assetName=None):
         if ( (filter in [None, 'VPC']) and (filterNoRR in [None, rr_type]) and (assetName in [None, vpc.name]) ):
              results = results + [{ 'id': vpc.id, 'type': 'VPC', 'name': vpc.name, 'domain': vpc.domain, 'rr_type': rr_type, 'restartrequired': vpc.restartrequired, 'state': vpc.state, 'vrs': ','.join(routers) }]
 
-    return results
+    def getSortKey(item):
+        return item['name'].upper()
+    
+    return sorted(results, key=getSortKey)
 
 
 def cmdListNetworks():
