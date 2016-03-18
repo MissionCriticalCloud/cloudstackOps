@@ -46,6 +46,8 @@ def handleArguments(argv):
     command = 'list'
     global opFilter
     opFilter = None
+    global opFilterNot
+    opFilterNot = None
     global opFilterNoRR
     opFilterNoRR = None
     global opFilterName
@@ -62,7 +64,8 @@ def handleArguments(argv):
         '\n  --plain-display\t\t\t\tEnable plain display, no pretty tables' + \
         '\n' + \
         '\n  Filters:' + \
-        '\n  --type <networkType> \t\t\t\tApplies filter to operation, Possible networkTypes: Isolated,Shared,VPC,Isolated' + \
+        '\n  --type <networkType> \t\t\t\tApplies filter to operation, Possible networkTypes: Isolated,Shared,VPC,VPCTier' + \
+        '\n  --not-type <networkType> \t\t\t\tApplies reverse filter to operation, Same network types as for --type' + \
         '\n  --onlyNoRR \t\t\t\t\tSelects only non-redudant VR networks' + \
         '\n  --onlyRR \t\t\t\t\tSelects only redudant VR networks' + \
         '\n  --name -n <name> \t\t\t\tSelects only the specified asset (VPC/network)'
@@ -70,7 +73,7 @@ def handleArguments(argv):
     try:
         opts, args = getopt.getopt(
             argv, "hc:rn:", [
-                "config-profile=", "debug", "exec", "restart", "type=", "onlyNoRR", "onlyRR", "name", "plain-display"])
+                "config-profile=", "debug", "exec", "restart", "type=", "not-type=", "onlyNoRR", "onlyRR", "name", "plain-display"])
     except getopt.GetoptError as e:
         print "Error: " + str(e)
         print help
@@ -94,6 +97,8 @@ def handleArguments(argv):
             command = 'restartcleanup'
         elif opt in ("--type"):
             opFilter = arg
+        elif opt in ("--not-type"):
+            opFilterNot = arg
         elif opt in ("--onlyNoRR"):
             opFilterNoRR = False
         elif opt in ("--onlyRR"):
@@ -107,7 +112,8 @@ def handleArguments(argv):
     if len(configProfileName) == 0:
         configProfileName = "config"
 
-    if opFilter != '' and opFilter not in [None, 'Isolated','Shared', 'VPC']:
+    allowed_network_types = [None, 'Isolated','Shared', 'VPC', 'VPCTier']
+    if opFilter != '' and opFilter not in allowed_network_types and opFilterNot not in allowed_network_types:
         print "ERROR: Invalid filter: %s" % opFilter
         sys.exit(3)
 
@@ -137,7 +143,7 @@ if DEBUG == 1:
     print "SecretKey: " + c.secretkey
 
 
-def getListNetworks(filter=None, filterNoRR=None, assetName=None):
+def getListNetworks(filter=None, filterNot=None, filterNoRR=None, assetName=None):
     results = []
     if DEBUG == 1:
         print '[d] getListNetworks() - networkType = %s, rrType = %s' % (opFilter, opFilterNoRR)
@@ -145,6 +151,7 @@ def getListNetworks(filter=None, filterNoRR=None, assetName=None):
     networkData = c.listNetworks()
     for network in networkData:
         rr_type = False
+        net_type = network.type
         if network.service:
             for netsvc in network.service:
                 if netsvc.capability:
@@ -152,6 +159,8 @@ def getListNetworks(filter=None, filterNoRR=None, assetName=None):
                         if cap.name == 'RedundantRouter':
                             if cap.value == 'true':
                                 rr_type = True
+        if network.vpcid:
+            net_type = 'VPCTier'
 
         routersData = c.getRouterData({'networkid': network.id})
         routers = []
@@ -159,8 +168,8 @@ def getListNetworks(filter=None, filterNoRR=None, assetName=None):
             for r in routersData:
                 routers = routers + [ r.name ]
 
-        if ( (filter in [None, network.type]) and (filterNoRR in [None, rr_type]) and (assetName in [None, network.name]) ):
-            results = results + [{ 'id': network.id, 'type': network.type, 'name': network.name, 'domain': network.domain, 'rr_type': rr_type, 'restartrequired': network.restartrequired, 'state': network.state, 'vrs': ','.join(routers) }]
+        if ( (filter in [None, net_type]) and (filterNot not in [net_type]) and (filterNoRR in [None, rr_type]) and (assetName in [None, network.name]) ):
+            results = results + [{ 'id': network.id, 'type': net_type, 'name': network.name, 'domain': network.domain, 'rr_type': rr_type, 'restartrequired': network.restartrequired, 'state': network.state, 'vrs': ','.join(routers) }]
 
     vpcData = routers = c.listVPCs()
     for vpc in vpcData:
@@ -174,7 +183,7 @@ def getListNetworks(filter=None, filterNoRR=None, assetName=None):
             for r in routersData:
                 routers = routers + [ r.name ]
 
-        if ( (filter in [None, 'VPC']) and (filterNoRR in [None, rr_type]) and (assetName in [None, vpc.name]) ):
+        if ( (filter in [None, 'VPC']) and (filterNot not in ['VPC']) and (filterNoRR in [None, rr_type]) and (assetName in [None, vpc.name]) ):
              results = results + [{ 'id': vpc.id, 'type': 'VPC', 'name': vpc.name, 'domain': vpc.domain, 'rr_type': rr_type, 'restartrequired': vpc.restartrequired, 'state': vpc.state, 'vrs': ','.join(routers) }]
 
     def getSortKey(item):
@@ -184,7 +193,7 @@ def getListNetworks(filter=None, filterNoRR=None, assetName=None):
 
 
 def cmdListNetworks():
-    networkData = getListNetworks(opFilter, opFilterNoRR, opFilterName)
+    networkData = getListNetworks(opFilter, opFilterNot, opFilterNoRR, opFilterName)
     counter = 0
 
 #    import pprint
@@ -210,7 +219,7 @@ def cmdListNetworks():
     print t
 
 def cmdRestartNetworks():
-    networkData = getListNetworks(opFilter, opFilterNoRR, opFilterName)
+    networkData = getListNetworks(opFilter, opFilterNot, opFilterNoRR, opFilterName)
 
     print
     import pprint
