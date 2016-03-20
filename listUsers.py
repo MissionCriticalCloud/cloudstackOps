@@ -187,7 +187,7 @@ def getListUsers(filters):
                 pp.pprint(user);
         
             #if ( (filters in [None, net_type]) and (filterNot not in [net_type]) and (filterNoRR in [None, rr_type]) and (assetName in [None, network.name]) and (domainName in [None, network.domain]) ):
-            results = results + [{ 'id': user.id, 'username': user.username, 'firstname': user.firstname, 'lastname': user.lastname, 'state': user.state, 'domain': user.domain }]
+            results = results + [{ 'id': user.id, 'username': user.username, 'firstname': user.firstname, 'lastname': user.lastname, 'state': user.state, 'domain': user.domain, 'account': user.account, 'accounttype': user.accounttype }]
 
     def getSortKey(item):
         return item['username'].upper()
@@ -201,7 +201,7 @@ def cmdListUsers():
 
     # Empty line
     print
-    t = PrettyTable(["#", "Domain", "Username", "Id", "Name1", "Name2", "State"])
+    t = PrettyTable(["#", "Domain", "Account", "Type", "Username", "Id", "First", "Last", "State"])
     #t.align["VM"] = "l"
     
     if plainDisplay == 1:
@@ -212,7 +212,7 @@ def cmdListUsers():
     if userData:
         for u in userData:
             counter = counter + 1
-            t.add_row([counter, u['domain'], u['username'], u['id'], u['firstname'], u['lastname'], u['state']])
+            t.add_row([counter, u['domain'], u['account'], u['accounttype'], u['username'], u['id'], u['firstname'], u['lastname'], u['state']])
 
     # Display table
     print t
