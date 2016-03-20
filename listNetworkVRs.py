@@ -52,6 +52,8 @@ def handleArguments(argv):
     opFilterNoRR = None
     global opFilterName
     opFilterName = None
+    global opFilterDomain
+    opFilterDomain = None
     global plainDisplay
     plainDisplay = 0
 
@@ -68,12 +70,13 @@ def handleArguments(argv):
         '\n  --not-type <networkType> \t\t\t\tApplies reverse filter to operation, Same network types as for --type' + \
         '\n  --onlyNoRR \t\t\t\t\tSelects only non-redudant VR networks' + \
         '\n  --onlyRR \t\t\t\t\tSelects only redudant VR networks' + \
-        '\n  --name -n <name> \t\t\t\tSelects only the specified asset (VPC/network)'
+        '\n  --name -n <name> \t\t\t\tSelects only the specified asset (VPC/network)' + \
+        '\n  --domain -d <name> \t\t\t\tSelects only networks from specified domain name'
 
     try:
         opts, args = getopt.getopt(
-            argv, "hc:rn:", [
-                "config-profile=", "debug", "exec", "restart", "type=", "not-type=", "onlyNoRR", "onlyRR", "name", "plain-display"])
+            argv, "hc:rn:d:", [
+                "config-profile=", "debug", "exec", "restart", "type=", "not-type=", "onlyNoRR", "onlyRR", "name=", "plain-display", "domain="])
     except getopt.GetoptError as e:
         print "Error: " + str(e)
         print help
@@ -89,6 +92,8 @@ def handleArguments(argv):
             sys.exit()
         elif opt in ("-c", "--config-profile"):
             configProfileName = arg
+        elif opt in ("--domain", "-d"):
+            opFilterDomain = arg
         elif opt in ("--debug"):
             DEBUG = 1
         elif opt in ("--exec"):
@@ -97,14 +102,14 @@ def handleArguments(argv):
             command = 'restartcleanup'
         elif opt in ("--type"):
             opFilter = arg
+        elif opt in ("-n", "--name"):
+            opFilterName = arg
         elif opt in ("--not-type"):
             opFilterNot = arg
         elif opt in ("--onlyNoRR"):
             opFilterNoRR = False
         elif opt in ("--onlyRR"):
             opFilterNoRR = True
-        elif opt in ("--name", "-n"):
-            opFilterName = arg
         elif opt in ("--plain-display"):
             plainDisplay = 1
 
@@ -117,6 +122,8 @@ def handleArguments(argv):
         print "ERROR: Invalid filter: %s" % opFilter
         sys.exit(3)
 
+    if DEBUG==1:
+        print '[d-d] filter=%s, filterNot=%s, filterNoRR=%s, filterName=%s, filterDomain=%s' % (opFilter, opFilterNot, opFilterNoRR, opFilterName, opFilterDomain) 
 
 # Parse arguments
 if __name__ == "__main__":
@@ -143,15 +150,26 @@ if DEBUG == 1:
     print "SecretKey: " + c.secretkey
 
 
-def getListNetworks(filter=None, filterNot=None, filterNoRR=None, assetName=None):
+def getListNetworks(filter=None, filterNot=None, filterNoRR=None, assetName=None, domainName=None):
+    cacheNetOffs = {}
     results = []
     if DEBUG == 1:
         print '[d] getListNetworks() - networkType = %s, rrType = %s' % (opFilter, opFilterNoRR)
+        print '[d] getListNetworks() - filter=%s, filterNot=%s, filterNoRR=%s, filterName=%s, filterDomain=%s' % (filter, filterNot, filterNoRR, assetName, domainName)
 
-    networkData = c.listNetworks()
+    domainId = None
+    if domainName:
+        domainIdr = c.listDomainsExt({'name': domainName})
+        if domainIdr[0]:
+            domainId = domainIdr[0].id
+        if DEBUG==1:
+            print '[d] resolved: domainName=%s, domainId=%s' % (domainName, domainId)
+    
+    networkData = c.listNetworks({'name': assetName, 'domainid': domainId})
     for network in networkData:
         rr_type = False
         net_type = network.type
+
         if network.service:
             for netsvc in network.service:
                 if netsvc.capability:
@@ -168,10 +186,35 @@ def getListNetworks(filter=None, filterNot=None, filterNoRR=None, assetName=None
             for r in routersData:
                 routers = routers + [ r.name ]
 
-        if ( (filter in [None, net_type]) and (filterNot not in [net_type]) and (filterNoRR in [None, rr_type]) and (assetName in [None, network.name]) ):
+        # BEGIN:NetworkCapabilitiesFIX
+        # Due to a bug in CS (at least up to 4.7.1), a network is shown as 
+        # redundant while deriving from a non-redundant network offering
+        # Therefore, we're safer by checking the redundancy against the service offering :(
+        # - a lot more roundtrips... that's why we try to minimize them by means of cacheNetOffs
+        if network.networkofferingid in cacheNetOffs.keys():
+            if DEBUG==1:
+                print '[d] Using from cache: cacheNetOffs[%s] ...' % (network.networkofferingid)
+            rr_type = cacheNetOffs[network.networkofferingid]
+        else:
+            cacheNetOffs[network.networkofferingid] = False
+            no = c.listNetworkOfferings(network.networkofferingid)
+            for no_this in no:
+                if no_this.service:
+                    for svc in no_this.service:
+                        if svc.name == 'SourceNat':
+                            for cap in svc.capability:
+                                if cap.name and cap.name == 'RedundantRouter':
+                                    print "PARSING: no=%s, rr_type=%s" % (no_this.name, cap.value.lower())
+                                    cacheNetOffs[no_this.name] = cap.value.lower() in ("true")
+                                    rr_type = cacheNetOffs[no_this.name]
+                                    if DEBUG == 1:
+                                        print "[d] adding to cacheNetOffs: %s = %s" % (network.networkofferingid, cap.value)
+        # END:NetworkCapabilitiesFIX
+        
+        if ( (filter in [None, net_type]) and (filterNot not in [net_type]) and (filterNoRR in [None, rr_type]) and (assetName in [None, network.name]) and (domainName in [None, network.domain]) ):
             results = results + [{ 'id': network.id, 'type': net_type, 'name': network.name, 'domain': network.domain, 'rr_type': rr_type, 'restartrequired': network.restartrequired, 'state': network.state, 'vrs': ','.join(routers) }]
 
-    vpcData = routers = c.listVPCs()
+    vpcData = c.listVPCs({'name': assetName, 'domainid': domainId})
     for vpc in vpcData:
         rr_type = False
         if vpc.redundantvpcrouter:
@@ -183,7 +226,7 @@ def getListNetworks(filter=None, filterNot=None, filterNoRR=None, assetName=None
             for r in routersData:
                 routers = routers + [ r.name ]
 
-        if ( (filter in [None, 'VPC']) and (filterNot not in ['VPC']) and (filterNoRR in [None, rr_type]) and (assetName in [None, vpc.name]) ):
+        if ( (filter in [None, 'VPC']) and (filterNot not in ['VPC']) and (filterNoRR in [None, rr_type]) and (assetName in [None, vpc.name]) and (domainName in [None, vpc.domain]) ):
              results = results + [{ 'id': vpc.id, 'type': 'VPC', 'name': vpc.name, 'domain': vpc.domain, 'rr_type': rr_type, 'restartrequired': vpc.restartrequired, 'state': vpc.state, 'vrs': ','.join(routers) }]
 
     def getSortKey(item):
@@ -193,7 +236,7 @@ def getListNetworks(filter=None, filterNot=None, filterNoRR=None, assetName=None
 
 
 def cmdListNetworks():
-    networkData = getListNetworks(opFilter, opFilterNot, opFilterNoRR, opFilterName)
+    networkData = getListNetworks(opFilter, opFilterNot, opFilterNoRR, opFilterName, opFilterDomain)
     counter = 0
 
 #    import pprint
@@ -219,7 +262,7 @@ def cmdListNetworks():
     print t
 
 def cmdRestartNetworks():
-    networkData = getListNetworks(opFilter, opFilterNot, opFilterNoRR, opFilterName)
+    networkData = getListNetworks(opFilter, opFilterNot, opFilterNoRR, opFilterName, opFilterDomain)
 
     print
     import pprint

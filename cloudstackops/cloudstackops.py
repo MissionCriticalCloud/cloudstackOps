@@ -866,10 +866,23 @@ class CloudStackOps(CloudStackOpsBase):
         # Call CloudStack API
         return self._callAPI(apicall)
 
+
+    def listDomainsExt(self, args = None):
+        apicall = listDomains.listDomainsCmd()
+        apicall.listAll = "true"
+        apicall.state = "Enabled"
+        apicall.id = args['id'] if 'id' in args else None
+        apicall.name = args['name'] if 'name' in args else None
+
+        # Call CloudStack API
+        return self._callAPI(apicall)
+
   # list networks (all or one)
-    def listNetworks(self, networkid = None):
+    def listNetworks(self, args = None):
         apicall = listNetworks.listNetworksCmd()
-        apicall.id = networkid
+        apicall.id = args['id'] if 'id' in args else None
+        apicall.name = args['name'] if 'name' in args else None
+        apicall.domainid = args['domainid'] if 'domainid' in args else None
         apicall.listAll = "true"
 
         # get default.page.size
@@ -894,11 +907,41 @@ class CloudStackOps(CloudStackOpsBase):
 
         return networks
 
+  # list networkOfferings (all or one)
+    def listNetworkOfferings(self, id = None):
+        apicall = listNetworkOfferings.listNetworkOfferingsCmd()
+        apicall.id = id
+        apicall.listAll = "true"
+
+        # get default.page.size
+        result = self.getConfiguration("default.page.size")
+        apicall.pagesize = result[0].value
+
+        # Call API multiple times to get all volumes
+        page = 0
+        apicall.page = page
+
+        # As long as we receive useful output, keep going
+        networkofferings = []
+        while result is not None:
+            page = page + 1
+            apicall.page = page
+            result = self._callAPI(apicall)
+            if result is not None:
+                if 'networkofferings' in locals():
+                    networkofferings = networkofferings + result
+                else:
+                    networkofferings = result
+
+        return networkofferings
+
 
     # list vpcs
-    def listVPCs(self, vpcid = None):
+    def listVPCs(self, args = None):
         apicall = listVPCs.listVPCsCmd()
-        apicall.id = vpcid
+        apicall.id = args['id'] if 'id' in args else None
+        apicall.name = args['name'] if 'name' in args else None
+        apicall.domainid = args['domainid'] if 'domainid' in args else None
         apicall.listAll = "true"
 
         # get default.page.size
