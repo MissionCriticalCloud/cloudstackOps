@@ -186,7 +186,6 @@ def getListUsers(filters):
                 pp = pprint.PrettyPrinter(indent=4)
                 pp.pprint(user);
         
-            #if ( (filters in [None, net_type]) and (filterNot not in [net_type]) and (filterNoRR in [None, rr_type]) and (assetName in [None, network.name]) and (domainName in [None, network.domain]) ):
             results = results + [{ 'id': user.id, 'username': user.username, 'firstname': user.firstname, 'lastname': user.lastname, 'state': user.state, 'domain': user.domain, 'account': user.account, 'accounttype': user.accounttype }]
 
     def getSortKey(item):
