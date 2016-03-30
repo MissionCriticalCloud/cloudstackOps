@@ -204,8 +204,8 @@ def getListNetworks(filter=None, filterNot=None, filterNoRR=None, assetName=None
                         if svc.name == 'SourceNat':
                             for cap in svc.capability:
                                 if cap.name and cap.name == 'RedundantRouter':
-                                    cacheNetOffs[no_this.name] = cap.value.lower() in ("true")
-                                    rr_type = cacheNetOffs[no_this.name]
+                                    cacheNetOffs[no_this.id] = cap.value.lower() in ("true")
+                                    rr_type = cacheNetOffs[no_this.id]
                                     if DEBUG == 1:
                                         print "[d] adding to cacheNetOffs: %s = %s" % (network.networkofferingid, cap.value)
         # END:NetworkCapabilitiesFIX
