@@ -26,6 +26,7 @@ import time
 import sys
 import getopt
 from cloudstackops import cloudstackops
+from cloudstackops import cloudstackopsssh
 import os.path
 from random import choice
 from prettytable import PrettyTable
@@ -56,6 +57,9 @@ def handleArguments(argv):
     opFilterHosts = False
     global opFilterAll
     opFilterAll = False
+    global PLATFORM
+    PLATFORM = None
+    global MGMT_SERVER
 
     # Usage message
     help = "Usage: ./" + os.path.basename(__file__) + ' [options] ' + \
@@ -89,8 +93,9 @@ def handleArguments(argv):
             sys.exit()
         elif opt in ("-c", "--config-profile"):
             configProfileName = arg
+            PLATFORM = configProfileName
         elif opt in ("--debug"):
-            DEBUG = 1
+            DEBUG = 2
         #elif opt in ("--exec"):
         #    DRYRUN = 0
         elif opt in ("--plain-display"):
@@ -106,6 +111,8 @@ def handleArguments(argv):
         elif opt in ("--all"):
             opFilterAll = True
 
+    MGMT_SERVER = "mgt01." + PLATFORM
+
     # Default to cloudmonkey default config file
     if len(configProfileName) == 0:
         configProfileName = "config"
@@ -116,8 +123,10 @@ if __name__ == "__main__":
 
 # Init our class
 c = cloudstackops.CloudStackOps(DEBUG, DRYRUN)
+ssh = cloudstackopsssh.CloudStackOpsSSH(DEBUG, DRYRUN)
+c.ssh = ssh
 
-if DEBUG == 1:
+if DEBUG > 0:
     print "# Warning: Debug mode is enabled!"
 
 if DRYRUN == 1:
@@ -137,36 +146,94 @@ if DEBUG == 1:
 
 
 def getAdvisoriesHosts():
-    if DEBUG == 1:
+    if DEBUG > 0:
         print "getAdvisoriesHosts : begin"
     results = []
-    if DEBUG == 1:
+    if DEBUG > 0:
         print "getAdvisoriesHosts : end"
     return results
 
 def getAdvisoriesInstances():
-    if DEBUG == 1:
+    if DEBUG > 0:
         print "getAdvisoriesInstances : begin"
     results = []
-    if DEBUG == 1:
+    if DEBUG > 0:
         print "getAdvisoriesInstances : end"
     return results
 
-def getAdvisoriesNetworks():
-    if DEBUG == 1:
+def getAdvisoriesNetworks(alarmedRoutersCache):
+    if DEBUG > 0:
         print "getAdvisoriesNetworks/Routers : begin"
     results = []
 
     # This method will analyse the network and return an advisory
-    def examineNetwork(network):
+    def examineNetwork(network, advRouters):
         if network.restartrequired:
             if network.rr_type:
                 return {'action': 'restart', 'safetylevel': 'Best', 'comment': 'Restart flag on, redundancy present'}
             else:
                 return {'action': 'restart', 'safetylevel': 'Downtime', 'comment': 'Restart flag on, no redundancy'}
+        if len(advRouters)>0:
+            rnames = [];
+            for r in advRouters:
+                rnames = rnames + [ r['name'] ];
+            if network.rr_type:
+                return {'action': 'restart', 'safetylevel': 'Best', 'comment': 'Network tainted, problems found with router(s): ' + ','.join(rnames)}
+            else:
+                return {'action': 'restart', 'safetylevel': 'Downtime', 'comment': 'Network tainted, problems found with router(s): '+ ','.join(rnames)}
+            
         return {'action': None, 'safetylevel': None, 'comment': None}
 
-    def examineRouter(network, router):
+    # Use this when you want to inspect routers real-time
+    # Note: Development was dropped in favor of examineRouterInternalsQuick()
+    # TODO we should provide a --deep switch
+    def examineRouterInternalsDeep(router):
+        if DEBUG > 0:
+            print "   + router: name: %s, ip=%s, host=%s, tpl=%s" % (router.name, router.linklocalip, router.hostname, router.templateversion)
+
+        #mgtSsh = "ssh -At %s ssh -At -p 3922 -i /root/.ssh/id_rsa.cloud -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no root@%s ls -la" % (router.hostname, router.linklocalip)
+        mgtSsh = "/usr/local/bin/check_routervms.py " + router.name
+        retcode, output = c.ssh.runSSHCommand(MGMT_SERVER, mgtSsh)
+        print "       + retcode=%d" % (retcode)
+        return retcode, output
+
+    def examineRouterInternalsQuick(alarmedRoutersCache, router):
+        if DEBUG > 0:
+            print "   + router: name: %s, ip=%s, host=%s, tpl=%s" % (router.name, router.linklocalip, router.hostname, router.templateversion)
+
+        if router.name in alarmedRoutersCache.keys():
+            if not alarmedRoutersCache[router.name]['checked']:
+                alarmedRoutersCache[router.name]['checked'] = True
+                return alarmedRoutersCache[router.name]['code'], "check_routervms returned errors"
+
+        return 0, None
+        
+    def resolveRouterErrorCode(errorCode):
+        str = []
+        errorCode = int(errorCode)
+        if errorCode & 1:
+            str = str + [ 'dmesg' ]
+        if errorCode & 2:
+            str = str + [ 'swap' ]
+        if errorCode & 4:
+            str = str + [ 'resolver' ]
+        if errorCode & 9:
+            str = str + [ 'ping' ]
+        if errorCode & 16:
+            str = str + [ 'filesystem' ]
+        if errorCode & 32:
+            str = str + [ 'disk' ]
+        return ",".join(str)
+        if errorCode & 64:
+            str = str + [ 'password' ]
+        return ",".join(str)
+        if errorCode & 128:
+            str = str + [ 'reserved' ]
+        return ",".join(str)
+                
+            
+
+    def examineRouter(alarmedRoutersCache, network, router):
         if router.isredundantrouter and (router.redundantstate not in ['MASTER', 'BACKUP']):
             if network.rr_type:
                 return {'action': 'restart', 'safetylevel': 'Best', 'comment': 'Redundancy state broken, redundancy present'}
@@ -174,13 +241,20 @@ def getAdvisoriesNetworks():
                 return {'action': 'restart', 'safetylevel': 'Downtime', 'comment': 'Redundancy state broken, no redundancy'}
         
         # We should now try to assess the router internal status (with SSH)
+        #retcode, output = examineRouterInternals(router)
         
+        retcode, output = examineRouterInternalsQuick(alarmedRoutersCache, router)
+        if retcode == 32:
+            return {'action': 'log-cleanup', 'safetylevel': 'Best', 'comment': output + ": " + str(retcode) + " (" + resolveRouterErrorCode(retcode) + ")" }
+        if retcode != 0:
+            return {'action': 'unknown', 'safetylevel': 'Unknown', 'comment': output + ": " + str(retcode) + " (" + resolveRouterErrorCode(retcode) + ")" }
+
         return {'action': None, 'safetylevel': None, 'comment': None}
 
     networkData = c.listNetworks({})
     for network in networkData:
-        if DEBUG == 1:
-            print "net.name " + network.name
+        if DEBUG > 0:
+            print " + Processing: network.name = %s (%s)" % (network.name, network.state)
         network.rr_type = False
         net_type = network.type
 
@@ -194,51 +268,81 @@ def getAdvisoriesNetworks():
         if network.vpcid:
             net_type = 'VPCTier'
 
+        advRouters = []
         if opFilterRouters:
             routersData = c.getRouterData({'networkid': network.id})
-            routers = []
             if routersData:
                 for r in routersData:
-                    diag = examineRouter(network, r)
+                    diag = examineRouter(alarmedRoutersCache, network, r)
                     if ( opFilterAll or (diag['action'] != None) ):
-                        results = results + [{ 'id': r.id, 'name': r.name, 'domain': network.domain, 'asset_type': 'router', 'adv_action': diag['action'], 'adv_safetylevel': diag['safetylevel'], 'adv_comment': diag['comment'] }]                
+                        advRouters = advRouters + [{ 'id': r.id, 'name': r.name, 'domain': network.domain, 'asset_type': 'router', 'adv_action': diag['action'], 'adv_safetylevel': diag['safetylevel'], 'adv_comment': diag['comment'] }]
+                        results = results + [{ 'id': r.id, 'name': r.name, 'domain': network.domain, 'asset_type': 'router', 'adv_action': diag['action'], 'adv_safetylevel': diag['safetylevel'], 'adv_comment': diag['comment'] }]
 
-        diag = examineNetwork(network)
+        
+        diag = examineNetwork(network, advRouters)
         if ( opFilterAll or (opFilterNetworks and (diag['action'] != None)) ):
             results = results + [{ 'id': network.id, 'type': net_type, 'name': network.name, 'domain': network.domain, 'rr_type': network.rr_type, 'restartrequired': network.restartrequired, 'state': network.state, 'asset_type': 'network', 'adv_action': diag['action'], 'adv_safetylevel': diag['safetylevel'], 'adv_comment': diag['comment'] }]
 
     vpcData = c.listVPCs({})
     for vpc in vpcData:
-        if DEBUG == 1:
-            print "vpc.name " + network.name
+        if DEBUG > 0:
+            print " + Processing: vpc.name = %s (%s)" % (vpc.name, vpc.state)
         vpc.rr_type = False
         if vpc.redundantvpcrouter:
             vpc.rr_type = vpc.redundantvpcrouter
 
+        advRouters = []
         if opFilterRouters:
             routersData = c.getRouterData({'vpcid': vpc.id})
-            routers = []
             if routersData:
                 for r in routersData:
-                    diag = examineRouter(vpc, r)
+                    diag = examineRouter(alarmedRoutersCache, vpc, r)
                     if ( opFilterAll or (diag['action'] != None) ):
-                        results = results + [{ 'id': r.id, 'name': r.name, 'domain': network.domain, 'asset_type': 'router', 'adv_action': diag['action'], 'adv_safetylevel': diag['safetylevel'], 'adv_comment': diag['comment'] }]                
+                        advRouters = advRouters + [{ 'id': r.id, 'name': r.name, 'domain': vpc.domain, 'asset_type': 'router', 'adv_action': diag['action'], 'adv_safetylevel': diag['safetylevel'], 'adv_comment': diag['comment'] }]
+                        results = results + [{ 'id': r.id, 'name': r.name, 'domain': vpc.domain, 'asset_type': 'router', 'adv_action': diag['action'], 'adv_safetylevel': diag['safetylevel'], 'adv_comment': diag['comment'] }]
 
 
-        diag = examineNetwork(vpc)
+        diag = examineNetwork(vpc, advRouters)
         if ( opFilterAll or (opFilterNetworks and (diag['action'] != None)) ):
             results = results + [{ 'id': vpc.id, 'type': 'VPC', 'name': vpc.name, 'domain': vpc.domain, 'rr_type': vpc.rr_type, 'restartrequired': vpc.restartrequired, 'state': vpc.state, 'asset_type': 'vpc', 'adv_action': diag['action'], 'adv_safetylevel': diag['safetylevel'], 'adv_comment': diag['comment'] }]
     
-    if DEBUG == 1:
+    if DEBUG > 0:
         print "getAdvisoriesNetworks/Routers : end"
 
     return results
 
 
 def cmdListAdvisories():
+    def retrieveAlarmedRoutersCache():
+        print "+ Testing SSH to '%s'" % (MGMT_SERVER)
+        retcode, output = c.ssh.testSSHConnection(MGMT_SERVER)
+        print "   + retcode=%d, output=%s" % (retcode, output)
+        if retcode != 0:
+            print "Failed to ssh to management server %s, please investigate." % (MGMT_SERVER)
+            sys.exit(1)
+
+        # MGMT servers are already checking the routerVMs, we can use that cache
+        alarmedRoutersCache = {}
+        if DEBUG>0:
+            print "Fetching alarmed routers cache..."
+        mgtSsh = "cat /tmp/routervms_problem"
+        retcode, output = c.ssh.runSSHCommand(MGMT_SERVER, mgtSsh)
+        print " + retcode=%d" % (retcode)
+        import re
+        lines = output.split('\n')
+        for line in lines:
+            m = re.match("(\S+) \[(.*)\] (\d+)", line)
+            if m:
+                if DEBUG>0:
+                    print "r: %s, n: %s, code: %s" % (m.group(1), m.group(2), m.group(3))
+                alarmedRoutersCache[m.group(1)] = { 'network': m.group(2), 'code': int(m.group(3)), 'checked': False }
+        return alarmedRoutersCache
+        
+    
     results = []
     if opFilterNetworks or opFilterRouters:
-        results = results + getAdvisoriesNetworks()
+        alarmedRoutersCache = retrieveAlarmedRoutersCache()
+        results = results + getAdvisoriesNetworks(alarmedRoutersCache)
     if opFilterHosts:
         results = results + getAdvisoriesHosts()
     if opFilterInstances:
