@@ -1799,6 +1799,7 @@ class CloudStackOps(CloudStackOpsBase):
         apicall.id = args['id'] if 'id' in args else None
         apicall.username = args['username'] if 'username' in args else None
         apicall.domainid = args['domainid'] if 'domainid' in args else None
+        apicall.account = args['account'] if 'account' in args else None
         apicall.accounttype = args['accounttype'] if 'accounttype' in args else None
         apicall.listAll = args['listall'] if 'listall' in args else True
         

@@ -66,27 +66,28 @@ def handleArguments(argv):
         '\n  --plain-display\t\t\t\tEnable plain display, no pretty tables' + \
         '\n' + \
         '\n  Commands:' + \
-        '\n  --list\t\t\t\t\tLists users applying filters (see below). This is the default command' + \
-        '\n  --create\t\t\t\t\tCreate user. See required parameters below' + \
-        '\n  --delete\t\t\t\t\tDelete user. WARNING it deletes all commands within the search filters, verify before with --list' + \
-        '\n  --enable\t\t\t\t\Enable user(s). WARNING idem.' + \
-        '\n  --disable\t\t\t\t\tDisable user(s). WARNING idem.' + \
+        '\n  --list\t\t\t\tLists users applying filters (see below). This is the default command' + \
+        '\n  --create\t\t\t\tCreate user. See required parameters below' + \
+        '\n  --delete\t\t\t\tDelete user. WARNING it deletes all commands within the search filters, verify before with --list' + \
+        '\n  --enable\t\t\t\tEnable user(s). WARNING idem.' + \
+        '\n  --disable\t\t\t\tDisable user(s). WARNING idem.' + \
         '\n' + \
         '\n  Filters:' + \
-        '\n  --username -u <username> \t\t\tSelects only the specified username' + \
-        '\n  --domain -d <domain> \t\t\t\tSearch only within <domain> domain' + \
+        '\n  --username -u <username> \t\tSelects only the specified username' + \
+        '\n  --domain -d <domain> \t\t\tSearch only within <domain> domain' + \
+        '\n  --account -a <account> \t\tUse account <account> as filter' + \
         '\n' + \
         '\n  Parameters --create:' + \
-        '\n  --first <name> \t\t\t\tFirst name' + \
-        '\n  --last <name> \t\t\t\tFirst name' + \
-        '\n  --email <email> \t\t\t\tEmail' + \
-        '\n  --password <password> \t\t\tPassword (plaintext)' + \
+        '\n  --first <name> \t\t\tFirst name' + \
+        '\n  --last <name> \t\t\tLast name' + \
+        '\n  --email <email> \t\t\tEmail' + \
+        '\n  --password <password> \t\tPassword (plaintext)' + \
         '\n  --domain <name> \t\t\tDomain name' + \
         '\n  --account <name> \t\t\tAccount name'
 
     try:
         opts, args = getopt.getopt(
-            argv, "hc:u:d:", [
+            argv, "hc:u:d:a:", [
                 "config-profile=", "debug", "username=", "plain-display", "domain=", "list", "create", "delete", "enable", "disable", "first=", "last=", "email=", "password=", "domain=", "account="])
     except getopt.GetoptError as e:
         print "Error: " + str(e)
@@ -129,7 +130,7 @@ def handleArguments(argv):
             optEmail = arg
         elif opt in ("--password"):
             optPassword = arg
-        elif opt in ("--account"):
+        elif opt in ("--account", "-a"):
             optAccount = arg
 
     # Default to cloudmonkey default config file
@@ -177,7 +178,7 @@ def getListUsers(filters):
             domainId = domainIdr[0].id
         print '[d] resolved: domainName=%s, domainId=%s' % (filters['domain'], domainId)
     
-    userData = c.listUsersExt({'username': filters['username'], 'domainid': domainId})
+    userData = c.listUsersExt({'username': filters['username'], 'domainid': domainId, 'account': filters['account']})
     results = []
     if userData:
         for user in userData:
@@ -195,7 +196,7 @@ def getListUsers(filters):
 
 
 def cmdListUsers():
-    userData = getListUsers({'username' : opFilterUsername, 'domain': opFilterDomain})
+    userData = getListUsers({'username' : opFilterUsername, 'domain': opFilterDomain, 'account': optAccount})
     counter = 0
 
     # Empty line
