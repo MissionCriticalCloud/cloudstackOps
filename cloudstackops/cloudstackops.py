@@ -448,6 +448,8 @@ class CloudStackOps(CloudStackOpsBase):
             str(args['domainid'])) if 'domainid' in args else None
         apicall.keyword = (
             args['filterKeyword']) if 'filterKeyword' in args else None
+        apicall.keyword = (
+            args['instancename']) if 'instancename' in args else None
 
         # Call CloudStack API
         return self._callAPI(apicall)
