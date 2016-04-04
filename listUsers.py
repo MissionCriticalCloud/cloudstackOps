@@ -176,7 +176,8 @@ def getListUsers(filters):
         domainIdr = c.listDomainsExt({'name': filters['domain']})
         if domainIdr and len(domainIdr)>0:
             domainId = domainIdr[0].id
-        print '[d] resolved: domainName=%s, domainId=%s' % (filters['domain'], domainId)
+        if DEBUG==1:
+            print '[d] resolved: domainName=%s, domainId=%s' % (filters['domain'], domainId)
     
     userData = c.listUsersExt({'username': filters['username'], 'domainid': domainId, 'account': filters['account']})
     results = []
