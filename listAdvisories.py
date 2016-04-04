@@ -40,18 +40,21 @@ def debug(level, args):
 SAFETY_BEST = 0
 SAFETY_DOWNTIME = 1
 SAFETY_UNKNOWN = -1
+SAFETY_NA = -99
 
 ACTION_R_LOG_CLEANUP = 'log-cleanup'
 ACTION_R_RST_PASSWD_SRV = 'rst-passwd-srv'
 ACTION_N_RESTART = 'restart'
+ACTION_H_THROTTLE = 'throttle'
 ACTION_UNKNOWN = 'unknown'
+ACTION_MANUAL = 'manual'
 
 def translateSafetyLevel(level):
     if level==SAFETY_BEST:
         return 'Best'
     if level==SAFETY_DOWNTIME:
         return 'Downtime'
-    if level==-99:
+    if level==SAFETY_NA:
         return 'N/A'
     return 'Unknown'
 
@@ -80,6 +83,8 @@ def handleArguments(argv):
     opFilterInstances = False
     global opFilterHosts
     opFilterHosts = False
+    global opFilterResources
+    opFilterResources = False
     global opFilterAll
     opFilterAll = False
     global PLATFORM
@@ -102,11 +107,12 @@ def handleArguments(argv):
         '\n  -r \t\tScan routerVMs' + \
         '\n  -i \t\tScan instances' + \
         '\n  -H \t\tScan hypervisors' + \
+        '\n  -t \t\tScan resource usage' + \
         '\n  --all \tReport all assets of the selected types, independently of the presence of advisory '
 
     try:
         opts, args = getopt.getopt(
-            argv, "hc:nriH", [
+            argv, "hc:nriHt", [
                 "config-profile=", "debug", "exec", "deep", "plain-display", "all", "repair" ])
     except getopt.GetoptError as e:
         print "Error: " + str(e)
@@ -140,6 +146,8 @@ def handleArguments(argv):
             opFilterInstances = True
         elif opt in ("-H"):
             opFilterHosts = True
+        elif opt in ("--t"):
+            opFilterResources = True
         elif opt in ("--all"):
             opFilterAll = True
         elif opt in ("--repair"):
@@ -177,7 +185,35 @@ if DEBUG == 1:
     print "ApiKey: " + c.apikey
     print "SecretKey: " + c.secretkey
 
+#
+# TODO : examine conntrack
+# TODO : /usr/local/nagios/libexec/nrpe_local/check_cloud_agents
 
+def examineHost(host):
+    def getHostIp(host):
+        return host.name + "." + PLATFORM
+
+    nodeSrv = getHostIp(host)
+    ##mgtSsh = "ssh -At %s ssh -At -p 3922 -i /root/.ssh/id_rsa.cloud -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no root@%s ls -la" % (router.hostname, router.linklocalip)
+    ##nodeSsh = 'CT_MAX=$(cat /proc/sys/net/netfilter/nf_conntrack_max); CT_COUNT=$(cat /proc/sys/net/netfilter/nf_conntrack_count); awk \'BEGIN {printf "%.2f",\${CT_COUNT}/\${CT_MAX}}\''
+    #nodeSsh = "echo \"$(cat /proc/sys/net/netfilter/nf_conntrack_count) $(cat /proc/sys/net/netfilter/nf_conntrack_max)\""
+    #retcode, output = c.ssh.runSSHCommand(nodeSrv, nodeSsh)
+    #debug(2, "  + retcode=%d, output=%s" % (retcode, output))
+
+    nodeSsh = "/usr/local/nagios/libexec/nrpe_local/check_libvirt_storage.sh"
+    retcode, output = c.ssh.runSSHCommand(nodeSrv, nodeSsh)
+    import re
+    lines = output.split('\n')
+    instances = []
+    for line in lines:
+        m = re.match("(\S+) (\S+) (\S+)", line)
+        if m:
+            debug(2, " + check_libvirt_storage: i=%s, m=%s, level=%s" % (m.group(2), m.group(3), m.group(1)))
+            instances += [ m.group(2) ]
+    if len(instances)>=1:
+        return { 'action': ACTION_H_THROTTLE, 'safetylevel': SAFETY_UNKNOWN, 'comment': 'IOP abusing instances: '+ ','.join(instances) }
+
+    return { 'action': None, 'safetylevel': SAFETY_NA, 'comment': '' }
 
 def getAdvisoriesHosts():
     debug(2, "getAdvisoriesHosts : begin")
@@ -185,17 +221,31 @@ def getAdvisoriesHosts():
     
     hostData = c.getHostData({'type': 'Routing'})
     for host in hostData:
-        if DEBUG>0:
-            print " + Processing: host.name = %s, type = %s" % (host.name, host.type)
+        debug(2, " + Processing: host.name = %s, type = %s" % (host.name, host.type))
 
-        #mgtSsh = "ssh -At %s ssh -At -p 3922 -i /root/.ssh/id_rsa.cloud -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no root@%s ls -la" % (router.hostname, router.linklocalip)
-        nodeSrv = host.name + "." + PLATFORM
-        #nodeSsh = 'CT_MAX=$(cat /proc/sys/net/netfilter/nf_conntrack_max); CT_COUNT=$(cat /proc/sys/net/netfilter/nf_conntrack_count); awk \'BEGIN {printf "%.2f",\${CT_COUNT}/\${CT_MAX}}\''
-        nodeSsh = "echo \"$(cat /proc/sys/net/netfilter/nf_conntrack_count) $(cat /proc/sys/net/netfilter/nf_conntrack_max)\""
-        retcode, output = c.ssh.runSSHCommand(nodeSrv, nodeSsh)
-        print "  + retcode=%d, output=%s" % (retcode, output)
-
+        diag = examineHost(host)
+        if opFilterAll or (diag['action'] != None):
+            results += [{ 'id': host.id, 'name': host.name, 'domain': 'ROOT', 'asset_type': 'host', 'adv_action': diag['action'], 'adv_safetylevel': diag['safetylevel'], 'adv_comment': diag['comment']}]
+ 
     debug(2, "getAdvisoriesHosts : end")
+    return results
+
+
+def getAdvisoriesResources():
+    debug(2, "getAdvisoriesResources : begin")
+    results = []
+    
+    mgtSsh = "/usr/local/nagios/libexec/nrpe_local/check_free_vcpus"
+    retcode, output = c.ssh.runSSHCommand(MGMT_SERVER, mgtSsh)
+    if retcode != 0:
+        results += [{ 'id': '', 'name': 'free-vcpu', 'domain': 'ROOT', 'asset_type': 'resource', 'adv_action': ACTION_MANUAL, 'adv_safetylevel': SAFETY_NA, 'adv_comment': output}]
+
+    mgtSsh = "/usr/local/nagios/libexec/nrpe_local/check_free_ips"
+    retcode, output = c.ssh.runSSHCommand(MGMT_SERVER, mgtSsh)
+    if retcode != 0:
+        results += [{ 'id': '', 'name': 'free-ip', 'domain': 'ROOT', 'asset_type': 'resource', 'adv_action': ACTION_MANUAL, 'adv_safetylevel': SAFETY_NA, 'adv_comment': output}]
+ 
+    debug(2, "getAdvisoriesResources : end")
     return results
 
 def getAdvisoriesInstances():
@@ -213,19 +263,19 @@ def getAdvisoriesNetworks(alarmedRoutersCache):
     def examineNetwork(network, advRouters):
         if network.restartrequired:
             if network.rr_type:
-                return {'action': 'restart', 'safetylevel': SAFETY_BEST, 'comment': 'Restart flag on, redundancy present'}
+                return {'action': ACTION_N_RESTART, 'safetylevel': SAFETY_BEST, 'comment': 'Restart flag on, redundancy present'}
             else:
-                return {'action': 'restart', 'safetylevel': SAFETY_DOWNTIME, 'comment': 'Restart flag on, no redundancy'}
+                return {'action': ACTION_N_RESTART, 'safetylevel': SAFETY_DOWNTIME, 'comment': 'Restart flag on, no redundancy'}
         if len(advRouters)>0:
             rnames = [];
             for r in advRouters:
                 rnames = rnames + [ r['name'] ];
             if network.rr_type:
-                return {'action': 'restart', 'safetylevel': SAFETY_BEST, 'comment': 'Network tainted, problems found with router(s): ' + ','.join(rnames)}
+                return {'action': ACTION_N_RESTART, 'safetylevel': SAFETY_BEST, 'comment': 'Network tainted, problems found with router(s): ' + ','.join(rnames)}
             else:
-                return {'action': 'restart', 'safetylevel': SAFETY_DOWNTIME, 'comment': 'Network tainted, problems found with router(s): '+ ','.join(rnames)}
+                return {'action': ACTION_N_RESTART, 'safetylevel': SAFETY_DOWNTIME, 'comment': 'Network tainted, problems found with router(s): '+ ','.join(rnames)}
             
-        return {'action': None, 'safetylevel': -99, 'comment': ''}
+        return {'action': None, 'safetylevel': SAFETY_NA, 'comment': ''}
 
     # Use this when you want to inspect routers real-time
     # Note: Development was dropped in favor of examineRouterInternalsQuick()
@@ -313,7 +363,7 @@ def getAdvisoriesNetworks(alarmedRoutersCache):
             action, safetylevel = getActionForStatus(retcode)
             return {'action': action, 'safetylevel': safetylevel, 'comment': output + ": " + str(retcode) + " (" + resolveRouterErrorCode(retcode) + ")" }
 
-        return {'action': None, 'safetylevel': -99, 'comment': ''}
+        return {'action': None, 'safetylevel': SAFETY_NA, 'comment': ''}
 
     networkData = c.listNetworks({})
     for network in networkData:
@@ -411,6 +461,8 @@ def getAdvisories():
         results = results + getAdvisoriesHosts()
     if opFilterInstances:
         results = results + getAdvisoriesInstances()
+    if opFilterResources:
+        results = results + getAdvisoriesResources()
 
     def getSortKey(item):
         return item['asset_type'].upper() + '-' + item['name'].upper() 
@@ -469,13 +521,14 @@ def repairRouter(adv):
 def repairNetwork(adv):
     debug(2, "repairNetwork(): network:%s, action:%s" % (adv['name'], adv['adv_action']))
     
-    if (DRYRUN==1) and (adv['adv_action'] in [ACTION_N_RESTART]):
-        return -2, 'Skipping, dryrun is on.'
     if adv['adv_action'] == None:
         return -2, ''
 
     if (adv['adv_action']==ACTION_N_RESTART) and (SAFETYLEVEL==adv['adv_safetylevel']):
         debug(2, ' + restart network.name=%s, .id=%s' % (adv['name'], adv['id']))
+        if (DRYRUN==1) and (adv['adv_action'] in [ACTION_N_RESTART]):
+            return -2, 'Skipping, dryrun is on.'
+        print "Restarting network '%s'" % (adv['name'])
         if c.restartNetwork(adv['id'], True):
             return 1, 'Errors during the restart. Check messages above.'
         else:
