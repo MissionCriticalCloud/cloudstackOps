@@ -613,6 +613,28 @@ Make sure you copy this script to the router VM, give it exec permission `chmod 
 `./cleanDHCPipaddress.sh 1.2.3.4 1`
 
 
+List networks, perform network maintenance
+------------------------
+This helper script allows you to get an overview of the networks in the platform, and perform restarts with cleanup=true to all or a subset of them, based on the filters.
+
+```
+$ ./listNetworkVRs.py
++---+----------------------+----------+--------------------------------------+--------+-------------+------------+-------------+----------------------------+
+| # |       Network        |   Type   |                  ID                  | Domain |    State    | Redundant? | RestartReq? |            VRs             |
++---+----------------------+----------+--------------------------------------+--------+-------------+------------+-------------+----------------------------+
+| 1 |  NET-NMCTX-T193702   | Isolated | 68c6bf52-1ab0-4f9c-bd15-96b8f38fe015 |  ROOT  |  Allocated  |   False    |    False    |             []             |
+| 2 | T2-VPC-NMCTX-T183517 | Isolated | 86144974-db8d-45fe-979d-e7ab8dd2c06b |  ROOT  | Implemented |    True    |    False    |       [u'r-1011-VM']       |
+| 3 |  VPC-NMCTX-T183517   |   VPC    | 4b229a04-718c-4c5c-ac54-471b4b5a2d8b |  ROOT  |   Enabled   |   False    |    False    |       [u'r-1011-VM']       |
+| 4 |        teste2        |   VPC    | 51e1f5ec-0881-4596-880d-829d30eb94e4 |  ROOT  |   Enabled   |   False    |    False    | [u'r-996-VM', u'r-995-VM'] |
++---+----------------------+----------+--------------------------------------+--------+-------------+------------+-------------+----------------------------+
+```
+
+Perform restarts on a subset (only VPCs with redundant VRs):
+```
+$ ./listNetworkVRs.py --exec -r --type VPC --onlyRR
+```
+
+
 Bugs
 =====
 The scripts have been well tested during migrations, but there could still be bugs (in handling unexpected conditions for example). If you encounter problems, please open an issue.

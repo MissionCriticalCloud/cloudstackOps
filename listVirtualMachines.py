@@ -561,9 +561,9 @@ for clusterid, clustername in clusters.items():
 
             # Name of the network / VPC
             if vm.vpcid is not None:
-                networkResult = c.listVPCs(vm.vpcid)
+                networkResult = c.listVPCs({'id': vm.vpcid})
             else:
-                networkResult = c.listNetworks(vm.guestnetworkid)
+                networkResult = c.listNetworks({'id': vm.guestnetworkid})
 
             if networkResult is not None:
                 displayname = networkResult[0].name
