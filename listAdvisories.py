@@ -30,6 +30,7 @@ from cloudstackops import cloudstackopsssh
 import os.path
 from random import choice
 from prettytable import PrettyTable
+import re
 
 # Function to handle our arguments
 
@@ -45,9 +46,10 @@ SAFETY_NA = -99
 ACTION_R_LOG_CLEANUP = 'log-cleanup'
 ACTION_R_RST_PASSWD_SRV = 'rst-passwd-srv'
 ACTION_N_RESTART = 'restart'
-ACTION_H_THROTTLE = 'throttle'
+ACTION_I_THROTTLE = 'throttle'
 ACTION_UNKNOWN = 'unknown'
 ACTION_MANUAL = 'manual'
+ACTION_ESCALATE = 'escalate'
 
 def translateSafetyLevel(level):
     if level==SAFETY_BEST:
@@ -99,7 +101,7 @@ def handleArguments(argv):
         '\n' + \
         '\n  Modifiers:' + \
         '\n  --exec\tDisable dry-run mode. You\'l need this to perform changes to the platform.' + \
-        '\n  --debug\tEnable debug mode' + \
+        '\n  --debug\tEnable debug mode. Use it multiple times to increase verbosity' + \
         '\n  --deep \tPerform deep scan. By default, quick mode is used (using deferred collection methods)' + \
         '\n' + \
         '\n  Filters:' + \
@@ -131,7 +133,10 @@ def handleArguments(argv):
             configProfileName = arg
             PLATFORM = configProfileName
         elif opt in ("--debug"):
-            DEBUG = 2
+            if DEBUG==2:
+                DEBUG = 1
+            else:
+                DEBUG = 2
         elif opt in ("--exec"):
             DRYRUN = 0
         elif opt in ("--deep"):
@@ -152,6 +157,10 @@ def handleArguments(argv):
             opFilterAll = True
         elif opt in ("--repair"):
             command = 'repair'
+
+    if PLATFORM==None:
+        print "No platform is specified. Please use the -c option."
+        sys.exit(1)
 
     MGMT_SERVER = "mgt01." + PLATFORM
 
@@ -189,33 +198,53 @@ if DEBUG == 1:
 # TODO : examine conntrack
 # TODO : /usr/local/nagios/libexec/nrpe_local/check_cloud_agents
 
-def examineHost(host):
+def examineHost(alarmedInstancesCache, host):
     def getHostIp(host):
         return host.name + "." + PLATFORM
-
+    ENABLED_INSPECTIONS = []
+    ENABLED_INSPECTIONS += [ 'io-abuse' ]
+    ENABLED_INSPECTIONS += [ 'conntrack' ]
+    
     nodeSrv = getHostIp(host)
-    ##mgtSsh = "ssh -At %s ssh -At -p 3922 -i /root/.ssh/id_rsa.cloud -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no root@%s ls -la" % (router.hostname, router.linklocalip)
-    ##nodeSsh = 'CT_MAX=$(cat /proc/sys/net/netfilter/nf_conntrack_max); CT_COUNT=$(cat /proc/sys/net/netfilter/nf_conntrack_count); awk \'BEGIN {printf "%.2f",\${CT_COUNT}/\${CT_MAX}}\''
-    #nodeSsh = "echo \"$(cat /proc/sys/net/netfilter/nf_conntrack_count) $(cat /proc/sys/net/netfilter/nf_conntrack_max)\""
-    #retcode, output = c.ssh.runSSHCommand(nodeSrv, nodeSsh)
-    #debug(2, "  + retcode=%d, output=%s" % (retcode, output))
+    if 'io-abuse' in ENABLED_INSPECTIONS:
+        nodeSsh = "/usr/local/nagios/libexec/nrpe_local/check_libvirt_storage.sh"
+        retcode, output = c.ssh.runSSHCommand(nodeSrv, nodeSsh)
 
-    nodeSsh = "/usr/local/nagios/libexec/nrpe_local/check_libvirt_storage.sh"
-    retcode, output = c.ssh.runSSHCommand(nodeSrv, nodeSsh)
-    import re
-    lines = output.split('\n')
-    instances = []
-    for line in lines:
-        m = re.match("(\S+) (\S+) (\S+)", line)
+        lines = output.split('\n')
+        instances = {}
+        for line in lines:
+            m = re.match("(\S+) (\S+) (\S+)", line)
+            if m:
+                debug(2, " + check_libvirt_storage: i=%s, m=%s, level=%s" % (m.group(2), m.group(3), m.group(1)))
+                # For some reason, someone decided to change the instance name... 
+                i_name = m.group(2).replace('_', '-')
+                if i_name not in instances.keys():
+                    instances[ i_name ] = []
+                instances[i_name] += [ m.group(3) ]
+                alarmedInstancesCache[i_name] = { 'alarm': 'io-abuse', 'host': host.name, 'level': m.group(1), 'metrics': instances[i_name] }
+        if len(instances.keys())>=1:
+            return { 'action': ACTION_ESCALATE, 'safetylevel': SAFETY_NA, 'comment': 'IOP abusing instances: '+ ','.join(instances.keys()) }
+
+    if 'conntrack' in ENABLED_INSPECTIONS:
+        CONNTRACK_RATIO_THRESHOLD_PC = 70
+        #mgtSsh = "ssh -At %s ssh -At -p 3922 -i /root/.ssh/id_rsa.cloud -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no root@%s ls -la" % (router.hostname, router.linklocalip)
+        #nodeSsh = 'CT_MAX=$(cat /proc/sys/net/netfilter/nf_conntrack_max); CT_COUNT=$(cat /proc/sys/net/netfilter/nf_conntrack_count); awk \'BEGIN {printf "%.2f",\${CT_COUNT}/\${CT_MAX}}\''
+        nodeSsh = "echo \"$(cat /proc/sys/net/netfilter/nf_conntrack_count) $(cat /proc/sys/net/netfilter/nf_conntrack_max)\""
+        retcode, output = c.ssh.runSSHCommand(nodeSrv, nodeSsh)
+        debug(2, "   + retcode=%d, output=%s" % (retcode, output))
+
+        m = re.match("(\d+) (\d+)", output)
         if m:
-            debug(2, " + check_libvirt_storage: i=%s, m=%s, level=%s" % (m.group(2), m.group(3), m.group(1)))
-            instances += [ m.group(2) ]
-    if len(instances)>=1:
-        return { 'action': ACTION_H_THROTTLE, 'safetylevel': SAFETY_UNKNOWN, 'comment': 'IOP abusing instances: '+ ','.join(instances) }
+            ct_cur = int(m.group(1))
+            ct_max = int(m.group(2))
+            debug(2, "   + conntrack: c=%d, max=%d" % (ct_cur, ct_max))
+            ct_ratio = 100.0 * ct_cur / ct_max
+            if ct_ratio > CONNTRACK_RATIO_THRESHOLD_PC:
+                return { 'action': ACTION_MANUAL, 'safetylevel': SAFETY_NA, 'comment': 'Conntrack abuse (' + "{:.2f}%".format(ct_ratio) + ')' }
 
     return { 'action': None, 'safetylevel': SAFETY_NA, 'comment': '' }
 
-def getAdvisoriesHosts():
+def getAdvisoriesHosts(alarmedInstancesCache):
     debug(2, "getAdvisoriesHosts : begin")
     results = []
     
@@ -223,7 +252,7 @@ def getAdvisoriesHosts():
     for host in hostData:
         debug(2, " + Processing: host.name = %s, type = %s" % (host.name, host.type))
 
-        diag = examineHost(host)
+        diag = examineHost(alarmedInstancesCache, host)
         if opFilterAll or (diag['action'] != None):
             results += [{ 'id': host.id, 'name': host.name, 'domain': 'ROOT', 'asset_type': 'host', 'adv_action': diag['action'], 'adv_safetylevel': diag['safetylevel'], 'adv_comment': diag['comment']}]
  
@@ -244,13 +273,45 @@ def getAdvisoriesResources():
     retcode, output = c.ssh.runSSHCommand(MGMT_SERVER, mgtSsh)
     if retcode != 0:
         results += [{ 'id': '', 'name': 'free-ip', 'domain': 'ROOT', 'asset_type': 'resource', 'adv_action': ACTION_MANUAL, 'adv_safetylevel': SAFETY_NA, 'adv_comment': output}]
- 
+
+    mgtSsh = "/usr/local/nagios/libexec/nrpe_local/check_cloud_agents"
+    retcode, output = c.ssh.runSSHCommand(MGMT_SERVER, mgtSsh)
+    if retcode != 0:
+        results += [{ 'id': '', 'name': 'cloud-agents', 'domain': 'ROOT', 'asset_type': 'resource', 'adv_action': ACTION_MANUAL, 'adv_safetylevel': SAFETY_NA, 'adv_comment': output}]
+
     debug(2, "getAdvisoriesResources : end")
     return results
 
-def getAdvisoriesInstances():
+def getAdvisoriesInstances(alarmedInstancesCache):
     debug(2, "getAdvisoriesInstances : begin")
     results = []
+    
+    for i_name in alarmedInstancesCache.keys():
+        i_domain = ''
+        i_id = ''
+        iinfo = c.listVirtualmachines({'instancename': i_name})
+        
+        #import pprint
+        #pp = pprint.PrettyPrinter(indent=4)
+        #pp.pprint(iinfo)
+        #break;
+
+        for i in iinfo:
+            if i.instancename == i_name:
+                i_domain = i.domain
+                i_id = i.id
+        if alarmedInstancesCache[i_name]['alarm']=='read-only':
+            comment = 'Instance is reported read-only'
+            action = ACTION_MANUAL
+            safety = SAFETY_NA
+        elif alarmedInstancesCache[i_name]['alarm']=='io-abuse':
+            comment = 'Instance is abusing I/O (' + ','.join(alarmedInstancesCache[i_name]['metrics']) + ')'
+            action = ACTION_I_THROTTLE
+            safety = SAFETY_NA
+        # else should never happen #
+        
+        results += [{ 'id': i_id, 'name': i_name, 'domain': i_domain, 'asset_type': 'instance', 'adv_action': action, 'adv_safetylevel': safety, 'adv_comment': comment}]
+
     debug(2, "getAdvisoriesInstances : end")
     return results
 
@@ -348,9 +409,9 @@ def getAdvisoriesNetworks(alarmedRoutersCache):
     def examineRouter(alarmedRoutersCache, network, router):
         if router.isredundantrouter and (router.redundantstate not in ['MASTER', 'BACKUP']):
             if network.rr_type:
-                return {'action': 'escalate', 'safetylevel': SAFETY_BEST, 'comment': 'Redundancy state broken (' + router.redundantstate + '), redundancy present'}
+                return {'action': ACTION_ESCALATE, 'safetylevel': SAFETY_BEST, 'comment': 'Redundancy state broken (' + router.redundantstate + '), redundancy present'}
             else:
-                return {'action': 'escalate', 'safetylevel': SAFETY_DOWNTIME, 'comment': 'Redundancy state broken (' + router.redundantstate + '), no redundancy'}
+                return {'action': ACTION_ESCALATE, 'safetylevel': SAFETY_DOWNTIME, 'comment': 'Redundancy state broken (' + router.redundantstate + '), no redundancy'}
         
         # We should now try to assess the router internal status (with SSH)
         #retcode, output = examineRouterInternals(router)
@@ -389,7 +450,7 @@ def getAdvisoriesNetworks(alarmedRoutersCache):
                 for r in routersData:
                     diag = examineRouter(alarmedRoutersCache, network, r)
                     if ( opFilterAll or (diag['action'] != None) ):
-                        if diag['action'] == 'escalate':
+                        if diag['action'] == ACTION_ESCALATE:
                             escalated = escalated + [{ 'id': r.id, 'name': r.name, 'domain': network.domain, 'asset_type': 'router', 'adv_action': diag['action'], 'adv_safetylevel': diag['safetylevel'], 'adv_comment': diag['comment'] }]
                         results = results + [{ 'id': r.id, 'name': r.name, 'domain': network.domain, 'asset_type': 'router', 'adv_action': diag['action'], 'adv_safetylevel': diag['safetylevel'], 'adv_comment': diag['comment'] }]
 
@@ -414,7 +475,7 @@ def getAdvisoriesNetworks(alarmedRoutersCache):
                     # We include 'escalate' in case opFilterNetworks is not specified to notify that we need it
                     # in order to fix this
                     if ( opFilterAll or (diag['action'] != None) ):
-                        if (diag['action'] == 'escalate'):
+                        if diag['action'] == ACTION_ESCALATE:
                             escalated = escalated + [{ 'id': r.id, 'name': r.name, 'domain': vpc.domain, 'asset_type': 'router', 'adv_action': diag['action'], 'adv_safetylevel': diag['safetylevel'], 'adv_comment': diag['comment'] }]
                         results = results + [{ 'id': r.id, 'name': r.name, 'domain': vpc.domain, 'asset_type': 'router', 'adv_action': diag['action'], 'adv_safetylevel': diag['safetylevel'], 'adv_comment': diag['comment'] }]
 
@@ -428,15 +489,26 @@ def getAdvisoriesNetworks(alarmedRoutersCache):
     return results
 
 def getAdvisories():
-    def retrieveAlarmedRoutersCache():
-        debug(2, "+ Testing SSH to '%s'" % (MGMT_SERVER))
-        retcode, output = c.ssh.testSSHConnection(MGMT_SERVER)
-        debug(2, "   + retcode=%d, output=%s" % (retcode, output))
-        if retcode != 0:
-            print "Failed to ssh to management server %s, please investigate." % (MGMT_SERVER)
-            sys.exit(1)
+    
+    # MGMT servers are already checking the routerVMs, we can use that cache
+    def retrieveAlarmedInstancesCache():
+        alarmedInstancesCache = {}
+        debug(2, "Fetching alarmed instances cache...")
+        mgtSsh = "grep -v -f /var/local/ack_readonly /tmp/vps_readonly"
+        retcode, output = c.ssh.runSSHCommand(MGMT_SERVER, mgtSsh)
+        debug(2, " + retcode=%d" % (retcode))
+        
+        import re
+        lines = output.split('\n')
+        for line in lines:
+            m = re.match("(\S+) \[(.*)\]", line)
+            if m:
+                debug(2, "i: %s, h: %s" % (m.group(1), m.group(2)))
+                alarmedInstancesCache[m.group(1)] = { 'alarm': 'read-only', 'name': m.group(1), 'host': m.group(2) }
+        return alarmedInstancesCache
 
-        # MGMT servers are already checking the routerVMs, we can use that cache
+    # MGMT servers are already checking the routerVMs, we can use that cache
+    def retrieveAlarmedRoutersCache():
         alarmedRoutersCache = {}
         debug(2, "Fetching alarmed routers cache...")
         mgtSsh = "cat /tmp/routervms_problem"
@@ -452,15 +524,25 @@ def getAdvisories():
                 alarmedRoutersCache[m.group(1)] = { 'network': m.group(2), 'code': int(m.group(3)), 'checked': False }
         return alarmedRoutersCache
         
-    
+
+    # Test connection to MGMT_SERVER, we are going to need it
+    debug(2, "+ Testing SSH to '%s'" % (MGMT_SERVER))
+    retcode, output = c.ssh.testSSHConnection(MGMT_SERVER)
+    debug(2, "   + retcode=%d, output=%s" % (retcode, output))
+    if retcode != 0:
+        print "Failed to ssh to management server %s, please investigate." % (MGMT_SERVER)
+        sys.exit(1)
+
     results = []
     if opFilterNetworks or opFilterRouters:
         alarmedRoutersCache = retrieveAlarmedRoutersCache()
         results = results + getAdvisoriesNetworks(alarmedRoutersCache)
-    if opFilterHosts:
-        results = results + getAdvisoriesHosts()
     if opFilterInstances:
-        results = results + getAdvisoriesInstances()
+        alarmedInstancesCache = retrieveAlarmedInstancesCache()
+    if opFilterHosts:
+        results = results + getAdvisoriesHosts(alarmedInstancesCache)
+    if opFilterInstances:
+        results = results + getAdvisoriesInstances(alarmedInstancesCache)
     if opFilterResources:
         results = results + getAdvisoriesResources()
 
