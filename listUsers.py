@@ -219,7 +219,7 @@ def cmdListUsers():
     print t
 
 def cmdDisableUsers():
-    userData = getListUsers({'username' : opFilterUsername, 'domain': opFilterDomain})
+    userData = getListUsers({'username' : opFilterUsername, 'domain': opFilterDomain, 'account': optAccount})
     cmdListUsers()
     if userData:
         for user in userData:
@@ -227,7 +227,7 @@ def cmdDisableUsers():
     cmdListUsers()
 
 def cmdEnableUsers():
-    userData = getListUsers({'username' : opFilterUsername, 'domain': opFilterDomain})
+    userData = getListUsers({'username' : opFilterUsername, 'domain': opFilterDomain, 'account': optAccount})
     cmdListUsers()
     if userData:
         for user in userData:
@@ -235,7 +235,7 @@ def cmdEnableUsers():
     cmdListUsers()
 
 def cmdDeleteUsers():
-    userData = getListUsers({'username' : opFilterUsername, 'domain': opFilterDomain})
+    userData = getListUsers({'username' : opFilterUsername, 'domain': opFilterDomain, 'account': optAccount})
     
     if userData:
         for user in userData:
