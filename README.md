@@ -622,14 +622,15 @@ This helper script allows you to get an overview of the networks in the platform
 
 ```
 $ ./listNetworkVRs.py
-+---+----------------------+----------+--------------------------------------+--------+-------------+------------+-------------+----------------------------+
-| # |       Network        |   Type   |                  ID                  | Domain |    State    | Redundant? | RestartReq? |            VRs             |
-+---+----------------------+----------+--------------------------------------+--------+-------------+------------+-------------+----------------------------+
-| 1 |  NET-NMCTX-T193702   | Isolated | 68c6bf52-1ab0-4f9c-bd15-96b8f38fe015 |  ROOT  |  Allocated  |   False    |    False    |             []             |
-| 2 | T2-VPC-NMCTX-T183517 | Isolated | 86144974-db8d-45fe-979d-e7ab8dd2c06b |  ROOT  | Implemented |    True    |    False    |       [u'r-1011-VM']       |
-| 3 |  VPC-NMCTX-T183517   |   VPC    | 4b229a04-718c-4c5c-ac54-471b4b5a2d8b |  ROOT  |   Enabled   |   False    |    False    |       [u'r-1011-VM']       |
-| 4 |        teste2        |   VPC    | 51e1f5ec-0881-4596-880d-829d30eb94e4 |  ROOT  |   Enabled   |   False    |    False    | [u'r-996-VM', u'r-995-VM'] |
-+---+----------------------+----------+--------------------------------------+--------+-------------+------------+-------------+----------------------------+
++---+----------------------+----------+--------------------------------------+---------+-------------+------------+-------------+---------------------+
+| # |       Network        |   Type   |                  ID                  |  Domain |    State    | Redundant? | RestartReq? |         VRs         |
++---+----------------------+----------+--------------------------------------+---------+-------------+------------+-------------+---------------------+
+| 1 |     net-jenkins      | Isolated | 8e8c6038-83f2-4063-8f32-88844608c534 | jenkins |  Allocated  |    True    |    False    | r-1303-VM,r-1302-VM |
+| 2 | T1-VPC-NMCTX-T154226 | VPCTier  | 26dd8f6e-e01e-4ddd-8160-ff8143b95ffd |   ROOT  | Implemented |   False    |    False    |      r-1300-VM      |
+| 3 | T2-VPC-NMCTX-T154226 | VPCTier  | dfe1c73e-87d1-4b58-a004-3071268aef7d |   ROOT  | Implemented |   False    |    False    |      r-1300-VM      |
+| 4 |     test-network     | Isolated | 2260393c-1913-4605-88f0-d4302573581e |   test  |  Allocated  |    True    |     True    |                     |
+| 5 |  VPC-NMCTX-T154226   |   VPC    | 53cab7c8-8560-4adc-a325-731260eebc77 |   ROOT  |   Enabled   |   False    |    False    |      r-1300-VM      |
++---+----------------------+----------+--------------------------------------+---------+-------------+------------+-------------+---------------------+
 ```
 
 Perform restarts on a subset (only VPCs with redundant VRs):
