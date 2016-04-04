@@ -33,12 +33,37 @@ from prettytable import PrettyTable
 
 # Function to handle our arguments
 
+def debug(level, args):
+    if DEBUG>=level:
+        print args
+
+SAFETY_BEST = 0
+SAFETY_DOWNTIME = 1
+SAFETY_UNKNOWN = -1
+
+ACTION_R_LOG_CLEANUP = 'log-cleanup'
+ACTION_R_RST_PASSWD_SRV = 'rst-passwd-srv'
+ACTION_N_RESTART = 'restart'
+ACTION_UNKNOWN = 'unknown'
+
+def translateSafetyLevel(level):
+    if level==SAFETY_BEST:
+        return 'Best'
+    if level==SAFETY_DOWNTIME:
+        return 'Downtime'
+    if level==-99:
+        return 'N/A'
+    return 'Unknown'
 
 def handleArguments(argv):
     global DEBUG
     DEBUG = 0
     global DRYRUN
     DRYRUN = 1
+    global QUICKSCAN
+    QUICKSCAN = 1
+    global SAFETYLEVEL
+    SAFETYLEVEL = SAFETY_BEST
     global domainname
     domainname = ''
     global configProfileName
@@ -63,9 +88,14 @@ def handleArguments(argv):
 
     # Usage message
     help = "Usage: ./" + os.path.basename(__file__) + ' [options] ' + \
-        '\n  --config-profile -c <profilename>\t\tSpecify the CloudMonkey profile name to get the credentials from (or specify in ./config file)' + \
-        '\n  --debug\t\t\t\t\tEnable debug mode' + \
-        '\n  --plain-display\t\t\t\tEnable plain display, no pretty tables' + \
+        '\n  --config-profile -c <profile>\t\tSpecify the CloudMonkey profile name to get the credentials from (or specify in ./config file)' + \
+        '\n  --plain-display\t\t\tEnable plain display, no pretty tables' + \
+        '\n  --repair\t\t\t\tApply suggested actions - at Safe/Best level' + \
+        '\n' + \
+        '\n  Modifiers:' + \
+        '\n  --exec\tDisable dry-run mode. You\'l need this to perform changes to the platform.' + \
+        '\n  --debug\tEnable debug mode' + \
+        '\n  --deep \tPerform deep scan. By default, quick mode is used (using deferred collection methods)' + \
         '\n' + \
         '\n  Filters:' + \
         '\n  -n \t\tScan networks (incl. VPCs)' + \
@@ -77,7 +107,7 @@ def handleArguments(argv):
     try:
         opts, args = getopt.getopt(
             argv, "hc:nriH", [
-                "config-profile=", "debug", "exec", "plain-display", "all" ])
+                "config-profile=", "debug", "exec", "deep", "plain-display", "all", "repair" ])
     except getopt.GetoptError as e:
         print "Error: " + str(e)
         print help
@@ -96,8 +126,10 @@ def handleArguments(argv):
             PLATFORM = configProfileName
         elif opt in ("--debug"):
             DEBUG = 2
-        #elif opt in ("--exec"):
-        #    DRYRUN = 0
+        elif opt in ("--exec"):
+            DRYRUN = 0
+        elif opt in ("--deep"):
+            QUICKSCAN = 0
         elif opt in ("--plain-display"):
             plainDisplay = 1
         elif opt in ("-n"):
@@ -110,6 +142,8 @@ def handleArguments(argv):
             opFilterHosts = True
         elif opt in ("--all"):
             opFilterAll = True
+        elif opt in ("--repair"):
+            command = 'repair'
 
     MGMT_SERVER = "mgt01." + PLATFORM
 
@@ -146,60 +180,83 @@ if DEBUG == 1:
 
 
 def getAdvisoriesHosts():
-    if DEBUG > 0:
-        print "getAdvisoriesHosts : begin"
+    debug(2, "getAdvisoriesHosts : begin")
     results = []
-    if DEBUG > 0:
-        print "getAdvisoriesHosts : end"
+    
+    hostData = c.getHostData({'type': 'Routing'})
+    for host in hostData:
+        if DEBUG>0:
+            print " + Processing: host.name = %s, type = %s" % (host.name, host.type)
+
+        #mgtSsh = "ssh -At %s ssh -At -p 3922 -i /root/.ssh/id_rsa.cloud -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no root@%s ls -la" % (router.hostname, router.linklocalip)
+        nodeSrv = host.name + "." + PLATFORM
+        #nodeSsh = 'CT_MAX=$(cat /proc/sys/net/netfilter/nf_conntrack_max); CT_COUNT=$(cat /proc/sys/net/netfilter/nf_conntrack_count); awk \'BEGIN {printf "%.2f",\${CT_COUNT}/\${CT_MAX}}\''
+        nodeSsh = "echo \"$(cat /proc/sys/net/netfilter/nf_conntrack_count) $(cat /proc/sys/net/netfilter/nf_conntrack_max)\""
+        retcode, output = c.ssh.runSSHCommand(nodeSrv, nodeSsh)
+        print "  + retcode=%d, output=%s" % (retcode, output)
+
+    debug(2, "getAdvisoriesHosts : end")
     return results
 
 def getAdvisoriesInstances():
-    if DEBUG > 0:
-        print "getAdvisoriesInstances : begin"
+    debug(2, "getAdvisoriesInstances : begin")
     results = []
-    if DEBUG > 0:
-        print "getAdvisoriesInstances : end"
+    debug(2, "getAdvisoriesInstances : end")
     return results
 
 def getAdvisoriesNetworks(alarmedRoutersCache):
-    if DEBUG > 0:
-        print "getAdvisoriesNetworks/Routers : begin"
+    debug(2, "getAdvisoriesNetworks/Routers : begin")
+    
     results = []
 
     # This method will analyse the network and return an advisory
     def examineNetwork(network, advRouters):
         if network.restartrequired:
             if network.rr_type:
-                return {'action': 'restart', 'safetylevel': 'Best', 'comment': 'Restart flag on, redundancy present'}
+                return {'action': 'restart', 'safetylevel': SAFETY_BEST, 'comment': 'Restart flag on, redundancy present'}
             else:
-                return {'action': 'restart', 'safetylevel': 'Downtime', 'comment': 'Restart flag on, no redundancy'}
+                return {'action': 'restart', 'safetylevel': SAFETY_DOWNTIME, 'comment': 'Restart flag on, no redundancy'}
         if len(advRouters)>0:
             rnames = [];
             for r in advRouters:
                 rnames = rnames + [ r['name'] ];
             if network.rr_type:
-                return {'action': 'restart', 'safetylevel': 'Best', 'comment': 'Network tainted, problems found with router(s): ' + ','.join(rnames)}
+                return {'action': 'restart', 'safetylevel': SAFETY_BEST, 'comment': 'Network tainted, problems found with router(s): ' + ','.join(rnames)}
             else:
-                return {'action': 'restart', 'safetylevel': 'Downtime', 'comment': 'Network tainted, problems found with router(s): '+ ','.join(rnames)}
+                return {'action': 'restart', 'safetylevel': SAFETY_DOWNTIME, 'comment': 'Network tainted, problems found with router(s): '+ ','.join(rnames)}
             
-        return {'action': None, 'safetylevel': None, 'comment': None}
+        return {'action': None, 'safetylevel': -99, 'comment': ''}
 
     # Use this when you want to inspect routers real-time
     # Note: Development was dropped in favor of examineRouterInternalsQuick()
     # TODO we should provide a --deep switch
-    def examineRouterInternalsDeep(router):
-        if DEBUG > 0:
-            print "   + router: name: %s, ip=%s, host=%s, tpl=%s" % (router.name, router.linklocalip, router.hostname, router.templateversion)
+    def examineRouterInternalsDeep(alarmedRoutersCache, router):
+        debug(2, "   + router: name: %s, ip=%s, host=%s, tpl=%s" % (router.name, router.linklocalip, router.hostname, router.templateversion))
+
+        # Use the cache anyway, to mark already checked routers:
+        if router.name in alarmedRoutersCache.keys():
+            if alarmedRoutersCache[router.name]['checked']:
+                return 0, None
 
         #mgtSsh = "ssh -At %s ssh -At -p 3922 -i /root/.ssh/id_rsa.cloud -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no root@%s ls -la" % (router.hostname, router.linklocalip)
         mgtSsh = "/usr/local/bin/check_routervms.py " + router.name
         retcode, output = c.ssh.runSSHCommand(MGMT_SERVER, mgtSsh)
-        print "       + retcode=%d" % (retcode)
+        if retcode != 0:
+            return "256", "check_routervms.py returned errors"
+            
+        lines = output.split('\n')
+        retcode = int(lines[-1])
+        output = "check_routervms returned errors"
+        debug(2, "   + cmd: " + mgtSsh)
+        debug(2, "       + retcode=%d" % (retcode))
+
+        # Use the cache anyway, to mark already checked routers:
+        alarmedRoutersCache[router.name] = { 'network': router.network, 'code': retcode, 'checked': True }
+
         return retcode, output
 
     def examineRouterInternalsQuick(alarmedRoutersCache, router):
-        if DEBUG > 0:
-            print "   + router: name: %s, ip=%s, host=%s, tpl=%s" % (router.name, router.linklocalip, router.hostname, router.templateversion)
+        debug(2, "   + router: name: %s, ip=%s, host=%s, tpl=%s" % (router.name, router.linklocalip, router.hostname, router.templateversion))
 
         if router.name in alarmedRoutersCache.keys():
             if not alarmedRoutersCache[router.name]['checked']:
@@ -217,44 +274,51 @@ def getAdvisoriesNetworks(alarmedRoutersCache):
             str = str + [ 'swap' ]
         if errorCode & 4:
             str = str + [ 'resolver' ]
-        if errorCode & 9:
+        if errorCode & 8:
             str = str + [ 'ping' ]
         if errorCode & 16:
             str = str + [ 'filesystem' ]
         if errorCode & 32:
             str = str + [ 'disk' ]
-        return ",".join(str)
         if errorCode & 64:
             str = str + [ 'password' ]
-        return ",".join(str)
         if errorCode & 128:
             str = str + [ 'reserved' ]
+        if errorCode & 256:
+            str = str + [ 'check_routervms.py' ]
         return ",".join(str)
-                
-            
+
+    def getActionForStatus(statuscode):
+        if statuscode == 32:
+            return ACTION_R_LOG_CLEANUP, SAFETY_BEST
+        if statuscode == 64:
+            return ACTION_R_RST_PASSWD_SRV, SAFETY_BEST
+        return ACTION_UNKNOWN, SAFETY_UNKNOWN
 
     def examineRouter(alarmedRoutersCache, network, router):
         if router.isredundantrouter and (router.redundantstate not in ['MASTER', 'BACKUP']):
             if network.rr_type:
-                return {'action': 'restart', 'safetylevel': 'Best', 'comment': 'Redundancy state broken, redundancy present'}
+                return {'action': 'escalate', 'safetylevel': SAFETY_BEST, 'comment': 'Redundancy state broken (' + router.redundantstate + '), redundancy present'}
             else:
-                return {'action': 'restart', 'safetylevel': 'Downtime', 'comment': 'Redundancy state broken, no redundancy'}
+                return {'action': 'escalate', 'safetylevel': SAFETY_DOWNTIME, 'comment': 'Redundancy state broken (' + router.redundantstate + '), no redundancy'}
         
         # We should now try to assess the router internal status (with SSH)
         #retcode, output = examineRouterInternals(router)
-        
-        retcode, output = examineRouterInternalsQuick(alarmedRoutersCache, router)
-        if retcode == 32:
-            return {'action': 'log-cleanup', 'safetylevel': 'Best', 'comment': output + ": " + str(retcode) + " (" + resolveRouterErrorCode(retcode) + ")" }
-        if retcode != 0:
-            return {'action': 'unknown', 'safetylevel': 'Unknown', 'comment': output + ": " + str(retcode) + " (" + resolveRouterErrorCode(retcode) + ")" }
+        if QUICKSCAN==1:
+            retcode, output = examineRouterInternalsQuick(alarmedRoutersCache, router)
+        else:
+            retcode, output = examineRouterInternalsDeep(alarmedRoutersCache, router)
 
-        return {'action': None, 'safetylevel': None, 'comment': None}
+        if retcode != 0:
+            action, safetylevel = getActionForStatus(retcode)
+            return {'action': action, 'safetylevel': safetylevel, 'comment': output + ": " + str(retcode) + " (" + resolveRouterErrorCode(retcode) + ")" }
+
+        return {'action': None, 'safetylevel': -99, 'comment': ''}
 
     networkData = c.listNetworks({})
     for network in networkData:
-        if DEBUG > 0:
-            print " + Processing: network.name = %s (%s)" % (network.name, network.state)
+        debug(2, " + Processing: network.name = %s (%s)" % (network.name, network.state))
+        
         network.rr_type = False
         net_type = network.type
 
@@ -268,73 +332,73 @@ def getAdvisoriesNetworks(alarmedRoutersCache):
         if network.vpcid:
             net_type = 'VPCTier'
 
-        advRouters = []
+        escalated = []
         if opFilterRouters:
             routersData = c.getRouterData({'networkid': network.id})
             if routersData:
                 for r in routersData:
                     diag = examineRouter(alarmedRoutersCache, network, r)
                     if ( opFilterAll or (diag['action'] != None) ):
-                        advRouters = advRouters + [{ 'id': r.id, 'name': r.name, 'domain': network.domain, 'asset_type': 'router', 'adv_action': diag['action'], 'adv_safetylevel': diag['safetylevel'], 'adv_comment': diag['comment'] }]
+                        if diag['action'] == 'escalate':
+                            escalated = escalated + [{ 'id': r.id, 'name': r.name, 'domain': network.domain, 'asset_type': 'router', 'adv_action': diag['action'], 'adv_safetylevel': diag['safetylevel'], 'adv_comment': diag['comment'] }]
                         results = results + [{ 'id': r.id, 'name': r.name, 'domain': network.domain, 'asset_type': 'router', 'adv_action': diag['action'], 'adv_safetylevel': diag['safetylevel'], 'adv_comment': diag['comment'] }]
 
         
-        diag = examineNetwork(network, advRouters)
-        if ( opFilterAll or (opFilterNetworks and (diag['action'] != None)) ):
+        diag = examineNetwork(network, escalated)
+        if ( opFilterNetworks and (opFilterAll or (diag['action'] != None)) ):
             results = results + [{ 'id': network.id, 'type': net_type, 'name': network.name, 'domain': network.domain, 'rr_type': network.rr_type, 'restartrequired': network.restartrequired, 'state': network.state, 'asset_type': 'network', 'adv_action': diag['action'], 'adv_safetylevel': diag['safetylevel'], 'adv_comment': diag['comment'] }]
 
     vpcData = c.listVPCs({})
     for vpc in vpcData:
-        if DEBUG > 0:
-            print " + Processing: vpc.name = %s (%s)" % (vpc.name, vpc.state)
+        debug(2, " + Processing: vpc.name = %s (%s)" % (vpc.name, vpc.state))
         vpc.rr_type = False
         if vpc.redundantvpcrouter:
             vpc.rr_type = vpc.redundantvpcrouter
 
-        advRouters = []
+        escalated = []
         if opFilterRouters:
             routersData = c.getRouterData({'vpcid': vpc.id})
             if routersData:
                 for r in routersData:
                     diag = examineRouter(alarmedRoutersCache, vpc, r)
+                    # We include 'escalate' in case opFilterNetworks is not specified to notify that we need it
+                    # in order to fix this
                     if ( opFilterAll or (diag['action'] != None) ):
-                        advRouters = advRouters + [{ 'id': r.id, 'name': r.name, 'domain': vpc.domain, 'asset_type': 'router', 'adv_action': diag['action'], 'adv_safetylevel': diag['safetylevel'], 'adv_comment': diag['comment'] }]
+                        if (diag['action'] == 'escalate'):
+                            escalated = escalated + [{ 'id': r.id, 'name': r.name, 'domain': vpc.domain, 'asset_type': 'router', 'adv_action': diag['action'], 'adv_safetylevel': diag['safetylevel'], 'adv_comment': diag['comment'] }]
                         results = results + [{ 'id': r.id, 'name': r.name, 'domain': vpc.domain, 'asset_type': 'router', 'adv_action': diag['action'], 'adv_safetylevel': diag['safetylevel'], 'adv_comment': diag['comment'] }]
 
 
-        diag = examineNetwork(vpc, advRouters)
-        if ( opFilterAll or (opFilterNetworks and (diag['action'] != None)) ):
+        diag = examineNetwork(vpc, escalated)
+        if ( opFilterNetworks and (opFilterAll or (diag['action'] != None)) ):
             results = results + [{ 'id': vpc.id, 'type': 'VPC', 'name': vpc.name, 'domain': vpc.domain, 'rr_type': vpc.rr_type, 'restartrequired': vpc.restartrequired, 'state': vpc.state, 'asset_type': 'vpc', 'adv_action': diag['action'], 'adv_safetylevel': diag['safetylevel'], 'adv_comment': diag['comment'] }]
     
-    if DEBUG > 0:
-        print "getAdvisoriesNetworks/Routers : end"
+    debug(2, "getAdvisoriesNetworks/Routers : end")
 
     return results
 
-
-def cmdListAdvisories():
+def getAdvisories():
     def retrieveAlarmedRoutersCache():
-        print "+ Testing SSH to '%s'" % (MGMT_SERVER)
+        debug(2, "+ Testing SSH to '%s'" % (MGMT_SERVER))
         retcode, output = c.ssh.testSSHConnection(MGMT_SERVER)
-        print "   + retcode=%d, output=%s" % (retcode, output)
+        debug(2, "   + retcode=%d, output=%s" % (retcode, output))
         if retcode != 0:
             print "Failed to ssh to management server %s, please investigate." % (MGMT_SERVER)
             sys.exit(1)
 
         # MGMT servers are already checking the routerVMs, we can use that cache
         alarmedRoutersCache = {}
-        if DEBUG>0:
-            print "Fetching alarmed routers cache..."
+        debug(2, "Fetching alarmed routers cache...")
         mgtSsh = "cat /tmp/routervms_problem"
         retcode, output = c.ssh.runSSHCommand(MGMT_SERVER, mgtSsh)
-        print " + retcode=%d" % (retcode)
+        debug(2, " + retcode=%d" % (retcode))
+        
         import re
         lines = output.split('\n')
         for line in lines:
             m = re.match("(\S+) \[(.*)\] (\d+)", line)
             if m:
-                if DEBUG>0:
-                    print "r: %s, n: %s, code: %s" % (m.group(1), m.group(2), m.group(3))
+                debug(2, "r: %s, n: %s, code: %s" % (m.group(1), m.group(2), m.group(3)))
                 alarmedRoutersCache[m.group(1)] = { 'network': m.group(2), 'code': int(m.group(3)), 'checked': False }
         return alarmedRoutersCache
         
@@ -347,13 +411,17 @@ def cmdListAdvisories():
         results = results + getAdvisoriesHosts()
     if opFilterInstances:
         results = results + getAdvisoriesInstances()
-    counter = 0
 
     def getSortKey(item):
         return item['asset_type'].upper() + '-' + item['name'].upper() 
 
-    results = sorted(results, key=getSortKey)
-    
+    return sorted(results, key=getSortKey)
+
+
+def cmdListAdvisories():
+
+    results = getAdvisories()
+
 #    import pprint
 #    pp = pprint.PrettyPrinter(indent=4)
 #    pp.pprint(networkData)
@@ -368,15 +436,91 @@ def cmdListAdvisories():
         t.header = False
         t.padding_width = 1
 
+    counter = 0
     for a in results:
         counter = counter + 1
-
-        t.add_row([counter, a['asset_type'], a['name'], a['id'], a['domain'], a['adv_action'], a['adv_safetylevel'], a['adv_comment']])
+        t.add_row([counter, a['asset_type'], a['name'], a['id'], a['domain'], a['adv_action'], translateSafetyLevel(a['adv_safetylevel']), a['adv_comment']])
 
     # Display table
     print t
 
+def repairRouter(adv):
+    debug(2, "repairRouter(): router:%s, action:%s" % (adv['name'], adv['adv_action']))
+    if (DRYRUN==1) and (adv['adv_action'] in [ACTION_R_RST_PASSWD_SRV, ACTION_R_LOG_CLEANUP]):
+        return -2, 'Skipping, dryrun is on.'
+    if adv['adv_action'] == None:
+        return -2, ''
+
+    if adv['adv_action'] == ACTION_R_RST_PASSWD_SRV:
+        mgtSsh = '/usr/local/bin/routervm_ssh.sh ' + adv['name'] + ' /etc/init.d/cloud-passwd-srvr restart'
+        retcode, output = c.ssh.runSSHCommand(MGMT_SERVER, mgtSsh)
+        if retcode==0:
+            output = 'cloud-passwd-srvr restarted'
+        return retcode, output
+    if adv['adv_action'] == ACTION_R_LOG_CLEANUP:
+        mgtSsh = '/usr/local/bin/routervm_ssh.sh ' + adv['name'] + " '/usr/bin/find /var/log -mtime +2 -type f -exec rm -f \\{\\} \\\\\;'"
+        retcode, output = c.ssh.runSSHCommand(MGMT_SERVER, mgtSsh)
+        if retcode==0:
+            output = 'tried deleted -mtime +2 files'
+        return retcode, output
+
+    return -1, 'Not implemented'
+
+def repairNetwork(adv):
+    debug(2, "repairNetwork(): network:%s, action:%s" % (adv['name'], adv['adv_action']))
+    
+    if (DRYRUN==1) and (adv['adv_action'] in [ACTION_N_RESTART]):
+        return -2, 'Skipping, dryrun is on.'
+    if adv['adv_action'] == None:
+        return -2, ''
+
+    if (adv['adv_action']==ACTION_N_RESTART) and (SAFETYLEVEL==adv['adv_safetylevel']):
+        debug(2, ' + restart network.name=%s, .id=%s' % (adv['name'], adv['id']))
+        if c.restartNetwork(adv['id'], True):
+            return 1, 'Errors during the restart. Check messages above.'
+        else:
+            return 0, 'Network restarted without errors.'
+    
+    return -1, 'Not implemented'
+
+def cmdRepair():
+    debug(2, "cmdRepair : begin")
+    results = getAdvisories()
+    debug(2, " + found %d results" % (len(results)))
+    for adv in results:
+        if opFilterRouters and (adv['asset_type'] == 'router'):
+            applied,output = repairRouter(adv)
+        if opFilterNetworks and (adv['asset_type'] == 'network'):
+            applied, output = repairNetwork(adv)
+        if applied==0:
+            adv['repair_code'] = 'OK'
+            adv['repair_msg'] = 'Repair successful: ' + output
+        elif applied>0:
+            adv['repair_code'] = 'NOK'
+            adv['repair_msg'] = 'Repair unsuccesful: ' + output
+        else:
+            adv['repair_code'] = 'N/A'
+            adv['repair_msg'] = output
+
+    print
+    t = PrettyTable(["#", "Type", "Name", "ID", "Domain", "Action", "Result", "Comment"])
+    t.align["Comment"] = "l"
+    
+    if plainDisplay == 1:
+        t.border = False
+        t.header = False
+        t.padding_width = 1
+
+    counter = 0
+    for a in results:
+        counter = counter + 1
+        t.add_row([counter, a['asset_type'], a['name'], a['id'], a['domain'], a['adv_action'], a['repair_code'], a['repair_msg']])
+    print t
+
+    debug(2, "cmdRepair : end")
 
 
 if command == 'list':
     cmdListAdvisories()
+elif command == 'repair':
+    cmdRepair()  

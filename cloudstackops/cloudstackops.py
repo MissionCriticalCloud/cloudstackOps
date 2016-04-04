@@ -691,6 +691,7 @@ class CloudStackOps(CloudStackOpsBase):
 
         apicall = listHosts.listHostsCmd()
         apicall.id = (str(args['hostid'])) if 'hostid' in args else None
+        apicall.type = (str(args['type'])) if 'type' in args else None
         apicall.name = (str(args['hostname'])) if 'hostname' in args else None
 
         # Call CloudStack API
