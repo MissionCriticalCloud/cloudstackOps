@@ -51,6 +51,8 @@ ACTION_UNKNOWN = 'unknown'
 ACTION_MANUAL = 'manual'
 ACTION_ESCALATE = 'escalate'
 
+STATE_ALLOCATED = 'Allocated'
+
 def translateSafetyLevel(level):
     if level==SAFETY_BEST:
         return 'Best'
@@ -332,9 +334,9 @@ def getAdvisoriesNetworks(alarmedRoutersCache):
             for r in advRouters:
                 rnames = rnames + [ r['name'] ];
             if network.rr_type:
-                return {'action': ACTION_N_RESTART, 'safetylevel': SAFETY_BEST, 'comment': 'Network tainted, problems found with router(s): ' + ','.join(rnames)}
+                return {'action': ACTION_N_RESTART, 'safetylevel': SAFETY_BEST, 'comment': 'Network tainted (State:' + network.state + '), problems found with router(s): ' + ','.join(rnames)}
             else:
-                return {'action': ACTION_N_RESTART, 'safetylevel': SAFETY_DOWNTIME, 'comment': 'Network tainted, problems found with router(s): '+ ','.join(rnames)}
+                return {'action': ACTION_N_RESTART, 'safetylevel': SAFETY_DOWNTIME, 'comment': 'Network tainted (State:' + network.state + '), problems found with router(s): '+ ','.join(rnames)}
             
         return {'action': None, 'safetylevel': SAFETY_NA, 'comment': ''}
 
@@ -399,10 +401,20 @@ def getAdvisoriesNetworks(alarmedRoutersCache):
             str = str + [ 'check_routervms.py' ]
         return ",".join(str)
 
-    def getActionForStatus(statuscode):
-        if statuscode == 32:
+    def getActionForStatus(statuscode, rr_type):
+        if statuscode & 4:
+            if rr_type:
+                return ACTION_ESCALATE, SAFETY_BEST
+            else:
+                return ACTION_ESCALATE, SAFETY_DOWNTIME
+        if statuscode & 8:
+            if rr_type:
+                return ACTION_ESCALATE, SAFETY_BEST
+            else:
+                return ACTION_ESCALATE, SAFETY_DOWNTIME
+        if statuscode & 32:
             return ACTION_R_LOG_CLEANUP, SAFETY_BEST
-        if statuscode == 64:
+        if statuscode & 64:
             return ACTION_R_RST_PASSWD_SRV, SAFETY_BEST
         return ACTION_UNKNOWN, SAFETY_UNKNOWN
 
@@ -421,7 +433,7 @@ def getAdvisoriesNetworks(alarmedRoutersCache):
             retcode, output = examineRouterInternalsDeep(alarmedRoutersCache, router)
 
         if retcode != 0:
-            action, safetylevel = getActionForStatus(retcode)
+            action, safetylevel = getActionForStatus(retcode, network.rr_type)
             return {'action': action, 'safetylevel': safetylevel, 'comment': output + ": " + str(retcode) + " (" + resolveRouterErrorCode(retcode) + ")" }
 
         return {'action': None, 'safetylevel': SAFETY_NA, 'comment': ''}
@@ -445,14 +457,17 @@ def getAdvisoriesNetworks(alarmedRoutersCache):
 
         escalated = []
         if opFilterRouters:
-            routersData = c.getRouterData({'networkid': network.id})
-            if routersData:
-                for r in routersData:
-                    diag = examineRouter(alarmedRoutersCache, network, r)
-                    if ( opFilterAll or (diag['action'] != None) ):
-                        if diag['action'] == ACTION_ESCALATE:
-                            escalated = escalated + [{ 'id': r.id, 'name': r.name, 'domain': network.domain, 'asset_type': 'router', 'adv_action': diag['action'], 'adv_safetylevel': diag['safetylevel'], 'adv_comment': diag['comment'] }]
-                        results = results + [{ 'id': r.id, 'name': r.name, 'domain': network.domain, 'asset_type': 'router', 'adv_action': diag['action'], 'adv_safetylevel': diag['safetylevel'], 'adv_comment': diag['comment'] }]
+            # A network in state Allocated probably has routers Offline.
+            # In that case, redundancystate will always be UNKNOWN or even unexplicable states
+            if network.state != STATE_ALLOCATED:
+                routersData = c.getRouterData({'networkid': network.id})
+                if routersData:
+                    for r in routersData:
+                        diag = examineRouter(alarmedRoutersCache, network, r)
+                        if ( opFilterAll or (diag['action'] != None) ):
+                            if diag['action'] == ACTION_ESCALATE:
+                                escalated = escalated + [{ 'id': r.id, 'name': r.name, 'domain': network.domain, 'asset_type': 'router', 'adv_action': diag['action'], 'adv_safetylevel': diag['safetylevel'], 'adv_comment': diag['comment'] }]
+                            results = results + [{ 'id': r.id, 'name': r.name, 'domain': network.domain, 'asset_type': 'router', 'adv_action': diag['action'], 'adv_safetylevel': diag['safetylevel'], 'adv_comment': diag['comment'] }]
 
         
         diag = examineNetwork(network, escalated)
