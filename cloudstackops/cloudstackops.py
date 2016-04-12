@@ -1242,12 +1242,15 @@ class CloudStackOps(CloudStackOpsBase):
         apicall = listTemplates.listTemplatesCmd()
         apicall.keyword = (str(args['keyword'])) if 'keyword' in args and len(
             args['keyword']) > 0 else ""
+        apicall.name = (str(args['name'])) if 'name' in args and len(
+            args['name']) > 0 else ""
         apicall.zoneid = (str(args['zoneid'])) if 'zoneid' in args and len(
             args['zoneid']) > 0 else ""
         apicall.templatefilter = (str(args['templatefilter'])) if 'templatefilter' in args and len(
             args['templatefilter']) > 0 else "featured"
+        apicall.listall = args['listall'] if 'listall' in args else None
         apicall.page = 1
-        apicall.pagesize = 1500
+        apicall.pagesize = 1000
 
         # Call CloudStack API
         return self._callAPI(apicall)

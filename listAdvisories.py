@@ -62,6 +62,17 @@ def translateSafetyLevel(level):
         return 'N/A'
     return 'Unknown'
 
+def translateSafetyLevelString(level):
+    if level=='Best':
+        return SAFETY_BEST
+    if level=='Downtime':
+        return SAFETY_DOWNTIME
+    if level=='N/A':
+        return SAFETY_NA
+    if level=='Unknown':
+        return SAFETY_UNKNOWN
+    return None
+
 def handleArguments(argv):
     global DEBUG
     DEBUG = 0
@@ -69,6 +80,8 @@ def handleArguments(argv):
     DRYRUN = 1
     global QUICKSCAN
     QUICKSCAN = 1
+    global DEEPSCAN
+    DEEPSCAN = 0
     global SAFETYLEVEL
     SAFETYLEVEL = SAFETY_BEST
     global domainname
@@ -91,6 +104,8 @@ def handleArguments(argv):
     opFilterResources = False
     global opFilterAll
     opFilterAll = False
+    global opFilterSafetyLevel
+    opFilterSafetyLevel = None
     global PLATFORM
     PLATFORM = None
     global MGMT_SERVER
@@ -104,7 +119,8 @@ def handleArguments(argv):
         '\n  Modifiers:' + \
         '\n  --exec\tDisable dry-run mode. You\'l need this to perform changes to the platform.' + \
         '\n  --debug\tEnable debug mode. Use it multiple times to increase verbosity' + \
-        '\n  --deep \tPerform deep scan. By default, quick mode is used (using deferred collection methods)' + \
+        '\n  --live\tPerform live scan. By default, quick mode is used (using deferred/cached collection methods)' + \
+        '\n  --deep\tEnable further tests that usually produces a lot of results. For a list of tests, use -h with this option' + \
         '\n' + \
         '\n  Filters:' + \
         '\n  -n \t\tScan networks (incl. VPCs)' + \
@@ -112,12 +128,13 @@ def handleArguments(argv):
         '\n  -i \t\tScan instances' + \
         '\n  -H \t\tScan hypervisors' + \
         '\n  -t \t\tScan resource usage' + \
-        '\n  --all \tReport all assets of the selected types, independently of the presence of advisory '
+        '\n  --all \tReport all assets of the selected types, independently of the presence of advisory' + \
+        '\n  --safety <safety> \tFilter out advisories that are not at the specified safety level (default: ' + translateSafetyLevel(SAFETYLEVEL) + ')'
 
     try:
         opts, args = getopt.getopt(
             argv, "hc:nriHt", [
-                "config-profile=", "debug", "exec", "deep", "plain-display", "all", "repair" ])
+                "config-profile=", "debug", "exec", "deep", "live", "plain-display", "all", "repair", "safety=" ])
     except getopt.GetoptError as e:
         print "Error: " + str(e)
         print help
@@ -127,10 +144,10 @@ def handleArguments(argv):
         print help
         sys.exit(2)
 
+    helpRequested = False
     for opt, arg in opts:
         if opt == '-h':
-            print help
-            sys.exit()
+            helpRequested = True
         elif opt in ("-c", "--config-profile"):
             configProfileName = arg
             PLATFORM = configProfileName
@@ -141,8 +158,10 @@ def handleArguments(argv):
                 DEBUG = 2
         elif opt in ("--exec"):
             DRYRUN = 0
-        elif opt in ("--deep"):
+        elif opt in ("--live"):
             QUICKSCAN = 0
+        elif opt in ("--deep"):
+            DEEPSCAN = 1
         elif opt in ("--plain-display"):
             plainDisplay = 1
         elif opt in ("-n"):
@@ -159,6 +178,37 @@ def handleArguments(argv):
             opFilterAll = True
         elif opt in ("--repair"):
             command = 'repair'
+        elif opt in ("--safety"):
+            opFilterSafetyLevel = translateSafetyLevelString(arg)
+            if opFilterSafetyLevel != None:
+                SAFETYLEVEL = opFilterSafetyLevel
+
+    def printHelpTests():
+        print
+        print "List of tests available"
+        t = PrettyTable(["Scope", "Level", "Symptom / Probe / Detection", "Detection", "Recovery"])
+        t.align["Symptom / Probe / Detection"] = "l"
+        
+        if plainDisplay == 1:
+            t.border = False
+            t.header = False
+            t.padding_width = 1
+
+        t.add_row([ "network", "Normal", "Flag restart_required", True, True ])
+        t.add_row([ "router", "Normal", "Redundancy state", True, True ])
+        t.add_row([ "router", "Normal", "Output of check_router.sh is non-zero (dmesg,swap,resolv,ping,fs,disk,password)", True, True ])
+        t.add_row([ "router", "Deep", "Checks if router is running on the current systemvm template version", True, True ])
+        t.add_row([ "instance", "Normal", "Try to assess instance read-only state", True, False ])
+        t.add_row([ "instance", "Normal", "Queries libvirt usage records for abusers (CPU, I/O, etc)", True, False ])
+        t.add_row([ "hypervisor", "Normal", "Conntrack abusers", True, False ])
+        print t
+        
+    if helpRequested:
+        if DEEPSCAN:
+            printHelpTests()
+        else:
+            print help
+        sys.exit()
 
     if PLATFORM==None:
         print "No platform is specified. Please use the -c option."
@@ -418,7 +468,7 @@ def getAdvisoriesNetworks(alarmedRoutersCache):
             return ACTION_R_RST_PASSWD_SRV, SAFETY_BEST
         return ACTION_UNKNOWN, SAFETY_UNKNOWN
 
-    def examineRouter(alarmedRoutersCache, network, router):
+    def examineRouter(alarmedRoutersCache, network, router, currentRouterTemplateId):
         if router.isredundantrouter and (router.redundantstate not in ['MASTER', 'BACKUP']):
             if network.rr_type:
                 return {'action': ACTION_ESCALATE, 'safetylevel': SAFETY_BEST, 'comment': 'Redundancy state broken (' + router.redundantstate + '), redundancy present'}
@@ -436,7 +486,30 @@ def getAdvisoriesNetworks(alarmedRoutersCache):
             action, safetylevel = getActionForStatus(retcode, network.rr_type)
             return {'action': action, 'safetylevel': safetylevel, 'comment': output + ": " + str(retcode) + " (" + resolveRouterErrorCode(retcode) + ")" }
 
+        # We now assess if the router VM template is current
+        if (DEEPSCAN==1) and (currentRouterTemplateId!=None):
+            if router.templateid != currentRouterTemplateId:
+                if network.rr_type:
+                    return {'action': ACTION_ESCALATE, 'safetylevel': SAFETY_BEST, 'comment': 'Router using an old template, redundancy present'}
+                else:
+                    return {'action': ACTION_ESCALATE, 'safetylevel': SAFETY_DOWNTIME, 'comment': 'Router using an old template, no redundancy'}
+
         return {'action': None, 'safetylevel': SAFETY_NA, 'comment': ''}
+
+
+    # One of the router tests we can make is to assess it's template version, if it's 
+    # current to the Global Setting router.template.kvm, so let's fetch that one.
+    confrtpl = c.getConfiguration("router.template.kvm" )
+    routerTemplateName = confrtpl[0].value
+    # Watch out for the use of "keyword". It should be "name", but Marvin API returns more results than expected..
+    routerTemplateData = c.listTemplates({'templatefilter': 'all', 'keyword': routerTemplateName, 'listall': True})
+    routerTemplateId = None
+    for r in routerTemplateData:
+        if r.name == routerTemplateName:
+            routerTemplateId = r.id
+    if routerTemplateId == None:
+        print "WARNING: Could not find the 'router.template.kvm' setting (name: %s)" % (routerTemplateName)
+
 
     networkData = c.listNetworks({})
     for network in networkData:
@@ -463,7 +536,7 @@ def getAdvisoriesNetworks(alarmedRoutersCache):
                 routersData = c.getRouterData({'networkid': network.id})
                 if routersData:
                     for r in routersData:
-                        diag = examineRouter(alarmedRoutersCache, network, r)
+                        diag = examineRouter(alarmedRoutersCache, network, r, routerTemplateId)
                         if ( opFilterAll or (diag['action'] != None) ):
                             if diag['action'] == ACTION_ESCALATE:
                                 escalated = escalated + [{ 'id': r.id, 'name': r.name, 'domain': network.domain, 'asset_type': 'router', 'adv_action': diag['action'], 'adv_safetylevel': diag['safetylevel'], 'adv_comment': diag['comment'] }]
@@ -486,8 +559,8 @@ def getAdvisoriesNetworks(alarmedRoutersCache):
             routersData = c.getRouterData({'vpcid': vpc.id})
             if routersData:
                 for r in routersData:
-                    diag = examineRouter(alarmedRoutersCache, vpc, r)
-                    # We include 'escalate' in case opFilterNetworks is not specified to notify that we need it
+                    diag = examineRouter(alarmedRoutersCache, vpc, r, routerTemplateId)
+                    # We include 'escalate' in case opFilterNetworks is not set, to notify that we need it
                     # in order to fix this
                     if ( opFilterAll or (diag['action'] != None) ):
                         if diag['action'] == ACTION_ESCALATE:
@@ -564,6 +637,12 @@ def getAdvisories():
     def getSortKey(item):
         return item['asset_type'].upper() + '-' + item['name'].upper() 
 
+    # Filter out advisories not in the specified safety level, if set
+    newResults = []
+    for r in results:
+        if (opFilterSafetyLevel==None) or (r['adv_safetylevel']==SAFETYLEVEL):
+            newResults = newResults + [ r ]
+
     return sorted(results, key=getSortKey)
 
 
@@ -597,6 +676,10 @@ def repairRouter(adv):
     debug(2, "repairRouter(): router:%s, action:%s" % (adv['name'], adv['adv_action']))
     if (DRYRUN==1) and (adv['adv_action'] in [ACTION_R_RST_PASSWD_SRV, ACTION_R_LOG_CLEANUP]):
         return -2, 'Skipping, dryrun is on.'
+
+    if adv['adv_action'] == ACTION_ESCALATE:
+        return -2, 'Escalated'
+
     if adv['adv_action'] == None:
         return -2, ''
 
@@ -621,16 +704,19 @@ def repairNetwork(adv):
     if adv['adv_action'] == None:
         return -2, ''
 
-    if (adv['adv_action']==ACTION_N_RESTART) and (SAFETYLEVEL==adv['adv_safetylevel']):
-        debug(2, ' + restart network.name=%s, .id=%s' % (adv['name'], adv['id']))
-        if (DRYRUN==1) and (adv['adv_action'] in [ACTION_N_RESTART]):
-            return -2, 'Skipping, dryrun is on.'
-        print "Restarting network '%s'" % (adv['name'])
-        if c.restartNetwork(adv['id'], True):
-            return 1, 'Errors during the restart. Check messages above.'
+    if adv['adv_action']==ACTION_N_RESTART:
+        if SAFETYLEVEL==adv['adv_safetylevel']:
+            debug(2, ' + restart network.name=%s, .id=%s' % (adv['name'], adv['id']))
+            if DRYRUN==1:
+                return -2, 'Skipping, dryrun is on.'
+            print "Restarting network '%s'" % (adv['name'])
+            if c.restartNetwork(adv['id'], True):
+                return 1, 'Errors during the restart. Check messages above.'
+            else:
+                return 0, 'Network restarted without errors.'
         else:
-            return 0, 'Network restarted without errors.'
-    
+            return -2, 'Ignored by SafetyLevel scope (' + translateSafetyLevel(SAFETYLEVEL) + ')'
+
     return -1, 'Not implemented'
 
 def cmdRepair():
