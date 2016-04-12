@@ -40,6 +40,7 @@ def debug(level, args):
 
 SAFETY_BEST = 0
 SAFETY_DOWNTIME = 1
+SAFETY_GOOD = 2
 SAFETY_UNKNOWN = -1
 SAFETY_NA = -99
 
@@ -58,6 +59,8 @@ def translateSafetyLevel(level):
         return 'Best'
     if level==SAFETY_DOWNTIME:
         return 'Downtime'
+    if level==SAFETY_GOOD:
+        return 'Good'
     if level==SAFETY_NA:
         return 'N/A'
     return 'Unknown'
@@ -67,6 +70,8 @@ def translateSafetyLevelString(level):
         return SAFETY_BEST
     if level=='Downtime':
         return SAFETY_DOWNTIME
+    if level=='Good':
+        return SAFETY_GOOD
     if level=='N/A':
         return SAFETY_NA
     if level=='Unknown':
@@ -386,7 +391,10 @@ def getAdvisoriesNetworks(alarmedRoutersCache):
             if network.rr_type:
                 return {'action': ACTION_N_RESTART, 'safetylevel': SAFETY_BEST, 'comment': 'Network tainted (State:' + network.state + '), problems found with router(s): ' + ','.join(rnames)}
             else:
-                return {'action': ACTION_N_RESTART, 'safetylevel': SAFETY_DOWNTIME, 'comment': 'Network tainted (State:' + network.state + '), problems found with router(s): '+ ','.join(rnames)}
+                if network.type == 'Shared':
+                    return {'action': ACTION_N_RESTART, 'safetylevel': SAFETY_GOOD, 'comment': 'Network tainted (State:' + network.state + '), problems found with router(s): '+ ','.join(rnames)}
+                else:
+                    return {'action': ACTION_N_RESTART, 'safetylevel': SAFETY_DOWNTIME, 'comment': 'Network tainted (State:' + network.state + '), problems found with router(s): '+ ','.join(rnames)}
             
         return {'action': None, 'safetylevel': SAFETY_NA, 'comment': ''}
 
@@ -451,17 +459,23 @@ def getAdvisoriesNetworks(alarmedRoutersCache):
             str = str + [ 'check_routervms.py' ]
         return ",".join(str)
 
-    def getActionForStatus(statuscode, rr_type):
+    def getActionForStatus(statuscode, rr_type, net_type):
         if statuscode & 4:
             if rr_type:
                 return ACTION_ESCALATE, SAFETY_BEST
             else:
-                return ACTION_ESCALATE, SAFETY_DOWNTIME
+                if net_type == 'Shared':
+                    return ACTION_ESCALATE, SAFETY_GOOD
+                else:
+                    return ACTION_ESCALATE, SAFETY_DOWNTIME
         if statuscode & 8:
             if rr_type:
                 return ACTION_ESCALATE, SAFETY_BEST
             else:
-                return ACTION_ESCALATE, SAFETY_DOWNTIME
+                if net_type == 'Shared':
+                    return ACTION_ESCALATE, SAFETY_GOOD
+                else:
+                    return ACTION_ESCALATE, SAFETY_DOWNTIME
         if statuscode & 32:
             return ACTION_R_LOG_CLEANUP, SAFETY_BEST
         if statuscode & 64:
@@ -483,16 +497,19 @@ def getAdvisoriesNetworks(alarmedRoutersCache):
             retcode, output = examineRouterInternalsDeep(alarmedRoutersCache, router)
 
         if retcode != 0:
-            action, safetylevel = getActionForStatus(retcode, network.rr_type)
+            action, safetylevel = getActionForStatus(retcode, network.rr_type, network.type)
             return {'action': action, 'safetylevel': safetylevel, 'comment': output + ": " + str(retcode) + " (" + resolveRouterErrorCode(retcode) + ")" }
 
         # We now assess if the router VM template is current
         if (DEEPSCAN==1) and (currentRouterTemplateId!=None):
             if router.templateid != currentRouterTemplateId:
                 if network.rr_type:
-                    return {'action': ACTION_ESCALATE, 'safetylevel': SAFETY_BEST, 'comment': 'Router using an old template, redundancy present'}
+                    return {'action': ACTION_ESCALATE, 'safetylevel': SAFETY_BEST, 'comment': 'Router using obsolete template, redundancy present'}
                 else:
-                    return {'action': ACTION_ESCALATE, 'safetylevel': SAFETY_DOWNTIME, 'comment': 'Router using an old template, no redundancy'}
+                    if network.type == 'Shared':
+                        return {'action': ACTION_ESCALATE, 'safetylevel': SAFETY_GOOD, 'comment': 'Router using obsolete template, redundancy not critical'}
+                    else:
+                        return {'action': ACTION_ESCALATE, 'safetylevel': SAFETY_DOWNTIME, 'comment': 'Router using obsolete template, no redundancy'}
 
         return {'action': None, 'safetylevel': SAFETY_NA, 'comment': ''}
 
@@ -643,7 +660,7 @@ def getAdvisories():
         if (opFilterSafetyLevel==None) or (r['adv_safetylevel']==SAFETYLEVEL):
             newResults = newResults + [ r ]
 
-    return sorted(results, key=getSortKey)
+    return sorted(newResults, key=getSortKey)
 
 
 def cmdListAdvisories():
@@ -755,6 +772,8 @@ def cmdRepair():
 
     debug(2, "cmdRepair : end")
 
+if opFilterSafetyLevel:
+    print "Applying filter: safetylevel == %s" % translateSafetyLevel(opFilterSafetyLevel)
 
 if command == 'list':
     cmdListAdvisories()
