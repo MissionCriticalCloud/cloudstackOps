@@ -727,10 +727,12 @@ def repairNetwork(adv):
             if DRYRUN==1:
                 return -2, 'Skipping, dryrun is on.'
             print "Restarting network '%s'" % (adv['name'])
-            if c.restartNetwork(adv['id'], True):
-                return 1, 'Errors during the restart. Check messages above.'
-            else:
+            ret = c.restartNetwork(adv['id'], True)
+            debug(2, " + ret = " + str(ret))
+            if ret and (hasattr(ret, 'success')) and (ret.success == True):
                 return 0, 'Network restarted without errors.'
+            else:
+                return 1, 'Errors during the restart. Check messages above.'
         else:
             return -2, 'Ignored by SafetyLevel scope (' + translateSafetyLevel(SAFETYLEVEL) + ')'
 
