@@ -1760,3 +1760,14 @@ class CloudStackOps(CloudStackOpsBase):
             return None
          
         return self._callAPI(apicall)
+
+    # update network
+    def updateNetwork(self, args):
+        args = self.remove_empty_values(args)
+
+        apicall = updateNetwork.updateNetworkCmd()
+        apicall.id = str(args['id'])
+        apicall.networkofferingid = (str(args['networkofferingid'])) if 'networkofferingid' in args else None
+
+        # Call CloudStack API
+        return self._callAPI(apicall)
