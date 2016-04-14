@@ -1245,7 +1245,7 @@ class CloudStackOps(CloudStackOpsBase):
         apicall.name = (str(args['name'])) if 'name' in args and len(
             args['name']) > 0 else ""
         apicall.zoneid = (str(args['zoneid'])) if 'zoneid' in args and len(
-            args['zoneid']) > 0 else ""
+            args['zoneid']) > 0 else None
         apicall.templatefilter = (str(args['templatefilter'])) if 'templatefilter' in args and len(
             args['templatefilter']) > 0 else "featured"
         apicall.listall = args['listall'] if 'listall' in args else None

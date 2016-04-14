@@ -519,8 +519,13 @@ def getAdvisoriesNetworks(alarmedRoutersCache):
     confrtpl = c.getConfiguration("router.template.kvm" )
     routerTemplateName = confrtpl[0].value
     # Watch out for the use of "keyword". It should be "name", but Marvin API returns more results than expected..
-    routerTemplateData = c.listTemplates({'templatefilter': 'all', 'keyword': routerTemplateName, 'listall': True})
+    routerTemplateData = c.listTemplates({'templatefilter': 'all', 'keyword': routerTemplateName, 'listall': 'True'})
     routerTemplateId = None
+    
+    if type(routerTemplateData) is not list:
+        print "ERROR: Failed to acquire the current router template"
+        sys.exit(2)
+
     for r in routerTemplateData:
         if r.name == routerTemplateName:
             routerTemplateId = r.id
