@@ -114,6 +114,8 @@ def handleArguments(argv):
     global PLATFORM
     PLATFORM = None
     global MGMT_SERVER
+    global MGMT_SERVER_DATA
+    MGMT_SERVER_DATA = {}
 
     # Usage message
     help = "Usage: ./" + os.path.basename(__file__) + ' [options] ' + \
@@ -262,6 +264,13 @@ def examineHost(alarmedInstancesCache, host):
     ENABLED_INSPECTIONS += [ 'io-abuse' ]
     ENABLED_INSPECTIONS += [ 'conntrack' ]
     
+    if host.state != 'Up':
+        return { 'action': ACTION_MANUAL, 'safetylevel': SAFETY_NA, 'comment': 'Agent is not Up (' + host.state + ')' }
+
+    debug(2, 'Comparing h.version(%s) with MGMT version(%s)' % (host.version, MGMT_SERVER_DATA['version']))
+    if host.version != MGMT_SERVER_DATA['version']:
+        return { 'action': ACTION_MANUAL, 'safetylevel': SAFETY_NA, 'comment': 'Agent version mistatch (' + host.version + '!=' + MGMT_SERVER_DATA['version'] + ')' }
+
     nodeSrv = getHostIp(host)
     if 'io-abuse' in ENABLED_INSPECTIONS:
         nodeSsh = "/usr/local/nagios/libexec/nrpe_local/check_libvirt_storage.sh"
@@ -604,7 +613,7 @@ def getAdvisories():
     def retrieveAlarmedInstancesCache():
         alarmedInstancesCache = {}
         debug(2, "Fetching alarmed instances cache...")
-        mgtSsh = "grep -v -f /var/local/ack_readonly /tmp/vps_readonly 2>/dev/null"
+        mgtSsh = "grep -v -f /var/local/ack_readonly /tmp/vps_readonly 2>/dev/null || /bin/true"
         retcode, output = c.ssh.runSSHCommand(MGMT_SERVER, mgtSsh)
         debug(2, " + retcode=%d" % (retcode))
         
@@ -633,15 +642,34 @@ def getAdvisories():
                 debug(2, "r: %s, n: %s, code: %s" % (m.group(1), m.group(2), m.group(3)))
                 alarmedRoutersCache[m.group(1)] = { 'network': m.group(2), 'code': int(m.group(3)), 'checked': False }
         return alarmedRoutersCache
-        
 
-    # Test connection to MGMT_SERVER, we are going to need it
-    debug(2, "+ Testing SSH to '%s'" % (MGMT_SERVER))
-    retcode, output = c.ssh.testSSHConnection(MGMT_SERVER)
-    debug(2, "   + retcode=%d, output=%s" % (retcode, output))
-    if retcode != 0:
-        print "Failed to ssh to management server %s, please investigate." % (MGMT_SERVER)
-        sys.exit(1)
+    # MGMT servers are already checking the routerVMs, we can use that cache
+    def retrieveListHostsCache():
+        listHostsCache = {}
+        debug(2, "Fetching hosts/nodes cache...")
+        listHostsCache = c.getHostData({'type': 'Routing'})
+        for h in listHostsCache:
+            print " + Host: %s (state:%s, version:%s)" % (h.name, h.state, h.version)
+
+        return listHostsCache
+    
+    def testMgmtServerConnection():
+        # Test connection to MGMT_SERVER, we are going to need it
+        debug(2, "+ Testing SSH to '%s'" % (MGMT_SERVER))
+        retcode, output = c.ssh.testSSHConnection(MGMT_SERVER)
+        debug(2, "   + retcode=%d, output=%s" % (retcode, output))
+        if retcode != 0:
+            print "Failed to ssh to management server %s, please investigate." % (MGMT_SERVER)
+            sys.exit(1)
+
+        mgtSsh = "dpkg -l cloudstack-management | tail -n 1 | awk '{print $3}'"
+        retcode, output = c.ssh.runSSHCommand(MGMT_SERVER, mgtSsh)
+        MGMT_SERVER_DATA['version'] = '__UNKNOWN__'
+        if retcode == 0:
+            MGMT_SERVER_DATA['version'] = output
+            debug(2, '    + Got MGMTVERSION: ' + MGMT_SERVER_DATA['version'])
+        
+    testMgmtServerConnection()
 
     results = []
     if opFilterNetworks or opFilterRouters:
@@ -650,6 +678,7 @@ def getAdvisories():
     if opFilterInstances or opFilterHosts:
         alarmedInstancesCache = retrieveAlarmedInstancesCache()
     if opFilterHosts:
+        #listHostsCache = retrieveListHostsCache()
         results = results + getAdvisoriesHosts(alarmedInstancesCache)
     if opFilterInstances:
         results = results + getAdvisoriesInstances(alarmedInstancesCache)
