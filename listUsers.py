@@ -176,7 +176,8 @@ def getListUsers(filters):
         domainIdr = c.listDomainsExt({'name': filters['domain']})
         if domainIdr and len(domainIdr)>0:
             domainId = domainIdr[0].id
-        print '[d] resolved: domainName=%s, domainId=%s' % (filters['domain'], domainId)
+        if DEBUG==1:
+            print '[d] resolved: domainName=%s, domainId=%s' % (filters['domain'], domainId)
     
     userData = c.listUsersExt({'username': filters['username'], 'domainid': domainId, 'account': filters['account']})
     results = []
@@ -218,7 +219,7 @@ def cmdListUsers():
     print t
 
 def cmdDisableUsers():
-    userData = getListUsers({'username' : opFilterUsername, 'domain': opFilterDomain})
+    userData = getListUsers({'username' : opFilterUsername, 'domain': opFilterDomain, 'account': optAccount})
     cmdListUsers()
     if userData:
         for user in userData:
@@ -226,7 +227,7 @@ def cmdDisableUsers():
     cmdListUsers()
 
 def cmdEnableUsers():
-    userData = getListUsers({'username' : opFilterUsername, 'domain': opFilterDomain})
+    userData = getListUsers({'username' : opFilterUsername, 'domain': opFilterDomain, 'account': optAccount})
     cmdListUsers()
     if userData:
         for user in userData:
@@ -234,7 +235,7 @@ def cmdEnableUsers():
     cmdListUsers()
 
 def cmdDeleteUsers():
-    userData = getListUsers({'username' : opFilterUsername, 'domain': opFilterDomain})
+    userData = getListUsers({'username' : opFilterUsername, 'domain': opFilterDomain, 'account': optAccount})
     
     if userData:
         for user in userData:
