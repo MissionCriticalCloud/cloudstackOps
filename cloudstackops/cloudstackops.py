@@ -433,6 +433,36 @@ class CloudStackOps(CloudStackOpsBase):
         # Call CloudStack API
         return self._callAPI(apicall)
 
+    # Find enabled hosts in a given cluster excluding it's hosts which have been marked dedicated
+    def getSharedHostsFromCluster(self, clusterID):
+        apicall = listHosts.listHostsCmd()
+        apicall.clusterid = str(clusterID)
+        apicall.resourcestate = "Enabled"
+        apicall.listAll = "true"
+
+        # Call CloudStack API
+        clusterhostdetails  =  self._callAPI(apicall)
+
+        # Remove dedicated hosts from the results
+        dedicatedhosts = self.getDedicatedHosts()
+        clusterhostdetails_orig = list(clusterhostdetails)
+        if dedicatedhosts:
+            for h in clusterhostdetails_orig:
+                for d in dedicatedhosts:
+                    if h.name == d.name:
+                        if self.DEBUG == 1:
+                            print "Remove dedicated host from the list: " + str(d.name)
+                        clusterhostdetails.remove(h)
+        return clusterhostdetails
+
+    # Find dedicated hosts
+    def getDedicatedHosts(self):
+        apicall = listDedicatedHosts.listDedicatedHostsCmd()
+        apicall.listAll = "true"
+
+        # Call CloudStack API
+        return self._callAPI(apicall)
+
     # Generic listVirtualMachines function
     def listVirtualmachines(self, args):
         args = self.remove_empty_values(args)
@@ -1775,5 +1805,51 @@ class CloudStackOps(CloudStackOpsBase):
         apicall.id = str(args['id'])
         apicall.networkofferingid = (str(args['networkofferingid'])) if 'networkofferingid' in args else None
 
+    def listUsersExt(self, args):
+        if 'accounttype' in args.keys() and len(str(args['accounttype'])) == 0:
+            return 1
+
+        apicall = listUsers.listUsersCmd()
+        apicall.id = args['id'] if 'id' in args else None
+        apicall.username = args['username'] if 'username' in args else None
+        apicall.domainid = args['domainid'] if 'domainid' in args else None
+        apicall.account = args['account'] if 'account' in args else None
+        apicall.accounttype = args['accounttype'] if 'accounttype' in args else None
+        apicall.listAll = args['listall'] if 'listall' in args else True
+        
+        # Call CloudStack API
+        return self._callAPI(apicall)
+
+    def disableUser(self, userid):
+        apicall = disableUser.disableUserCmd()
+        apicall.id = userid
+        
+        # Call CloudStack API
+        return self._callAPI(apicall)
+
+    def enableUser(self, userid):
+        apicall = enableUser.enableUserCmd()
+        apicall.id = userid
+        
+        # Call CloudStack API
+        return self._callAPI(apicall)
+
+    def createUser(self, args):
+        apicall = createUser.createUserCmd()
+        apicall.username = args['username'] if 'username' in args else None
+        apicall.domainid = args['domainid'] if 'domainid' in args else None
+        apicall.firstname = args['firstname'] if 'firstname' in args else None
+        apicall.lastname = args['lastname'] if 'lastname' in args else None
+        apicall.email = args['email'] if 'email' in args else None
+        apicall.password = args['password'] if 'password' in args else None
+        apicall.account = args['account'] if 'account' in args else None
+
+        # Call CloudStack API
+        return self._callAPI(apicall)
+
+    def deleteUser(self, userid):
+        apicall = deleteUser.deleteUserCmd()
+        apicall.id = userid
+        
         # Call CloudStack API
         return self._callAPI(apicall)

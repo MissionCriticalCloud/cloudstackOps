@@ -638,6 +638,23 @@ Perform restarts on a subset (only VPCs with redundant VRs):
 $ ./listNetworkVRs.py --exec -r --type VPC --onlyRR
 ```
 
+Perform user maintenance
+------------------------
+This script will assist you in maintaining users across several domains and - especially - expiring them.
+
+```
+$ ./listUsers.py -u n.tavares
++---+--------+----------+------+-----------+--------------------------------------+-------+---------+----------+
+| # | Domain | Account  | Type |  Username |                  Id                  | First |   Last  |  State   |
++---+--------+----------+------+-----------+--------------------------------------+-------+---------+----------+
+| 1 |  ROOT  |  admin   |  1   | ntavares  | 37c92e7f-5bb6-485e-ba33-4db0e3f503ee |  Nuno | Tavares | enabled  |
+| 2 |  CDN   |   cdn    |  2   | ntavares  | 3e4bd323-9312-4936-ac94-1e1277b43c80 |  Nuno | Tavares | enabled  |
++---+--------+----------+------+-----------+--------------------------------------+-------+---------+----------+
+```
+
+```
+$ ./listUsers.py --disable -u n.tavares --domain CDN
+```
 
 Bugs
 =====
