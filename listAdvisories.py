@@ -647,7 +647,7 @@ def getAdvisories():
     if opFilterNetworks or opFilterRouters:
         alarmedRoutersCache = retrieveAlarmedRoutersCache()
         results = results + getAdvisoriesNetworks(alarmedRoutersCache)
-    if opFilterInstances:
+    if opFilterInstances or opFilterHosts:
         alarmedInstancesCache = retrieveAlarmedInstancesCache()
     if opFilterHosts:
         results = results + getAdvisoriesHosts(alarmedInstancesCache)
