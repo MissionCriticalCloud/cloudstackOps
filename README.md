@@ -120,6 +120,9 @@ You also need `pretty table`.
 
 `pip install -Iv prettytable`
 
+... and for the MySQL direct access, you'll need `mysql-connector-python`.
+
+`yum -y install mysql-connector-python`
 
 Tips
 ----
