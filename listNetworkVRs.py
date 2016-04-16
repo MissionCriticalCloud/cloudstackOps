@@ -38,6 +38,8 @@ def handleArguments(argv):
     DEBUG = 0
     global DRYRUN
     DRYRUN = 1
+    global EXTENDEDOUTPUT
+    EXTENDEDOUTPUT = 0
     global domainname
     domainname = ''
     global configProfileName
@@ -65,6 +67,7 @@ def handleArguments(argv):
     help = "Usage: ./" + os.path.basename(__file__) + ' [options] ' + \
         '\n  --config-profile -c <profilename>\t\tSpecify the CloudMonkey profile name to get the credentials from (or specify in ./config file)' + \
         '\n  --debug\t\t\t\t\tEnable debug mode' + \
+        '\n  --extended\t\t\t\t\tEnable extended info output' + \
         '\n  --exec\t\t\t\t\tExecute for real (not needed for list* scripts), default: dry-run' + \
         '\n  --plain-display\t\t\t\tEnable plain display, no pretty tables' + \
         '\n' + \
@@ -74,17 +77,17 @@ def handleArguments(argv):
         '\n' + \
         '\n  Filters:' + \
         '\n  --type <networkType> \t\t\t\tApplies filter to operation, Possible networkTypes: Isolated,Shared,VPC,VPCTier' + \
-        '\n  --not-type <networkType> \t\t\t\tApplies reverse filter to operation, Same network types as for --type' + \
+        '\n  --not-type <networkType> \t\t\tApplies reverse filter to operation, Same network types as for --type' + \
         '\n  --onlyNoRR \t\t\t\t\tSelects only non-redudant VR networks' + \
         '\n  --onlyRR \t\t\t\t\tSelects only redudant VR networks' + \
-        '\n  --onlyNO <networkofferingid>\t\t\t\t\tSelects only networks with specified networkofferingid' + \
+        '\n  --onlyNO <networkofferingid>\t\t\tSelects only networks with specified networkofferingid' + \
         '\n  --name -n <name> \t\t\t\tSelects only the specified asset (VPC/network)' + \
         '\n  --domain -d <name> \t\t\t\tSelects only networks from specified domain name'
 
     try:
         opts, args = getopt.getopt(
             argv, "hc:rn:d:u:", [
-                "config-profile=", "debug", "exec", "restart", "type=", "not-type=", "onlyNoRR", "onlyRR", "onlyNO", "name=", "plain-display", "domain=", "update="])
+                "config-profile=", "debug", "extended", "exec", "restart", "type=", "not-type=", "onlyNoRR", "onlyRR", "onlyNO=", "name=", "plain-display", "domain=", "update="])
     except getopt.GetoptError as e:
         print "Error: " + str(e)
         print help
@@ -98,32 +101,35 @@ def handleArguments(argv):
         if opt == '-h':
             print help
             sys.exit()
-        elif opt in ("-c", "--config-profile"):
+        elif opt in ["-c", "--config-profile"]:
             configProfileName = arg
-        elif opt in ("--domain", "-d"):
+        elif opt in ["--domain", "-d"]:
             opFilterDomain = arg
-        elif opt in ("--debug"):
+        elif opt in ["--debug"]:
             DEBUG = 1
-        elif opt in ("--exec"):
+        elif opt in ["--extended"]:
+            EXTENDEDOUTPUT = 1
+        elif opt in ["--exec"]:
             DRYRUN = 0
-        elif opt in ("-r", "--restart"):
+        elif opt in ["-r", "--restart"]:
             command = 'restartcleanup'
-        elif opt in ("-u", "--update"):
+        elif opt in ["-u", "--update"]:
             command = 'updateserviceoffering'
             opUpdateServiceOffering = arg
-        elif opt in ("--type"):
+        elif opt in ["--type"]:
             opFilter = arg
-        elif opt in ("-n", "--name"):
+        elif opt in ["-n", "--name"]:
             opFilterName = arg
-        elif opt in ("--not-type"):
+        elif opt in ["--not-type"]:
             opFilterNot = arg
-        elif opt in ("--onlyNoRR"):
-            opFilterNoRR = False
         elif opt in ("--onlyNO"):
+            print "setting onlyNO=%s" % arg
             opFilterNetworkOffering = arg
-        elif opt in ("--onlyRR"):
+        elif opt in ["--onlyNoRR"]:
+            opFilterNoRR = False
+        elif opt in ["--onlyRR"]:
             opFilterNoRR = True
-        elif opt in ("--plain-display"):
+        elif opt in ["--plain-display"]:
             plainDisplay = 1
 
     # Default to cloudmonkey default config file
@@ -162,8 +168,16 @@ if DEBUG == 1:
     print "ApiKey: " + c.apikey
     print "SecretKey: " + c.secretkey
 
+if DEBUG == 1:
+    print "opFilter=" + str(opFilter)
+    print "opFilterNot=" + str(opFilterNot)
+    print "opFilterNoRR=" + str(opFilterNoRR)
+    print "opFilterNetworkOffering=" + str(opFilterNetworkOffering)
+    print "opFilterName=" + str(opFilterName)
+    print "opFilterDomain=" + str(opFilterDomain)
 
 def getListNetworks(filter=None, filterNot=None, filterNoRR=None, assetName=None, domainName=None, filterNetworkOffering=None):
+
     cacheNetOffs = {}
     results = []
     if DEBUG == 1:
@@ -225,7 +239,7 @@ def getListNetworks(filter=None, filterNot=None, filterNoRR=None, assetName=None
         # END:NetworkCapabilitiesFIX
         
         if ( (filter in [None, net_type]) and (filterNot not in [net_type]) and (filterNoRR in [None, rr_type]) and (assetName in [None, network.name]) and (domainName in [None, network.domain]) and (filterNetworkOffering in [None, network.networkofferingid])):
-            results = results + [{ 'id': network.id, 'type': net_type, 'name': network.name, 'domain': network.domain, 'rr_type': rr_type, 'restartrequired': network.restartrequired, 'state': network.state, 'vrs': ','.join(routers) }]
+            results = results + [{ 'id': network.id, 'type': net_type, 'name': network.name, 'domain': network.domain, 'rr_type': rr_type, 'restartrequired': network.restartrequired, 'state': network.state, 'networkofferingid': network.networkofferingid, 'vrs': ','.join(routers) }]
 
     vpcData = c.listVPCs({'name': assetName, 'domainid': domainId})
     for vpc in vpcData:
@@ -240,7 +254,7 @@ def getListNetworks(filter=None, filterNot=None, filterNoRR=None, assetName=None
                 routers = routers + [ r.name ]
 
         if ( (filter in [None, 'VPC']) and (filterNot not in ['VPC']) and (filterNoRR in [None, rr_type]) and (assetName in [None, vpc.name]) and (domainName in [None, vpc.domain]) and (filterNetworkOffering in [None, network.networkofferingid]) ):
-             results = results + [{ 'id': vpc.id, 'type': 'VPC', 'name': vpc.name, 'domain': vpc.domain, 'rr_type': rr_type, 'restartrequired': vpc.restartrequired, 'state': vpc.state, 'vrs': ','.join(routers) }]
+             results = results + [{ 'id': vpc.id, 'type': 'VPC', 'name': vpc.name, 'domain': vpc.domain, 'rr_type': rr_type, 'restartrequired': vpc.restartrequired, 'state': vpc.state, 'networkofferingid': network.networkofferingid, 'vrs': ','.join(routers) }]
 
     def getSortKey(item):
         return item['name'].upper()
@@ -258,7 +272,10 @@ def cmdListNetworks():
     
     # Empty line
     print
-    t = PrettyTable(["#", "Network", "Type", "ID", "Domain", "State", "Redundant?", "RestartReq?", "VRs"])
+    if EXTENDEDOUTPUT==1:
+        t = PrettyTable(["#", "Network", "Type", "ID", "Domain", "State", "NetworkOffering", "Redundant?", "RestartReq?", "VRs"])
+    else:
+        t = PrettyTable(["#", "Network", "Type", "ID", "Domain", "State", "Redundant?", "RestartReq?", "VRs"])
     #t.align["VM"] = "l"
     
     if plainDisplay == 1:
@@ -269,7 +286,10 @@ def cmdListNetworks():
     for n in networkData:
         counter = counter + 1
 
-        t.add_row([counter, n['name'], n['type'], n['id'], n['domain'], n['state'], n['rr_type'], n['restartrequired'], n['vrs']])
+        if EXTENDEDOUTPUT==1:
+            t.add_row([counter, n['name'], n['type'], n['id'], n['domain'], n['state'], n['networkofferingid'], n['rr_type'], n['restartrequired'], n['vrs']])
+        else:
+            t.add_row([counter, n['name'], n['type'], n['id'], n['domain'], n['state'], n['rr_type'], n['restartrequired'], n['vrs']])
 
     # Display table
     print t
