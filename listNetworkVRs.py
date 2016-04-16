@@ -318,10 +318,18 @@ def cmdRestartNetworks():
                 print "[d]   + %s (state=%s, rr=%s)" % (r.name, r.state, r.redundantstate)
 
         sys.stdout.flush()
-        if n['type'] == 'VPC' and n['state'] == 'Enabled':
-            c.restartVPC(n['id'], True)
-        elif n['type'] in ('Isolated', 'Shared') and n['state'] == 'Implemented':
-            print c.restartNetwork(n['id'], True)
+        if (n['type'] == 'VPC') and (n['state'] == 'Enabled'):
+            if DRYRUN==0:
+                print "[I] DRYRUN==0: Skipped restartVPC(id=%, True)" % (n['id'])
+            else:
+                c.restartVPC(n['id'], True)
+        elif (n['type'] in ['Isolated', 'Shared']) and (n['state'] == 'Implemented'):
+            if DRYRUN==0:
+                print "[I] DRYRUN==0: Skipped restartNetwork(id=%, True)" % (n['id'])
+            else:
+                print c.restartNetwork(n['id'], True)
+        else:
+            print "[I] Skipped restartNetwork() due to unmet practical benefit"
 
 def cmdUpdateNetworks():
     # Let's make sure the network offering exists
@@ -346,10 +354,18 @@ def cmdUpdateNetworks():
             print "[d] + state=%s, type=%s, rr_type=%s" % (n['state'], n['type'], n['rr_type'])
             print "[d] + id=%s" % (n['id'])
         
-        if (n['type'] == 'VPC') and newno.forvpc:
-            c.updateNetwork({'id': n['id'], 'networkofferingid': newno.id})
+        if (n['type'] == 'VPC') and newno.forvpc and (DRYRUN==0):
+            if  DRYRUN==0:
+                print "[I] DRYRUN==0: Skipped updateNetwork(id=%, networkofferingid=%)" % (n['id'], newno.id)
+            else:
+                print c.updateNetwork({'id': n['id'], 'networkofferingid': newno.id})
         elif (n['type'] in ('Isolated', 'Shared')) and (not newno.forvpc):
-            print c.updateNetwork({'id': n['id'], 'networkofferingid': newno.id})
+            if  DRYRUN==0:
+                print "[I] DRYRUN==0: Skipped updateNetwork(id=%, networkofferingid=%)" % (n['id'], newno.id)
+            else:
+                print c.updateNetwork({'id': n['id'], 'networkofferingid': newno.id})
+        else:
+            print "[I] Skipped updateNetwork() due to unmet practical benefit"
 
 
 
