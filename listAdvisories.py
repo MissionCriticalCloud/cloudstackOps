@@ -604,7 +604,7 @@ def getAdvisories():
     def retrieveAlarmedInstancesCache():
         alarmedInstancesCache = {}
         debug(2, "Fetching alarmed instances cache...")
-        mgtSsh = "grep -v -f /var/local/ack_readonly /tmp/vps_readonly"
+        mgtSsh = "grep -v -f /var/local/ack_readonly /tmp/vps_readonly 2>/dev/null"
         retcode, output = c.ssh.runSSHCommand(MGMT_SERVER, mgtSsh)
         debug(2, " + retcode=%d" % (retcode))
         
