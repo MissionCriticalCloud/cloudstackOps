@@ -207,6 +207,8 @@ def handleArguments(argv):
         t.add_row([ "router", "Deep", "Checks if router is running on the current systemvm template version", True, True ])
         t.add_row([ "instance", "Normal", "Try to assess instance read-only state", True, False ])
         t.add_row([ "instance", "Normal", "Queries libvirt usage records for abusers (CPU, I/O, etc)", True, False ])
+        t.add_row([ "hypervisor", "Normal", "Agent state (version, conn state)", True, False ])
+        t.add_row([ "hypervisor", "Normal", "Load average", True, False ])
         t.add_row([ "hypervisor", "Normal", "Conntrack abusers", True, False ])
         print t
         
@@ -263,6 +265,7 @@ def examineHost(alarmedInstancesCache, host):
     ENABLED_INSPECTIONS = []
     ENABLED_INSPECTIONS += [ 'io-abuse' ]
     ENABLED_INSPECTIONS += [ 'conntrack' ]
+    ENABLED_INSPECTIONS += [ 'load-avg' ]
     
     if host.state != 'Up':
         return { 'action': ACTION_MANUAL, 'safetylevel': SAFETY_NA, 'comment': 'Agent is not Up (' + host.state + ')' }
@@ -272,6 +275,19 @@ def examineHost(alarmedInstancesCache, host):
         return { 'action': ACTION_MANUAL, 'safetylevel': SAFETY_NA, 'comment': 'Agent version mistatch (' + host.version + '!=' + MGMT_SERVER_DATA['version'] + ')' }
 
     nodeSrv = getHostIp(host)
+    if 'load-avg' in ENABLED_INSPECTIONS:
+        LOAD_AVG_MARGIN = 0.3
+        nodeSsh = "echo \"$(grep ^processor /proc/cpuinfo  | wc -l) $(awk '{print $2}' /proc/loadavg)\""
+        retcode, output = c.ssh.runSSHCommand(nodeSrv, nodeSsh)
+        
+        debug(2, " + Load average check: %s" % (output))
+        (n_cpus, loadavg) = output.split(' ')
+        n_cpus = int(n_cpus)
+        loadavg = float(loadavg)
+        debug(2, " + Load average check: %d  + %.0f%% < %.1f" % (n_cpus, LOAD_AVG_MARGIN*100, loadavg))
+        if loadavg > n_cpus*(1+LOAD_AVG_MARGIN):
+            return { 'action': ACTION_UNKNOWN, 'safetylevel': SAFETY_NA, 'comment': 'Hypervisor under pressure (load): %.1f' % loadavg }
+
     if 'io-abuse' in ENABLED_INSPECTIONS:
         nodeSsh = "/usr/local/nagios/libexec/nrpe_local/check_libvirt_storage.sh"
         retcode, output = c.ssh.runSSHCommand(nodeSrv, nodeSsh)
