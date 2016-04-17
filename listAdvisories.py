@@ -210,6 +210,8 @@ def handleArguments(argv):
         t.add_row([ "hypervisor", "Normal", "Agent state (version, conn state)", True, False ])
         t.add_row([ "hypervisor", "Normal", "Load average", True, False ])
         t.add_row([ "hypervisor", "Normal", "Conntrack abusers", True, False ])
+        t.add_row([ "hypervisor", "Normal", "check_libvirt_storage.sh correct functioning", True, False ])
+
         print t
         
     if helpRequested:
@@ -257,7 +259,6 @@ if DEBUG == 1:
 
 #
 # TODO : examine conntrack
-# TODO : /usr/local/nagios/libexec/nrpe_local/check_cloud_agents
 
 def examineHost(alarmedInstancesCache, host):
     def getHostIp(host):
@@ -267,10 +268,11 @@ def examineHost(alarmedInstancesCache, host):
     ENABLED_INSPECTIONS += [ 'conntrack' ]
     ENABLED_INSPECTIONS += [ 'load-avg' ]
     
+    debug(2, ' + Checking agent connection state: ' + host.state)
     if host.state != 'Up':
         return { 'action': ACTION_MANUAL, 'safetylevel': SAFETY_NA, 'comment': 'Agent is not Up (' + host.state + ')' }
 
-    debug(2, 'Comparing h.version(%s) with MGMT version(%s)' % (host.version, MGMT_SERVER_DATA['version']))
+    debug(2, ' + Comparing h.version(%s) with MGMT version(%s)' % (host.version, MGMT_SERVER_DATA['version']))
     if host.version != MGMT_SERVER_DATA['version']:
         return { 'action': ACTION_MANUAL, 'safetylevel': SAFETY_NA, 'comment': 'Agent version mistatch (' + host.version + '!=' + MGMT_SERVER_DATA['version'] + ')' }
 
@@ -279,18 +281,22 @@ def examineHost(alarmedInstancesCache, host):
         LOAD_AVG_MARGIN = 0.3
         nodeSsh = "echo \"$(grep ^processor /proc/cpuinfo  | wc -l) $(awk '{print $2}' /proc/loadavg)\""
         retcode, output = c.ssh.runSSHCommand(nodeSrv, nodeSsh)
+        debug(2, "   + Load average check output: %s" % (output))
         
-        debug(2, " + Load average check: %s" % (output))
         (n_cpus, loadavg) = output.split(' ')
         n_cpus = int(n_cpus)
         loadavg = float(loadavg)
-        debug(2, " + Load average check: %d  + %.0f%% < %.1f" % (n_cpus, LOAD_AVG_MARGIN*100, loadavg))
+        debug(2, "   + Load average check: %d  + %.0f%% < %.1f" % (n_cpus, LOAD_AVG_MARGIN*100, loadavg))
         if loadavg > n_cpus*(1+LOAD_AVG_MARGIN):
             return { 'action': ACTION_UNKNOWN, 'safetylevel': SAFETY_NA, 'comment': 'Hypervisor under pressure (load): %.1f' % loadavg }
 
     if 'io-abuse' in ENABLED_INSPECTIONS:
+        debug(2, ' + Checking I/O abuse...')
         nodeSsh = "/usr/local/nagios/libexec/nrpe_local/check_libvirt_storage.sh"
         retcode, output = c.ssh.runSSHCommand(nodeSrv, nodeSsh)
+
+        if retcode!=0:
+            return { 'action': ACTION_MANUAL, 'safetylevel': SAFETY_NA, 'comment': 'check_libvirt_storage.sh seems to be failing' }
 
         lines = output.split('\n')
         instances = {}
@@ -309,6 +315,7 @@ def examineHost(alarmedInstancesCache, host):
 
     if 'conntrack' in ENABLED_INSPECTIONS:
         CONNTRACK_RATIO_THRESHOLD_PC = 70
+        debug(2, ' + Checking conntrack...')
         #mgtSsh = "ssh -At %s ssh -At -p 3922 -i /root/.ssh/id_rsa.cloud -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no root@%s ls -la" % (router.hostname, router.linklocalip)
         #nodeSsh = 'CT_MAX=$(cat /proc/sys/net/netfilter/nf_conntrack_max); CT_COUNT=$(cat /proc/sys/net/netfilter/nf_conntrack_count); awk \'BEGIN {printf "%.2f",\${CT_COUNT}/\${CT_MAX}}\''
         nodeSsh = "echo \"$(cat /proc/sys/net/netfilter/nf_conntrack_count) $(cat /proc/sys/net/netfilter/nf_conntrack_max)\""
@@ -332,7 +339,7 @@ def getAdvisoriesHosts(alarmedInstancesCache):
     
     hostData = c.getHostData({'type': 'Routing'})
     for host in hostData:
-        debug(2, " + Processing: host.name = %s, type = %s" % (host.name, host.type))
+        debug(2, "Processing: host.name = %s, type = %s" % (host.name, host.type))
 
         diag = examineHost(alarmedInstancesCache, host)
         if opFilterAll or (diag['action'] != None):
@@ -678,12 +685,12 @@ def getAdvisories():
             print "Failed to ssh to management server %s, please investigate." % (MGMT_SERVER)
             sys.exit(1)
 
-        mgtSsh = "dpkg -l cloudstack-management | tail -n 1 | awk '{print $3}'"
-        retcode, output = c.ssh.runSSHCommand(MGMT_SERVER, mgtSsh)
         MGMT_SERVER_DATA['version'] = '__UNKNOWN__'
+        mgtSsh = "if [ -n \"$(which dpkg 2>/dev/null)\" ] ; then dpkg -l cloudstack-management | tail -n 1 | awk '{print $3}'; elif [ -n \"$(which rpm 2>/dev/null)\" ] ; then rpm -qa | grep cloudstack-management | tail -n 1 | sed 's,cloudstack-management-,,g; s,\.el6.*$,,g' ; fi"
+        retcode, output = c.ssh.runSSHCommand(MGMT_SERVER, mgtSsh)
         if retcode == 0:
             MGMT_SERVER_DATA['version'] = output
-            debug(2, '    + Got MGMTVERSION: ' + MGMT_SERVER_DATA['version'])
+        debug(2, '    + Got MGMTVERSION: ' + MGMT_SERVER_DATA['version'])
         
     testMgmtServerConnection()
 
@@ -723,7 +730,7 @@ def cmdListAdvisories():
     
     # Empty line
     print
-    t = PrettyTable(["#", "Type", "Name", "ID", "Domain", "Action", "SafetyLevel", "Comment"])
+    t = PrettyTable(["#", "Platf", "Type", "Name", "ID", "Domain", "Action", "SafetyLevel", "Comment"])
     t.align["Comment"] = "l"
     
     if plainDisplay == 1:
@@ -734,7 +741,7 @@ def cmdListAdvisories():
     counter = 0
     for a in results:
         counter = counter + 1
-        t.add_row([counter, a['asset_type'], a['name'], a['id'], a['domain'], a['adv_action'], translateSafetyLevel(a['adv_safetylevel']), a['adv_comment']])
+        t.add_row([counter, configProfileName, a['asset_type'], a['name'], a['id'], a['domain'], a['adv_action'], translateSafetyLevel(a['adv_safetylevel']), a['adv_comment']])
 
     # Display table
     print t
