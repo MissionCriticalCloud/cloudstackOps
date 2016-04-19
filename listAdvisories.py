@@ -491,7 +491,7 @@ def getAdvisoriesNetworks(alarmedRoutersCache):
             str = str + [ 'check_routervms.py' ]
         return ",".join(str)
 
-    def getActionForStatus(statuscode, rr_type, net_type):
+    def getActionForStatus(statuscode, router, rr_type, net_type):
         if statuscode & 4:
             if rr_type:
                 return ACTION_ESCALATE, SAFETY_BEST
@@ -511,7 +511,16 @@ def getAdvisoriesNetworks(alarmedRoutersCache):
         if statuscode & 32:
             return ACTION_R_LOG_CLEANUP, SAFETY_BEST
         if statuscode & 64:
-            return ACTION_R_RST_PASSWD_SRV, SAFETY_BEST
+            if router.cloudstackversion.startswith('4.7.1-'):
+                if rr_type:
+                    return ACTION_ESCALATE, SAFETY_BEST
+                else:
+                    if net_type == 'Shared':
+                        return ACTION_ESCALATE, SAFETY_GOOD
+                    else:
+                        return ACTION_ESCALATE, SAFETY_DOWNTIME
+            else:
+                return ACTION_R_RST_PASSWD_SRV, SAFETY_BEST
         return ACTION_UNKNOWN, SAFETY_UNKNOWN
 
     def examineRouter(alarmedRoutersCache, network, router, currentRouterTemplateId):
@@ -529,7 +538,7 @@ def getAdvisoriesNetworks(alarmedRoutersCache):
             retcode, output = examineRouterInternalsDeep(alarmedRoutersCache, router)
 
         if retcode != 0:
-            action, safetylevel = getActionForStatus(retcode, network.rr_type, network.type)
+            action, safetylevel = getActionForStatus(retcode, router, network.rr_type, network.type)
             return {'action': action, 'safetylevel': safetylevel, 'comment': output + ": " + str(retcode) + " (" + resolveRouterErrorCode(retcode) + ")" }
 
         # We now assess if the router VM template is current
