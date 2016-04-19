@@ -323,7 +323,12 @@ def cmdRestartNetworks():
                 print "[I] DRYRUN==0: Skipped restartVPC(id=%, True)" % (n['id'])
             else:
                 c.restartVPC(n['id'], True)
-        elif (n['type'] in ['Isolated', 'Shared']) and (n['state'] == 'Implemented'):
+        elif (n['type'] in ['Isolated']) and (n['state'] == 'Implemented'):
+            if DRYRUN==0:
+                print "[I] DRYRUN==0: Skipped restartNetwork(id=%, True)" % (n['id'])
+            else:
+                print c.restartNetwork(n['id'], True)
+        elif (n['type'] in ['Shared']) and (n['state'] == 'Setup'):
             if DRYRUN==0:
                 print "[I] DRYRUN==0: Skipped restartNetwork(id=%, True)" % (n['id'])
             else:
