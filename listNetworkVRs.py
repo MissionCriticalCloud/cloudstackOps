@@ -360,12 +360,12 @@ def cmdUpdateNetworks():
             print "[d] + id=%s" % (n['id'])
         
         if (n['type'] == 'VPC') and newno.forvpc and (DRYRUN==0):
-            if  DRYRUN==0:
+            if  DRYRUN==1:
                 print "[I] DRYRUN==0: Skipped updateNetwork(id=%, networkofferingid=%)" % (n['id'], newno.id)
             else:
                 print c.updateNetwork({'id': n['id'], 'networkofferingid': newno.id})
         elif (n['type'] in ('Isolated', 'Shared')) and (not newno.forvpc):
-            if  DRYRUN==0:
+            if  DRYRUN==1:
                 print "[I] DRYRUN==0: Skipped updateNetwork(id=%, networkofferingid=%)" % (n['id'], newno.id)
             else:
                 print c.updateNetwork({'id': n['id'], 'networkofferingid': newno.id})
