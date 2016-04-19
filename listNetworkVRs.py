@@ -298,13 +298,13 @@ def cmdRestartNetworks():
     networkData = getListNetworks(opFilter, opFilterNot, opFilterNoRR, opFilterName, opFilterDomain, opFilterNetworkOffering)
 
     print
-    import pprint
+    import pprin
     pp = pprint.PrettyPrinter(indent=4)
 #    pp.pprint(networkData)
 
     for n in networkData:
         print "[I] Restarting network/VPC: %s" % n['name']
-        if DEBUG ==1:
+        if DEBUG==1:
             print "[d] + state=%s, type=%s, rr_type=%s" % (n['state'], n['type'], n['rr_type'])
             print "[d] + id=%s" % (n['id'])
         
@@ -319,17 +319,17 @@ def cmdRestartNetworks():
 
         sys.stdout.flush()
         if (n['type'] == 'VPC') and (n['state'] == 'Enabled'):
-            if DRYRUN==0:
+            if DRYRUN==1:
                 print "[I] DRYRUN==0: Skipped restartVPC(id=%s, True)" % (n['id'])
             else:
                 c.restartVPC(n['id'], True)
         elif (n['type'] in ['Isolated']) and (n['state'] == 'Implemented'):
-            if DRYRUN==0:
+            if DRYRUN==1:
                 print "[I] DRYRUN==0: Skipped restartNetwork(id=%s, True)" % (n['id'])
             else:
                 print c.restartNetwork(n['id'], True)
         elif (n['type'] in ['Shared']) and (n['state'] == 'Setup'):
-            if DRYRUN==0:
+            if DRYRUN==1:
                 print "[I] DRYRUN==0: Skipped restartNetwork(id=%s, True)" % (n['id'])
             else:
                 print c.restartNetwork(n['id'], True)
