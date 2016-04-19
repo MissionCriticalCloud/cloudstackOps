@@ -1805,6 +1805,9 @@ class CloudStackOps(CloudStackOpsBase):
         apicall.id = str(args['id'])
         apicall.networkofferingid = (str(args['networkofferingid'])) if 'networkofferingid' in args else None
 
+        # Call CloudStack API
+        return self._callAPI(apicall)
+
     def listUsersExt(self, args):
         if 'accounttype' in args.keys() and len(str(args['accounttype'])) == 0:
             return 1
