@@ -298,7 +298,7 @@ def cmdRestartNetworks():
     networkData = getListNetworks(opFilter, opFilterNot, opFilterNoRR, opFilterName, opFilterDomain, opFilterNetworkOffering)
 
     print
-    import pprin
+    import pprint
     pp = pprint.PrettyPrinter(indent=4)
 #    pp.pprint(networkData)
 
