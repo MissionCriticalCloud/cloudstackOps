@@ -320,17 +320,17 @@ def cmdRestartNetworks():
         sys.stdout.flush()
         if (n['type'] == 'VPC') and (n['state'] == 'Enabled'):
             if DRYRUN==1:
-                print "[I] DRYRUN==0: Skipped restartVPC(id=%s, True)" % (n['id'])
+                print "[I] DRYRUN==1: Skipped restartVPC(id=%s, True)" % (n['id'])
             else:
                 c.restartVPC(n['id'], True)
         elif (n['type'] in ['Isolated']) and (n['state'] == 'Implemented'):
             if DRYRUN==1:
-                print "[I] DRYRUN==0: Skipped restartNetwork(id=%s, True)" % (n['id'])
+                print "[I] DRYRUN==1: Skipped restartNetwork(id=%s, True)" % (n['id'])
             else:
                 print c.restartNetwork(n['id'], True)
         elif (n['type'] in ['Shared']) and (n['state'] == 'Setup'):
             if DRYRUN==1:
-                print "[I] DRYRUN==0: Skipped restartNetwork(id=%s, True)" % (n['id'])
+                print "[I] DRYRUN==1: Skipped restartNetwork(id=%s, True)" % (n['id'])
             else:
                 print c.restartNetwork(n['id'], True)
         else:
@@ -361,12 +361,12 @@ def cmdUpdateNetworks():
         
         if (n['type'] == 'VPC') and newno.forvpc:
             if  DRYRUN==1:
-                print "[I] DRYRUN==0: Skipped updateNetwork(id=%s, networkofferingid=%s)" % (n['id'], newno.id)
+                print "[I] DRYRUN==1: Skipped updateNetwork(id=%s, networkofferingid=%s)" % (n['id'], newno.id)
             else:
                 print c.updateNetwork({'id': n['id'], 'networkofferingid': newno.id})
         elif (n['type'] in ('Isolated', 'Shared')) and (not newno.forvpc):
             if  DRYRUN==1:
-                print "[I] DRYRUN==0: Skipped updateNetwork(id=%s, networkofferingid=%s)" % (n['id'], newno.id)
+                print "[I] DRYRUN==1: Skipped updateNetwork(id=%s, networkofferingid=%s)" % (n['id'], newno.id)
             else:
                 print c.updateNetwork({'id': n['id'], 'networkofferingid': newno.id})
         else:
