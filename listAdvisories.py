@@ -431,7 +431,11 @@ def getAdvisoriesNetworks(alarmedRoutersCache):
             if network.rr_type:
                 return {'action': ACTION_N_RESTART, 'safetylevel': SAFETY_BEST, 'comment': 'Restart flag on, redundancy present'}
             else:
-                return {'action': ACTION_N_RESTART, 'safetylevel': SAFETY_DOWNTIME, 'comment': 'Restart flag on, no redundancy'}
+                 if network.type == 'Shared':
+                     return {'action': ACTION_N_RESTART, 'safetylevel': SAFETY_GOOD, 'comment': 'Restart flag on, no redundancy (Shared network)'}
+                 else:
+                     return {'action': ACTION_N_RESTART, 'safetylevel': SAFETY_DOWNTIME, 'comment': 'Restart flag on, no redundancy'}
+
         if len(advRouters)>0:
             rnames = [];
             for r in advRouters:
@@ -577,6 +581,7 @@ def getAdvisoriesNetworks(alarmedRoutersCache):
     for r in routerTemplateData:
         if r.name == routerTemplateName:
             routerTemplateId = r.id
+
     if routerTemplateId == None:
         print "WARNING: Could not find the 'router.template.kvm' setting (name: %s)" % (routerTemplateName)
 
@@ -584,6 +589,10 @@ def getAdvisoriesNetworks(alarmedRoutersCache):
     networkData = c.listNetworks({})
     for network in networkData:
         debug(2, " + Processing: network.name = %s (%s)" % (network.name, network.state))
+
+        if network.vpcid:
+            debug(2, '   + Skipped, sub-network analysis will done done at the VPC level (later)')
+            continue
         
         network.rr_type = False
         net_type = network.type
@@ -595,8 +604,6 @@ def getAdvisoriesNetworks(alarmedRoutersCache):
                         if cap.name == 'RedundantRouter':
                             if cap.value == 'true':
                                 network.rr_type = True
-        if network.vpcid:
-            net_type = 'VPCTier'
 
         escalated = []
         if opFilterRouters:
