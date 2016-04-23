@@ -285,11 +285,14 @@ def cmdListNetworks():
 
     for n in networkData:
         counter = counter + 1
+        n_name = n['name']
+        if plainDisplay:
+            n_name = n['name'].replace(' ', '_')
 
         if EXTENDEDOUTPUT==1:
-            t.add_row([counter, n['name'], n['type'], n['id'], n['domain'], n['state'], n['networkofferingid'], n['rr_type'], n['restartrequired'], n['vrs']])
+            t.add_row([counter, n_name, n['type'], n['id'], n['domain'], n['state'], n['networkofferingid'], n['rr_type'], n['restartrequired'], n['vrs']])
         else:
-            t.add_row([counter, n['name'], n['type'], n['id'], n['domain'], n['state'], n['rr_type'], n['restartrequired'], n['vrs']])
+            t.add_row([counter, n_name, n['type'], n['id'], n['domain'], n['state'], n['rr_type'], n['restartrequired'], n['vrs']])
 
     # Display table
     print t
