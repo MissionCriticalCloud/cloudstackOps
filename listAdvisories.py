@@ -260,6 +260,15 @@ if DEBUG == 1:
 #
 # TODO : examine conntrack
 
+def normalizePackageVersion(versionstr):
+    # At LSW, RPM version differs in the bugfix version number between - (Ubuntu) and . (CentOS)
+    # Example: 4.2.1-leaseweb34-1 (Ubuntu) vs. 4.2.1-leaseweb34.1 (CentOS)
+    # So, let's normallize version numbers:
+    #import re
+    #regex = re.compile(r'(\d+)[-\.](\d+)$', re.IGNORECASE)
+    #return regex.sub('\1-\2', versionstr)
+    return versionstr.replace('.', '-')
+
 def examineHost(alarmedInstancesCache, host):
     def getHostIp(host):
         return host.name + "." + PLATFORM
@@ -272,8 +281,9 @@ def examineHost(alarmedInstancesCache, host):
     if host.state != 'Up':
         return { 'action': ACTION_MANUAL, 'safetylevel': SAFETY_NA, 'comment': 'Agent is not Up (' + host.state + ')' }
 
-    debug(2, ' + Comparing h.version(%s) with MGMT version(%s)' % (host.version, MGMT_SERVER_DATA['version']))
-    if host.version != MGMT_SERVER_DATA['version']:
+    nodeversion = normalizePackageVersion(host.version)
+    debug(2, ' + Comparing h.version(%s) with MGMT version(%s)' % (nodeversion, MGMT_SERVER_DATA['version.normalized']))
+    if nodeversion != MGMT_SERVER_DATA['version.normalized']:
         return { 'action': ACTION_MANUAL, 'safetylevel': SAFETY_NA, 'comment': 'Agent version mistatch (' + host.version + '!=' + MGMT_SERVER_DATA['version'] + ')' }
 
     nodeSrv = getHostIp(host)
@@ -695,11 +705,13 @@ def getAdvisories():
             sys.exit(1)
 
         MGMT_SERVER_DATA['version'] = '__UNKNOWN__'
+        MGMT_SERVER_DATA['version.normalized'] = '__UNKNOWN__'
         mgtSsh = "if [ -n \"$(which dpkg 2>/dev/null)\" ] ; then dpkg -l cloudstack-management | tail -n 1 | awk '{print $3}'; elif [ -n \"$(which rpm 2>/dev/null)\" ] ; then rpm -qa | grep cloudstack-management | tail -n 1 | sed 's,cloudstack-management-,,g; s,\.el6.*$,,g' ; fi"
         retcode, output = c.ssh.runSSHCommand(MGMT_SERVER, mgtSsh)
         if retcode == 0:
             MGMT_SERVER_DATA['version'] = output
-        debug(2, '    + Got MGMTVERSION: ' + MGMT_SERVER_DATA['version'])
+            MGMT_SERVER_DATA['version.normalized'] = normalizePackageVersion(output)
+        debug(2, '    + Got MGMTVERSION: ' + MGMT_SERVER_DATA['version'] + ', normalized: ' + MGMT_SERVER_DATA['version.normalized'])
         
     testMgmtServerConnection()
 
