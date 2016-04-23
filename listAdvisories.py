@@ -521,16 +521,7 @@ def getAdvisoriesNetworks(alarmedRoutersCache):
         if statuscode & 32:
             return ACTION_R_LOG_CLEANUP, SAFETY_BEST
         if statuscode & 64:
-            if router.cloudstackversion.startswith('4.7.1-'):
-                if rr_type:
-                    return ACTION_ESCALATE, SAFETY_BEST
-                else:
-                    if net_type == 'Shared':
-                        return ACTION_ESCALATE, SAFETY_GOOD
-                    else:
-                        return ACTION_ESCALATE, SAFETY_DOWNTIME
-            else:
-                return ACTION_R_RST_PASSWD_SRV, SAFETY_BEST
+            return ACTION_R_RST_PASSWD_SRV, SAFETY_BEST
         return ACTION_UNKNOWN, SAFETY_UNKNOWN
 
     def examineRouter(alarmedRoutersCache, network, router, currentRouterTemplateId):
