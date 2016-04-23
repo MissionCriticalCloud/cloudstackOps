@@ -253,8 +253,8 @@ def getListNetworks(filter=None, filterNot=None, filterNoRR=None, assetName=None
             for r in routersData:
                 routers = routers + [ r.name ]
 
-        if ( (filter in [None, 'VPC']) and (filterNot not in ['VPC']) and (filterNoRR in [None, rr_type]) and (assetName in [None, vpc.name]) and (domainName in [None, vpc.domain]) and (filterNetworkOffering in [None, network.networkofferingid]) ):
-             results = results + [{ 'id': vpc.id, 'type': 'VPC', 'name': vpc.name, 'domain': vpc.domain, 'rr_type': rr_type, 'restartrequired': vpc.restartrequired, 'state': vpc.state, 'networkofferingid': network.networkofferingid, 'vrs': ','.join(routers) }]
+        if ( (filter in [None, 'VPC']) and (filterNot not in ['VPC']) and (filterNoRR in [None, rr_type]) and (assetName in [None, vpc.name]) and (domainName in [None, vpc.domain]) and (filterNetworkOffering in [None, vpc.networkofferingid]) ):
+             results = results + [{ 'id': vpc.id, 'type': 'VPC', 'name': vpc.name, 'domain': vpc.domain, 'rr_type': rr_type, 'restartrequired': vpc.restartrequired, 'state': vpc.state, 'networkofferingid': vpc.networkofferingid, 'vrs': ','.join(routers) }]
 
     def getSortKey(item):
         return item['name'].upper()
