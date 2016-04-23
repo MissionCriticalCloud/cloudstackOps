@@ -113,6 +113,8 @@ def handleArguments(argv):
     opFilterSafetyLevel = None
     global PLATFORM
     PLATFORM = None
+    global SEND_EMAIL
+    SEND_EMAIL = False
     global MGMT_SERVER
     global MGMT_SERVER_DATA
     MGMT_SERVER_DATA = {}
@@ -128,6 +130,7 @@ def handleArguments(argv):
         '\n  --debug\tEnable debug mode. Use it multiple times to increase verbosity' + \
         '\n  --live\tPerform live scan. By default, quick mode is used (using deferred/cached collection methods)' + \
         '\n  --deep\tEnable further tests that usually produces a lot of results. For a list of tests, use -h with this option' + \
+        '\n  --email\tSend Repair Report by email' + \
         '\n' + \
         '\n  Filters:' + \
         '\n  -n \t\tScan networks (incl. VPCs)' + \
@@ -141,7 +144,7 @@ def handleArguments(argv):
     try:
         opts, args = getopt.getopt(
             argv, "hc:nriHt", [
-                "config-profile=", "debug", "exec", "deep", "live", "plain-display", "all", "repair", "safety=" ])
+                "config-profile=", "debug", "exec", "deep", "live", "plain-display", "all", "repair", "safety=", 'email' ])
     except getopt.GetoptError as e:
         print "Error: " + str(e)
         print help
@@ -169,6 +172,8 @@ def handleArguments(argv):
             QUICKSCAN = 0
         elif opt in ("--deep"):
             DEEPSCAN = 1
+        elif opt in ("--email"):
+            SEND_EMAIL = True
         elif opt in ("--plain-display"):
             plainDisplay = 1
         elif opt in ("-n"):
@@ -234,6 +239,7 @@ def handleArguments(argv):
 # Parse arguments
 if __name__ == "__main__":
     handleArguments(sys.argv[1:])
+    debug(2, 'Command line args: ' + str(sys.argv))
 
 # Init our class
 c = cloudstackops.CloudStackOps(DEBUG, DRYRUN)
@@ -731,7 +737,6 @@ def getAdvisories():
 
     return sorted(newResults, key=getSortKey)
 
-
 def cmdListAdvisories():
 
     results = getAdvisories()
@@ -757,6 +762,24 @@ def cmdListAdvisories():
 
     # Display table
     print t
+
+    if SEND_EMAIL and counter>0:
+        if not c.errors_to:
+            print "Warning: Skipping mailing due to missing e-mail address."
+
+        templatefile = open(
+            "email_template/advisoriesReport.txt",
+            "r")
+        emailbody = templatefile.read()
+        emailbody = emailbody.replace("PLATFORM", PLATFORM)
+        emailbody = emailbody.replace("ADVISORIES_REPORT", str(t))
+        emailbody = emailbody.replace("COMMAND_LINE", str(sys.argv))
+        templatefile.close()
+
+        msgSubject = '[' + PLATFORM + '] listAdvisories Report'
+
+        # Notify admin
+        c.sendMail(c.mail_from, c.errors_to, msgSubject, emailbody)
 
 def repairRouter(adv):
     debug(2, "repairRouter(): router:%s, action:%s" % (adv['name'], adv['adv_action']))
@@ -807,6 +830,7 @@ def repairNetwork(adv):
 
     return -1, 'Not implemented'
 
+
 def cmdRepair():
     debug(2, "cmdRepair : begin")
     results = getAdvisories()
@@ -840,6 +864,24 @@ def cmdRepair():
         counter = counter + 1
         t.add_row([counter, a['asset_type'], a['name'], a['id'], a['domain'], a['adv_action'], a['repair_code'], a['repair_msg']])
     print t
+
+    if SEND_EMAIL and counter>0:
+        if not c.errors_to:
+            print "Warning: Skipping mailing due to missing e-mail address."
+
+        templatefile = open(
+            "email_template/advisoriesRepairReport.txt",
+            "r")
+        emailbody = templatefile.read()
+        emailbody = emailbody.replace("PLATFORM", PLATFORM)
+        emailbody = emailbody.replace("REPAIR_REPORT", str(t))
+        emailbody = emailbody.replace("COMMAND_LINE", str(sys.argv))
+        templatefile.close()
+
+        msgSubject = '[' + PLATFORM + '] listAdvisories Repair Report'
+
+        # Notify admin
+        c.sendMail(c.mail_from, c.errors_to, msgSubject, emailbody)
 
     debug(2, "cmdRepair : end")
 

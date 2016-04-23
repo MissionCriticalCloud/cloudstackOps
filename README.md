@@ -677,6 +677,7 @@ Usage: ./listAdvisories.py [options]
   --debug	Enable debug mode. Use it multiple times to increase verbosity
   --live	Perform live scan. By default, quick mode is used (using deferred/cached collection methods)
   --deep	Enable further tests that usually produces a lot of results. For a list of tests, use -h with this option
+  --email	Send Repair Report by email
 
   Filters:
   -n 		Scan networks (incl. VPCs)
@@ -703,7 +704,10 @@ List of tests available
 |   router   |  Deep  | Checks if router is running on the current systemvm template version            |    True   |   True   |
 |  instance  | Normal | Try to assess instance read-only state                                          |    True   |  False   |
 |  instance  | Normal | Queries libvirt usage records for abusers (CPU, I/O, etc)                       |    True   |  False   |
+| hypervisor | Normal | Agent state (version, conn state)                                               |    True   |  False   |
+| hypervisor | Normal | Load average                                                                    |    True   |  False   |
 | hypervisor | Normal | Conntrack abusers                                                               |    True   |  False   |
+| hypervisor | Normal | check_libvirt_storage.sh correct functioning                                    |    True   |  False   |
 +------------+--------+---------------------------------------------------------------------------------+-----------+----------+
 ```
 

@@ -1,0 +1,17 @@
+Dear PLATFORM Administrator,
+<P>
+The following actions were taken by the <a href="https://github.com/ntavares/cloudstackOps">cloudstackOps:listAdvisories</a> tool in the referred platform:
+<P>
+<PRE>
+REPAIR_REPORT
+</PRE>
+<P>
+Command line used:
+<PRE>
+COMMAND_LINE
+</PRE>
+Kind Regards,
+<BR>
+--
+<BR>
+The Cloud Team
