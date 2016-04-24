@@ -454,7 +454,7 @@ def getAdvisoriesNetworks(alarmedRoutersCache):
     # Note: Development was dropped in favor of examineRouterInternalsQuick()
     # TODO we should provide a --deep switch
     def examineRouterInternalsDeep(alarmedRoutersCache, router):
-        debug(2, "   + router: name: %s, ip=%s, host=%s, tpl=%s" % (router.name, router.linklocalip, router.hostname, router.templateversion))
+        debug(2, "   + router: name: %s, ip=%s, host=%s, tpl=%s" % (router.name, router.linklocalip, router.hostname, (router.version if router.templateversion==None else router.templateversion)))
 
         # Use the cache anyway, to mark already checked routers:
         if router.name in alarmedRoutersCache.keys():
@@ -479,7 +479,7 @@ def getAdvisoriesNetworks(alarmedRoutersCache):
         return retcode, output
 
     def examineRouterInternalsQuick(alarmedRoutersCache, router):
-        debug(2, "   + router: name: %s, ip=%s, host=%s, tpl=%s" % (router.name, router.linklocalip, router.hostname, router.templateversion))
+        debug(2, "   + router: name: %s, ip=%s, host=%s, tpl=%s" % (router.name, router.linklocalip, router.hostname, (router.version if router.templateversion==None else router.templateversion)))
 
         if router.name in alarmedRoutersCache.keys():
             if not alarmedRoutersCache[router.name]['checked']:
