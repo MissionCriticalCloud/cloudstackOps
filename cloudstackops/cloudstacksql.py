@@ -83,7 +83,9 @@ class CloudStackSQL(CloudStackOpsBase):
             hypervisorNameWhere = ""
 
         cursor = self.conn.cursor()
-        cursor.execute("SELECT vm.name, \
+        cursor.execute("SELECT \
+        d.name AS domain, \
+        vm.name AS vmname, \
         ha.type, \
         vm.state, \
         ha.created, \
@@ -96,9 +98,10 @@ class CloudStackSQL(CloudStackOpsBase):
         LEFT JOIN cloud.mshost ms ON ms.msid=ha.mgmt_server_id \
         LEFT JOIN cloud.vm_instance vm ON vm.id=ha.instance_id \
         LEFT JOIN cloud.host ON host.id=ha.host_id \
+        LEFT JOIN cloud.domain d ON vm.domain_id = d.id \
         WHERE ha.created > DATE_SUB(NOW(), INTERVAL 1 DAY) " +
                        hypervisorNameWhere + " \
-        ORDER BY ha.created desc \
+        ORDER BY domain,ha.created desc \
         ;")
         result = cursor.fetchall()
         cursor.close()
