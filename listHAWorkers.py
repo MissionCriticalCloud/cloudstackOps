@@ -131,6 +131,7 @@ elif DEBUG == 1:
 haworkers = s.getHAWorkerData(hypervisorName)
 counter = 0
 t = PrettyTable([
+    "Domain",
     "VM",
     "Type",
     "VM state",
@@ -147,7 +148,7 @@ if plainDisplay == 1:
     t.header = False
     t.padding_width = 1
 
-for (vmname, vm_type, state, created, taken, step, hypervisor, mgtname,
+for (domain,vmname, vm_type, state, created, taken, step, hypervisor, mgtname,
         hastate) in haworkers:
     if onlyNonRunning == 1 and state == "Running":
         continue
@@ -156,6 +157,7 @@ for (vmname, vm_type, state, created, taken, step, hypervisor, mgtname,
     counter = counter + 1
     displayname = (vmname[:28] + '..') if len(vmname) >= 31 else vmname
     t.add_row([
+        domain,
         displayname,
         vm_type,
         state,
