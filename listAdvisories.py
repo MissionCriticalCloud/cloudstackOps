@@ -540,6 +540,12 @@ def getAdvisoriesNetworks(alarmedRoutersCache):
                 return {'action': ACTION_ESCALATE, 'safetylevel': SAFETY_BEST, 'comment': 'Redundancy state broken (' + router.redundantstate + '), redundancy present'}
             else:
                 return {'action': ACTION_ESCALATE, 'safetylevel': SAFETY_DOWNTIME, 'comment': 'Redundancy state broken (' + router.redundantstate + '), no redundancy'}
+
+        if router.requiresupgrade:
+            if network.rr_type:
+                return {'action': ACTION_ESCALATE, 'safetylevel': SAFETY_BEST, 'comment': 'Redundancy requires upgrade, redundancy present'}
+            else:
+                return {'action': ACTION_ESCALATE, 'safetylevel': SAFETY_DOWNTIME, 'comment': 'Redundancy requires upgrade, no redundancy'}
         
         # We should now try to assess the router internal status (with SSH)
         #retcode, output = examineRouterInternals(router)
