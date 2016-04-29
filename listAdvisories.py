@@ -209,7 +209,9 @@ def handleArguments(argv):
         t.add_row([ "network", "Normal", "Flag restart_required", True, True ])
         t.add_row([ "router", "Normal", "Redundancy state", True, True ])
         t.add_row([ "router", "Normal", "Output of check_router.sh is non-zero (dmesg,swap,resolv,ping,fs,disk,password)", True, True ])
+        t.add_row([ "router", "Normal", "Checks if router has requiresUpgrade flag on", True, True ])
         t.add_row([ "router", "Deep", "Checks if router is running on the current systemvm template version", True, True ])
+        t.add_row([ "router", "Deep", "Checks if router is based on the same package version than management (router.cloudstackversion)", True, True ])
         t.add_row([ "instance", "Normal", "Try to assess instance read-only state", True, False ])
         t.add_row([ "instance", "Normal", "Queries libvirt usage records for abusers (CPU, I/O, etc)", True, False ])
         t.add_row([ "hypervisor", "Normal", "Agent state (version, conn state)", True, False ])
@@ -568,6 +570,19 @@ def getAdvisoriesNetworks(alarmedRoutersCache):
                         return {'action': ACTION_ESCALATE, 'safetylevel': SAFETY_GOOD, 'comment': 'Router using obsolete template, redundancy not critical'}
                     else:
                         return {'action': ACTION_ESCALATE, 'safetylevel': SAFETY_DOWNTIME, 'comment': 'Router using obsolete template, no redundancy'}
+
+        rversion = normalizePackageVersion(router.cloudstackversion)
+        if (DEEPSCAN==1) and (router.cloudstackversion):
+            rversion = normalizePackageVersion(router.cloudstackversion)
+            if rversion != MGMT_SERVER_DATA['version.normalized'] :
+                if network.rr_type:
+                    return {'action': ACTION_ESCALATE, 'safetylevel': SAFETY_BEST, 'comment': 'Router in deprecated version, redundancy presentt'}
+                else:
+                    if network.type == 'Shared':
+                        return {'action': ACTION_ESCALATE, 'safetylevel': SAFETY_GOOD, 'comment': 'Router in deprecated version, redundancy not critical'}
+                    else:
+                        return {'action': ACTION_ESCALATE, 'safetylevel': SAFETY_DOWNTIME, 'comment': 'Router in deprecated version, no redundancy'}
+                
 
         return {'action': None, 'safetylevel': SAFETY_NA, 'comment': ''}
 
