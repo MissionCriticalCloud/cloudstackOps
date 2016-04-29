@@ -535,18 +535,18 @@ def getAdvisoriesNetworks(alarmedRoutersCache):
         return ACTION_UNKNOWN, SAFETY_UNKNOWN
 
     def examineRouter(alarmedRoutersCache, network, router, currentRouterTemplateId):
-        if router.isredundantrouter and (router.redundantstate not in ['MASTER', 'BACKUP']):
-            if network.rr_type:
-                return {'action': ACTION_ESCALATE, 'safetylevel': SAFETY_BEST, 'comment': 'Redundancy state broken (' + router.redundantstate + '), redundancy present'}
-            else:
-                return {'action': ACTION_ESCALATE, 'safetylevel': SAFETY_DOWNTIME, 'comment': 'Redundancy state broken (' + router.redundantstate + '), no redundancy'}
-
         if router.requiresupgrade:
             if network.rr_type:
                 return {'action': ACTION_ESCALATE, 'safetylevel': SAFETY_BEST, 'comment': 'Redundancy requires upgrade, redundancy present'}
             else:
                 return {'action': ACTION_ESCALATE, 'safetylevel': SAFETY_DOWNTIME, 'comment': 'Redundancy requires upgrade, no redundancy'}
         
+        if router.isredundantrouter and (router.redundantstate not in ['MASTER', 'BACKUP']):
+            if network.rr_type:
+                return {'action': ACTION_ESCALATE, 'safetylevel': SAFETY_BEST, 'comment': 'Redundancy state broken (' + router.redundantstate + '), redundancy present'}
+            else:
+                return {'action': ACTION_ESCALATE, 'safetylevel': SAFETY_DOWNTIME, 'comment': 'Redundancy state broken (' + router.redundantstate + '), no redundancy'}
+
         # We should now try to assess the router internal status (with SSH)
         #retcode, output = examineRouterInternals(router)
         if QUICKSCAN==1:
@@ -577,7 +577,7 @@ def getAdvisoriesNetworks(alarmedRoutersCache):
     confrtpl = c.getConfiguration("router.template.kvm" )
     routerTemplateName = confrtpl[0].value
     # Watch out for the use of "keyword". It should be "name", but Marvin API returns more results than expected..
-    routerTemplateData = c.listTemplates({'templatefilter': 'all', 'keyword': routerTemplateName, 'listall': 'True'})
+    routerTemplateData = c.listTemplates({'templatefilter': 'all', 'keyword': routerTemplateName, 'listall': 'True', 'state': 'Active'})
     routerTemplateId = None
     
     if type(routerTemplateData) is not list:
