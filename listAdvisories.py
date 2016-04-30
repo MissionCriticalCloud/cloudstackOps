@@ -731,7 +731,7 @@ def getAdvisories():
 
         MGMT_SERVER_DATA['version'] = '__UNKNOWN__'
         MGMT_SERVER_DATA['version.normalized'] = '__UNKNOWN__'
-        mgtSsh = "if [ -n \"$(which dpkg 2>/dev/null)\" ] ; then dpkg -l cloudstack-management | tail -n 1 | awk '{print $3}'; elif [ -n \"$(which rpm 2>/dev/null)\" ] ; then rpm -qa | grep cloudstack-management | tail -n 1 | sed 's,cloudstack-management-,,g; s,\.el6.*$,,g' ; fi"
+        mgtSsh = "if [ -n \"$(which dpkg 2>/dev/null)\" ] ; then dpkg -l cloudstack-management | tail -n 1 | awk '{print $3}'; elif [ -n \"$(which rpm 2>/dev/null)\" ] ; then rpm -qa | grep cloudstack-management | tail -n 1 | sed 's,cloudstack-management-,,g; s,\.el6.*$,,g; s,\.el7.*,,g'; fi"
         retcode, output = c.ssh.runSSHCommand(MGMT_SERVER, mgtSsh)
         if retcode == 0:
             MGMT_SERVER_DATA['version'] = output
@@ -846,8 +846,12 @@ def repairNetwork(adv):
             debug(2, ' + restart network.name=%s, .id=%s' % (adv['name'], adv['id']))
             if DRYRUN==1:
                 return -2, 'Skipping, dryrun is on.'
-            print "Restarting network '%s'" % (adv['name'])
-            ret = c.restartNetwork(adv['id'], True)
+            if adv['asset_type']=='network':
+                print "Restarting network '%s'" % (adv['name'])
+                ret = c.restartNetwork(adv['id'], True)
+            elif adv['asset_type']=='vpc':
+                print "Restarting vpc '%s'" % (adv['name'])
+                ret = c.restartVPC(adv['id'], True)
             debug(2, " + ret = " + str(ret))
             if ret and (hasattr(ret, 'success')) and (ret.success == True):
                 return 0, 'Network restarted without errors.'
@@ -866,7 +870,7 @@ def cmdRepair():
     for adv in results:
         if opFilterRouters and (adv['asset_type'] == 'router'):
             applied,output = repairRouter(adv)
-        if opFilterNetworks and (adv['asset_type'] == 'network'):
+        if opFilterNetworks and (adv['asset_type'] in ['network', 'vpc']):
             applied, output = repairNetwork(adv)
         if applied==0:
             adv['repair_code'] = 'OK'
