@@ -299,9 +299,9 @@ def csVersionCompare(aver,bver):
       return 4
    elif int(a.group(4)) < int(b.group(4)):
       return -4
-   elif ((a.group(5)==None) and (b.group(5)!=None)) or ((b.group(5)!=None) and (int(a.group(5)) < int(b.group(5)))):
+   elif ((a.group(5)==None) and (b.group(5)!=None)) or ((a.group(5)!=None) and (b.group(5)!=None) and (int(a.group(5)) < int(b.group(5)))):
       return -5
-   elif ((a.group(5)!=None) and (b.group(5)==None)) or (((b.group(5)==None) and int(a.group(5)) > int(b.group(5)))):
+   elif ((a.group(5)!=None) and (b.group(5)==None)) or ((a.group(5)!=None) and (b.group(5)!=None) and (int(a.group(5)) > int(b.group(5)))):
       return 5
    return 0
 
