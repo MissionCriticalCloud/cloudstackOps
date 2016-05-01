@@ -279,7 +279,12 @@ def normalizePackageVersion(versionstr):
 
 def examineHost(alarmedInstancesCache, host):
     def getHostIp(host):
+        # Unfortunatel, cs00 used FQDNs in the node name
+        if host.name.find('.')!=-1:
+           (hostname, hostdomain) = host.name.split('.', 1)
+           host.name = hostname
         return host.name + "." + PLATFORM
+
     ENABLED_INSPECTIONS = []
     ENABLED_INSPECTIONS += [ 'io-abuse' ]
     ENABLED_INSPECTIONS += [ 'conntrack' ]
