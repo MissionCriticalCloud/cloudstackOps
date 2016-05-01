@@ -478,6 +478,8 @@ class CloudStackOps(CloudStackOpsBase):
             str(args['domainid'])) if 'domainid' in args else None
         apicall.keyword = (
             args['filterKeyword']) if 'filterKeyword' in args else None
+        apicall.keyword = (
+            args['instancename']) if 'instancename' in args else None
 
         # Call CloudStack API
         return self._callAPI(apicall)
@@ -512,6 +514,8 @@ class CloudStackOps(CloudStackOpsBase):
         apicall = listRouters.listRoutersCmd()
         apicall.networkid = (
             str(args['networkid'])) if 'networkid' in args else None
+        apicall.vpcid = (
+            str(args['vpcid'])) if 'vpcid' in args else None
         apicall.name = (str(args['name'])) if 'name' in args else None
         apicall.listAll = (args['listAll']) if 'listAll' in args else 'true'
         apicall.requiresupgrade = (
@@ -719,6 +723,7 @@ class CloudStackOps(CloudStackOpsBase):
 
         apicall = listHosts.listHostsCmd()
         apicall.id = (str(args['hostid'])) if 'hostid' in args else None
+        apicall.type = (str(args['type'])) if 'type' in args else None
         apicall.name = (str(args['hostname'])) if 'hostname' in args else None
 
         # Call CloudStack API
@@ -894,23 +899,105 @@ class CloudStackOps(CloudStackOpsBase):
         # Call CloudStack API
         return self._callAPI(apicall)
 
-    # list networks
-    def listNetworks(self, networkid):
-        apicall = listNetworks.listNetworksCmd()
-        apicall.id = networkid
+
+    def listDomainsExt(self, args = None):
+        apicall = listDomains.listDomainsCmd()
         apicall.listAll = "true"
+        apicall.state = "Enabled"
+        apicall.id = args['id'] if 'id' in args else None
+        apicall.name = args['name'] if 'name' in args else None
 
         # Call CloudStack API
         return self._callAPI(apicall)
+
+  # list networks (all or one)
+    def listNetworks(self, args = None):
+        apicall = listNetworks.listNetworksCmd()
+        apicall.id = args['id'] if 'id' in args else None
+        apicall.name = args['name'] if 'name' in args else None
+        apicall.domainid = args['domainid'] if 'domainid' in args else None
+        apicall.listAll = "true"
+
+        # get default.page.size
+        result = self.getConfiguration("default.page.size")
+        apicall.pagesize = result[0].value
+
+        # Call API multiple times to get all volumes
+        page = 0
+        apicall.page = page
+
+        # As long as we receive useful output, keep going
+        networks = []
+        while result is not None:
+            page = page + 1
+            apicall.page = page
+            result = self._callAPI(apicall)
+            if result is not None:
+                if 'networks' in locals():
+                    networks = networks + result
+                else:
+                    networks = result
+
+        return networks
+
+  # list networkOfferings (all or one)
+    def listNetworkOfferings(self, id = None):
+        apicall = listNetworkOfferings.listNetworkOfferingsCmd()
+        apicall.id = id
+        apicall.listAll = "true"
+
+        # get default.page.size
+        result = self.getConfiguration("default.page.size")
+        apicall.pagesize = result[0].value
+
+        # Call API multiple times to get all volumes
+        page = 0
+        apicall.page = page
+
+        # As long as we receive useful output, keep going
+        networkofferings = []
+        while result is not None:
+            page = page + 1
+            apicall.page = page
+            result = self._callAPI(apicall)
+            if result is not None:
+                if 'networkofferings' in locals():
+                    networkofferings = networkofferings + result
+                else:
+                    networkofferings = result
+
+        return networkofferings
+
 
     # list vpcs
-    def listVPCs(self, vpcid):
+    def listVPCs(self, args = None):
         apicall = listVPCs.listVPCsCmd()
-        apicall.id = vpcid
+        apicall.id = args['id'] if 'id' in args else None
+        apicall.name = args['name'] if 'name' in args else None
+        apicall.domainid = args['domainid'] if 'domainid' in args else None
         apicall.listAll = "true"
 
-        # Call CloudStack API
-        return self._callAPI(apicall)
+        # get default.page.size
+        result = self.getConfiguration("default.page.size")
+        apicall.pagesize = result[0].value
+
+        # Call API multiple times to get all volumes
+        page = 0
+        apicall.page = page
+
+        # As long as we receive useful output, keep going
+        vpcs = []
+        while result is not None:
+            page = page + 1
+            apicall.page = page
+            result = self._callAPI(apicall)
+            if result is not None:
+                if 'vpcs' in locals():
+                    vpcs = vpcs + result
+                else:
+                    vpcs = result
+
+        return vpcs
 
     # Translate id to name, because of CLOUDSTACK-6542
     def translateIntervalType(self, intervaltype):
@@ -1185,12 +1272,17 @@ class CloudStackOps(CloudStackOpsBase):
         apicall = listTemplates.listTemplatesCmd()
         apicall.keyword = (str(args['keyword'])) if 'keyword' in args and len(
             args['keyword']) > 0 else ""
+        apicall.name = (str(args['name'])) if 'name' in args and len(
+            args['name']) > 0 else ""
         apicall.zoneid = (str(args['zoneid'])) if 'zoneid' in args and len(
-            args['zoneid']) > 0 else ""
+            args['zoneid']) > 0 else None
+        apicall.state = (str(args['state'])) if 'state' in args and len(
+            args['state']) > 0 else None
         apicall.templatefilter = (str(args['templatefilter'])) if 'templatefilter' in args and len(
             args['templatefilter']) > 0 else "featured"
+        apicall.listall = args['listall'] if 'listall' in args else None
         apicall.page = 1
-        apicall.pagesize = 1500
+        apicall.pagesize = 1000
 
         # Call CloudStack API
         return self._callAPI(apicall)
@@ -1682,3 +1774,87 @@ class CloudStackOps(CloudStackOpsBase):
       # Call CloudStack API
       return self._callAPI(apicall)
 
+
+    # restart network
+    def restartNetwork(self, networkId, cleanup=False):
+        apicall = restartNetwork.restartNetworkCmd()
+        apicall.id = networkId
+        apicall.cleanup = cleanup
+        
+        if self.DRYRUN:
+            print "[INFO] Skipping restartNetwork(%s), dryrun is on." % (networkId)
+            return None
+        
+        return self._callAPI(apicall)
+
+    # restart network
+    def restartVPC(self, vpcId, cleanup=False):
+        apicall = restartVPC.restartVPCCmd()
+        apicall.id = vpcId
+        apicall.cleanup = cleanup
+        
+        if self.DRYRUN:
+            print "[INFO] Skipping restartVPC(%s), dryrun is on." % (vpcId)
+            return None
+         
+        return self._callAPI(apicall)
+
+    # update network
+    def updateNetwork(self, args):
+        args = self.remove_empty_values(args)
+
+        apicall = updateNetwork.updateNetworkCmd()
+        apicall.id = str(args['id'])
+        apicall.networkofferingid = (str(args['networkofferingid'])) if 'networkofferingid' in args else None
+
+        # Call CloudStack API
+        return self._callAPI(apicall)
+
+    def listUsersExt(self, args):
+        if 'accounttype' in args.keys() and len(str(args['accounttype'])) == 0:
+            return 1
+
+        apicall = listUsers.listUsersCmd()
+        apicall.id = args['id'] if 'id' in args else None
+        apicall.username = args['username'] if 'username' in args else None
+        apicall.domainid = args['domainid'] if 'domainid' in args else None
+        apicall.account = args['account'] if 'account' in args else None
+        apicall.accounttype = args['accounttype'] if 'accounttype' in args else None
+        apicall.listAll = args['listall'] if 'listall' in args else True
+        
+        # Call CloudStack API
+        return self._callAPI(apicall)
+
+    def disableUser(self, userid):
+        apicall = disableUser.disableUserCmd()
+        apicall.id = userid
+        
+        # Call CloudStack API
+        return self._callAPI(apicall)
+
+    def enableUser(self, userid):
+        apicall = enableUser.enableUserCmd()
+        apicall.id = userid
+        
+        # Call CloudStack API
+        return self._callAPI(apicall)
+
+    def createUser(self, args):
+        apicall = createUser.createUserCmd()
+        apicall.username = args['username'] if 'username' in args else None
+        apicall.domainid = args['domainid'] if 'domainid' in args else None
+        apicall.firstname = args['firstname'] if 'firstname' in args else None
+        apicall.lastname = args['lastname'] if 'lastname' in args else None
+        apicall.email = args['email'] if 'email' in args else None
+        apicall.password = args['password'] if 'password' in args else None
+        apicall.account = args['account'] if 'account' in args else None
+
+        # Call CloudStack API
+        return self._callAPI(apicall)
+
+    def deleteUser(self, userid):
+        apicall = deleteUser.deleteUserCmd()
+        apicall.id = userid
+        
+        # Call CloudStack API
+        return self._callAPI(apicall)

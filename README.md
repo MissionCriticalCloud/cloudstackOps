@@ -120,6 +120,9 @@ You also need `pretty table`.
 
 `pip install -Iv prettytable`
 
+... and for the MySQL direct access, you'll need `mysql-connector-python`.
+
+`yum -y install mysql-connector-python`
 
 Tips
 ----
@@ -612,6 +615,101 @@ Make sure you copy this script to the router VM, give it exec permission `chmod 
 * If it's in a weird state, use force to clean as much as possible on its own:
 `./cleanDHCPipaddress.sh 1.2.3.4 1`
 
+
+List networks, perform network maintenance
+------------------------
+This helper script allows you to get an overview of the networks in the platform, and perform restarts with cleanup=true to all or a subset of them, based on the filters.
+
+```
+$ ./listNetworkVRs.py
++---+----------------------+----------+--------------------------------------+---------+-------------+------------+-------------+---------------------+
+| # |       Network        |   Type   |                  ID                  |  Domain |    State    | Redundant? | RestartReq? |         VRs         |
++---+----------------------+----------+--------------------------------------+---------+-------------+------------+-------------+---------------------+
+| 1 |     net-jenkins      | Isolated | 8e8c6038-83f2-4063-8f32-88844608c534 | jenkins |  Allocated  |    True    |    False    | r-1303-VM,r-1302-VM |
+| 2 | T1-VPC-NMCTX-T154226 | VPCTier  | 26dd8f6e-e01e-4ddd-8160-ff8143b95ffd |   ROOT  | Implemented |   False    |    False    |      r-1300-VM      |
+| 3 | T2-VPC-NMCTX-T154226 | VPCTier  | dfe1c73e-87d1-4b58-a004-3071268aef7d |   ROOT  | Implemented |   False    |    False    |      r-1300-VM      |
+| 4 |     test-network     | Isolated | 2260393c-1913-4605-88f0-d4302573581e |   test  |  Allocated  |    True    |     True    |                     |
+| 5 |  VPC-NMCTX-T154226   |   VPC    | 53cab7c8-8560-4adc-a325-731260eebc77 |   ROOT  |   Enabled   |   False    |    False    |      r-1300-VM      |
++---+----------------------+----------+--------------------------------------+---------+-------------+------------+-------------+---------------------+
+```
+
+Perform restarts on a subset (only VPCs with redundant VRs):
+```
+$ ./listNetworkVRs.py --exec -r --type VPC --onlyRR
+```
+
+Perform user maintenance
+------------------------
+This script will assist you in maintaining users across several domains and - especially - expiring them.
+
+```
+$ ./listUsers.py -u n.tavares
++---+--------+----------+------+-----------+--------------------------------------+-------+---------+----------+
+| # | Domain | Account  | Type |  Username |                  Id                  | First |   Last  |  State   |
++---+--------+----------+------+-----------+--------------------------------------+-------+---------+----------+
+| 1 |  ROOT  |  admin   |  1   | ntavares  | 37c92e7f-5bb6-485e-ba33-4db0e3f503ee |  Nuno | Tavares | enabled  |
+| 2 |  CDN   |   cdn    |  2   | ntavares  | 3e4bd323-9312-4936-ac94-1e1277b43c80 |  Nuno | Tavares | enabled  |
++---+--------+----------+------+-----------+--------------------------------------+-------+---------+----------+
+```
+
+```
+$ ./listUsers.py --disable -u n.tavares --domain CDN
+```
+
+Advisory tool
+------------------------
+This is a tool to run detect problem in all components of a CloudStack cloud. It will attempt to detect problems as precise as possible, and suggest actions to be taken. For certain problems, 
+it is actually able to self-heal. For each action suggested, an impact analysis is also made (Safety Level), so that you can use the tool to automate some of the repair tasks up to a specified 
+Safety level. Also, because some of the tests might take long or produce a lot of results (due to circumstancial conditions, e.g., after an upgrade), there is a --deep switch to enable these.
+
+Currently, this tool integrates (is dependent) of other Leaseweb support and monitoring tools, mostly using them in the so-called "quick" mode (default). To perform a live assessment, there is a --live switch.
+Generally speaking, the filters you specify will dictate the scope of the actions requested (if any).
+
+```
+$ ./listAdvisories.py -h
+Usage: ./listAdvisories.py [options] 
+  --config-profile -c <profile>		Specify the CloudMonkey profile name to get the credentials from (or specify in ./config file)
+  --plain-display			Enable plain display, no pretty tables
+  --repair				Apply suggested actions - at Safe/Best level
+
+  Modifiers:
+  --exec	Disable dry-run mode. You'l need this to perform changes to the platform.
+  --debug	Enable debug mode. Use it multiple times to increase verbosity
+  --live	Perform live scan. By default, quick mode is used (using deferred/cached collection methods)
+  --deep	Enable further tests that usually produces a lot of results. For a list of tests, use -h with this option
+  --email	Send Repair Report by email
+
+  Filters:
+  -n 		Scan networks (incl. VPCs)
+  -r 		Scan routerVMs
+  -i 		Scan instances
+  -H 		Scan hypervisors
+  -t 		Scan resource usage
+  --all 	Report all assets of the selected types, independently of the presence of advisory
+  --safety <safety> 	Filter out advisories that are not at the specified safety level (default: Best)
+```
+
+There is extensive documentation at Leaseweb, but to be simplify the documentation we will now start documenting the check and repair support in the tool itself. To see the list of tests and 
+actions supported, along in which "depth" level:
+```
+$ ./listAdvisories.py -h --deep
+
+List of tests available
++------------+--------+---------------------------------------------------------------------------------+-----------+----------+
+|   Scope    | Level  | Symptom / Probe / Detection                                                     | Detection | Recovery |
++------------+--------+---------------------------------------------------------------------------------+-----------+----------+
+|  network   | Normal | Flag restart_required                                                           |    True   |   True   |
+|   router   | Normal | Redundancy state                                                                |    True   |   True   |
+|   router   | Normal | Output of check_router.sh is non-zero (dmesg,swap,resolv,ping,fs,disk,password) |    True   |   True   |
+|   router   |  Deep  | Checks if router is running on the current systemvm template version            |    True   |   True   |
+|  instance  | Normal | Try to assess instance read-only state                                          |    True   |  False   |
+|  instance  | Normal | Queries libvirt usage records for abusers (CPU, I/O, etc)                       |    True   |  False   |
+| hypervisor | Normal | Agent state (version, conn state)                                               |    True   |  False   |
+| hypervisor | Normal | Load average                                                                    |    True   |  False   |
+| hypervisor | Normal | Conntrack abusers                                                               |    True   |  False   |
+| hypervisor | Normal | check_libvirt_storage.sh correct functioning                                    |    True   |  False   |
++------------+--------+---------------------------------------------------------------------------------+-----------+----------+
+```
 
 Bugs
 =====
