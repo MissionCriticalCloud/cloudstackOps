@@ -277,6 +277,34 @@ def normalizePackageVersion(versionstr):
     #return regex.sub('\1-\2', versionstr)
     return versionstr.replace('.', '-')
 
+def csVersionCompare(aver,bver):
+   vstr = r'(\d+)[\.-](\d+)[\.-](\d+)-leaseweb(\d+)[\.-]*(\d+)*'
+   a = re.match(vstr, aver)
+   b = re.match(vstr, bver)
+
+   print "   + csVersionCompare(%s, %s) ==> %s, %s" % (aver, bver, a.group(5), b.group(5))
+   if int(a.group(1)) > int(b.group(1)):
+      return 1
+   elif int(a.group(1)) < int(b.group(1)):
+      return -1
+   elif int(a.group(2)) > int(b.group(2)):
+      return 2
+   elif int(a.group(2)) < int(b.group(2)):
+      return -2
+   elif int(a.group(3)) > int(b.group(3)):
+      return 3
+   elif int(a.group(3)) < int(b.group(3)):
+      return -3
+   elif int(a.group(4)) > int(b.group(4)):
+      return 4
+   elif int(a.group(4)) < int(b.group(4)):
+      return -4
+   elif ((a.group(5)==None) and (b.group(5)!=None)) or ((b.group(5)!=None) and (int(a.group(5)) < int(b.group(5)))):
+      return -5
+   elif ((a.group(5)!=None) and (b.group(5)==None)) or (((b.group(5)==None) and int(a.group(5)) > int(b.group(5)))):
+      return 5
+   return 0
+
 def examineHost(alarmedInstancesCache, host):
     def getHostIp(host):
         # Unfortunatel, cs00 used FQDNs in the node name
@@ -376,20 +404,39 @@ def getAdvisoriesResources():
     debug(2, "getAdvisoriesResources : begin")
     results = []
     
+    debug(2, " + checking check_free_vcpus")
     mgtSsh = "/usr/local/nagios/libexec/nrpe_local/check_free_vcpus"
     retcode, output = c.ssh.runSSHCommand(MGMT_SERVER, mgtSsh)
     if retcode != 0:
+        if output == '':
+            output = 'return code: ' + str(retcode)
         results += [{ 'id': '', 'name': 'free-vcpu', 'domain': 'ROOT', 'asset_type': 'resource', 'adv_action': ACTION_MANUAL, 'adv_safetylevel': SAFETY_NA, 'adv_comment': output}]
 
+    debug(2, " + checking check_free_ips")
     mgtSsh = "/usr/local/nagios/libexec/nrpe_local/check_free_ips"
     retcode, output = c.ssh.runSSHCommand(MGMT_SERVER, mgtSsh)
     if retcode != 0:
+        if output == '':
+            output = 'return code: ' + str(retcode)
         results += [{ 'id': '', 'name': 'free-ip', 'domain': 'ROOT', 'asset_type': 'resource', 'adv_action': ACTION_MANUAL, 'adv_safetylevel': SAFETY_NA, 'adv_comment': output}]
 
+    debug(2, " + checking check_cloud_agents")
     mgtSsh = "/usr/local/nagios/libexec/nrpe_local/check_cloud_agents"
     retcode, output = c.ssh.runSSHCommand(MGMT_SERVER, mgtSsh)
     if retcode != 0:
+        if output == '':
+            output = 'return code: ' + str(retcode)
         results += [{ 'id': '', 'name': 'cloud-agents', 'domain': 'ROOT', 'asset_type': 'resource', 'adv_action': ACTION_MANUAL, 'adv_safetylevel': SAFETY_NA, 'adv_comment': output}]
+
+    # Taken from /usr/local/nagios/libexec/check_zone_resources
+    debug(2, " + checking check_zone_resources")
+    mgtSsh = "(cloudmonkey listCapacity type=0 | grep percentused | cut -d '\"' -f 4; cloudmonkey listCapacity type=1 | grep percentused | cut -d '\"' -f 4) | xargs"
+    retcode, output = c.ssh.runSSHCommand(MGMT_SERVER, mgtSsh)
+    (memory, cpu) = output.split(' ')
+    if retcode != 0:
+        if output == '':
+            output = 'return code: ' + str(retcode)
+        results += [{ 'id': '', 'name': 'capacity', 'domain': 'ROOT', 'asset_type': 'resource', 'adv_action': ACTION_MANUAL, 'adv_safetylevel': SAFETY_NA, 'adv_comment': 'check_zone_resources breached thresholds, mem=' + memory + ', cpu=' + cpu }]
 
     debug(2, "getAdvisoriesResources : end")
     return results
@@ -579,7 +626,9 @@ def getAdvisoriesNetworks(alarmedRoutersCache):
         rversion = normalizePackageVersion(router.cloudstackversion)
         if (DEEPSCAN==1) and (router.cloudstackversion):
             rversion = normalizePackageVersion(router.cloudstackversion)
-            if rversion != MGMT_SERVER_DATA['version.normalized'] :
+            # If the router version is more recent than the package, then there probably emergency patching was made
+            # so, it's not really a problem, nor suprising.
+            if csVersionCompare(rversion,MGMT_SERVER_DATA['version.normalized'])<0:
                 if network.rr_type:
                     return {'action': ACTION_ESCALATE, 'safetylevel': SAFETY_BEST, 'comment': 'Router in deprecated version, redundancy presentt'}
                 else:
