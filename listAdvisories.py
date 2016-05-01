@@ -207,6 +207,7 @@ def handleArguments(argv):
             t.padding_width = 1
 
         t.add_row([ "network", "Normal", "Flag restart_required", True, True ])
+        t.add_row([ "network", "Normal", "Redundancy state inconsistency (needs -r)", True, True ])
         t.add_row([ "router", "Normal", "Redundancy state", True, True ])
         t.add_row([ "router", "Normal", "Output of check_router.sh is non-zero (dmesg,swap,resolv,ping,fs,disk,password)", True, True ])
         t.add_row([ "router", "Normal", "Checks if router has requiresUpgrade flag on", True, True ])
@@ -480,7 +481,7 @@ def getAdvisoriesNetworks(alarmedRoutersCache):
     results = []
 
     # This method will analyse the network and return an advisory
-    def examineNetwork(network, advRouters):
+    def examineNetwork(network, advRouters, redundantstate):
         if network.restartrequired:
             if network.rr_type:
                 return {'action': ACTION_N_RESTART, 'safetylevel': SAFETY_BEST, 'comment': 'Restart flag on, redundancy present'}
@@ -490,6 +491,10 @@ def getAdvisoriesNetworks(alarmedRoutersCache):
                  else:
                      return {'action': ACTION_N_RESTART, 'safetylevel': SAFETY_DOWNTIME, 'comment': 'Restart flag on, no redundancy'}
 
+        debug(2, ' + check redundantstate => ' + str(redundantstate) )
+        if redundantstate['flags'] != 3:
+            return {'action': ACTION_N_RESTART, 'safetylevel': SAFETY_UNKNOWN, 'comment': 'Redundancy state is found inconsistent (' + ','.join(redundantstate['states']) + ')'}
+
         if len(advRouters)>0:
             rnames = [];
             for r in advRouters:
@@ -498,9 +503,9 @@ def getAdvisoriesNetworks(alarmedRoutersCache):
                 return {'action': ACTION_N_RESTART, 'safetylevel': SAFETY_BEST, 'comment': 'Network tainted (State:' + network.state + '), problems found with router(s): ' + ','.join(rnames)}
             else:
                 if network.type == 'Shared':
-                    return {'action': ACTION_N_RESTART, 'safetylevel': SAFETY_GOOD, 'comment': 'Network tainted (State:' + network.state + '), problems found with router(s): '+ ','.join(rnames)}
+                    return {'action': ACTION_N_RESTART, 'safetylevel': SAFETY_GOOD, 'comment': 'Network tainted (State:' + network.state + '), problems found with router(s): ' + ','.join(rnames)}
                 else:
-                    return {'action': ACTION_N_RESTART, 'safetylevel': SAFETY_DOWNTIME, 'comment': 'Network tainted (State:' + network.state + '), problems found with router(s): '+ ','.join(rnames)}
+                    return {'action': ACTION_N_RESTART, 'safetylevel': SAFETY_DOWNTIME, 'comment': 'Network tainted (State:' + network.state + '), problems found with router(s): ' + ','.join(rnames)}
             
         return {'action': None, 'safetylevel': SAFETY_NA, 'comment': ''}
 
@@ -681,6 +686,7 @@ def getAdvisoriesNetworks(alarmedRoutersCache):
                                 network.rr_type = True
 
         escalated = []
+        redundantstate = { 'flags': 0, 'states': [] }
         if opFilterRouters:
             # A network in state Allocated probably has routers Offline.
             # In that case, redundancystate will always be UNKNOWN or even unexplicable states
@@ -688,14 +694,24 @@ def getAdvisoriesNetworks(alarmedRoutersCache):
                 routersData = c.getRouterData({'networkid': network.id})
                 if routersData:
                     for r in routersData:
+                        # redundantstate consistency has to be out since examineRouter only can analyse individual routers
+                        if r.isredundantrouter:
+                            if r.redundantstate == 'BACKUP':
+                               redundantstate['flags'] = redundantstate['flags'] | 1
+                            elif r.redundantstate == 'MASTER':
+                               redundantstate['flags'] = redundantstate['flags'] | 2
+                            redundantstate['states'] = redundantstate['states'] + [ r.redundantstate ]
                         diag = examineRouter(alarmedRoutersCache, network, r, routerTemplateId)
                         if ( opFilterAll or (diag['action'] != None) ):
                             if diag['action'] == ACTION_ESCALATE:
                                 escalated = escalated + [{ 'id': r.id, 'name': r.name, 'domain': network.domain, 'asset_type': 'router', 'adv_action': diag['action'], 'adv_safetylevel': diag['safetylevel'], 'adv_comment': diag['comment'] }]
                             results = results + [{ 'id': r.id, 'name': r.name, 'domain': network.domain, 'asset_type': 'router', 'adv_action': diag['action'], 'adv_safetylevel': diag['safetylevel'], 'adv_comment': diag['comment'] }]
 
-        
-        diag = examineNetwork(network, escalated)
+        if not network.rr_type or not opFilterRouters:
+            # silence redundantstate check
+            redundantstate['flags'] = 1 | 2
+
+        diag = examineNetwork(network, escalated, redundantstate)
         if ( opFilterNetworks and (opFilterAll or (diag['action'] != None)) ):
             results = results + [{ 'id': network.id, 'type': net_type, 'name': network.name, 'domain': network.domain, 'rr_type': network.rr_type, 'restartrequired': network.restartrequired, 'state': network.state, 'asset_type': 'network', 'adv_action': diag['action'], 'adv_safetylevel': diag['safetylevel'], 'adv_comment': diag['comment'] }]
 
@@ -707,10 +723,18 @@ def getAdvisoriesNetworks(alarmedRoutersCache):
             vpc.rr_type = vpc.redundantvpcrouter
 
         escalated = []
+        redundantstate = { 'flags': 0, 'states': [] }
         if opFilterRouters:
             routersData = c.getRouterData({'vpcid': vpc.id})
             if routersData:
                 for r in routersData:
+                    # redundantstate consistency has to be out since examineRouter only can analyse individual routers
+                    if r.isredundantrouter:
+                        if r.redundantstate == 'BACKUP':
+                            redundantstate['flags'] = redundantstate['flags'] | 1
+                        elif r.redundantstate == 'MASTER':
+                            redundantstate['flags'] = redundantstate['flags'] | 2
+                        redundantstate['states'] = redundantstate['states'] + [ r.redundantstate ]
                     diag = examineRouter(alarmedRoutersCache, vpc, r, routerTemplateId)
                     # We include 'escalate' in case opFilterNetworks is not set, to notify that we need it
                     # in order to fix this
@@ -720,7 +744,11 @@ def getAdvisoriesNetworks(alarmedRoutersCache):
                         results = results + [{ 'id': r.id, 'name': r.name, 'domain': vpc.domain, 'asset_type': 'router', 'adv_action': diag['action'], 'adv_safetylevel': diag['safetylevel'], 'adv_comment': diag['comment'] }]
 
 
-        diag = examineNetwork(vpc, escalated)
+        if not vpc.rr_type or not opFilterRouters:
+            # silence redundantstate check
+            redundantstate['flags'] = 1 | 2
+
+        diag = examineNetwork(vpc, escalated, redundantstate)
         if ( opFilterNetworks and (opFilterAll or (diag['action'] != None)) ):
             results = results + [{ 'id': vpc.id, 'type': 'VPC', 'name': vpc.name, 'domain': vpc.domain, 'rr_type': vpc.rr_type, 'restartrequired': vpc.restartrequired, 'state': vpc.state, 'asset_type': 'vpc', 'adv_action': diag['action'], 'adv_safetylevel': diag['safetylevel'], 'adv_comment': diag['comment'] }]
     
