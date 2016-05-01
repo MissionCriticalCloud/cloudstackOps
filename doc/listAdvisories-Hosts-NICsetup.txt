@@ -1,0 +1,47 @@
+* Verify that all configured VLANs in CloudStack are available to hosts
+
+(csXX) -O- > list vlanipranges filter=vlan
+{
+  "count": 1,
+  "vlaniprange": [
+    {
+      "vlan": "vlan://200"
+    }
+  ]
+}
+
+(csXX) -O- > list physicalnetworks name=PUB filter=vlan,id
+{
+  "count": 1,
+  "physicalnetwork": [
+    {
+      "id": "1a5e7a38-b37b-4f69-8b30-33f5cbd0c0ce",
+      "vlan": "2000-4000"
+    }
+  ]
+}
+
+(csXX) -O- > list traffictypes physicalnetworkid=1a5e7a38-b37b-4f69-8b30-33f5cbd0c0ce
+{
+  "count": 2,
+  "traffictype": [
+    {
+      "id": "960f7a0a-ef91-48ab-96b1-cc601a75aa3e",
+      "kvmnetworklabel": "cloudbr0",
+      "physicalnetworkid": "1a5e7a38-b37b-4f69-8b30-33f5cbd0c0ce",
+      "traffictype": "Guest"
+    },
+    {
+      "id": "24e230a5-6b65-4fd5-a47f-c51d2082e5b4",
+      "kvmnetworklabel": "cloudbr0",
+      "physicalnetworkid": "1a5e7a38-b37b-4f69-8b30-33f5cbd0c0ce",
+      "traffictype": "Public"
+    }
+  ]
+}
+
+* Check NIC topology/aggregation:
+cat /proc/net/bonding/bond0 | grep "^Slave Interface"
+
+* Now, LLDPCTL on the node acquire port number for each of the involved interfaces
+* And we need an extra script to assert that the port number is 1) in trunk and portgroup mode and 2) has the vlans available

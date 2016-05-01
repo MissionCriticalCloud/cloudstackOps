@@ -31,7 +31,6 @@ from cloudstackops import lswcloudstackopsssh
 import os.path
 from random import choice
 from prettytable import PrettyTable
-import re
 
 # Function to handle our arguments
 
@@ -77,7 +76,7 @@ def handleArguments(argv):
         '\n  -H \t\tScan hypervisors' + \
         '\n  -t \t\tScan resource usage' + \
         '\n  --all \tReport all assets of the selected types, independently of the presence of advisory' + \
-        '\n  --safety <safety> \tFilter out advisories that are not at the specified safety level (default: ' + lswcloudstackops.LswCloudStackOps.translateSafetyLevel(opFilters['safetylevel']) + ')'
+        '\n  --safety <safety> \tFilter out advisories that are not at the specified safety level (default: ' + lswcloudstackopsbase.LswCloudStackOpsBase.translateSafetyLevel(opFilters['safetylevel']) + ')'
 
     try:
         opts, args = getopt.getopt(
@@ -129,7 +128,7 @@ def handleArguments(argv):
         elif opt in ["--all"]:
             opFilters['all'] = True
         elif opt in ["--safety"]:
-            safety = c.translateSafetyLevelString(arg)
+            safety = lswcloudstackopsbase.LswCloudStackOpsBase.translateSafetyLevelString(arg)
             if safety != None:
                 opFilters['safetylevel'] = safety
                 opFilters['safetylevel_set'] = True
@@ -237,7 +236,7 @@ def cmdListAdvisories():
     counter = 0
     for a in results:
         counter = counter + 1
-        t.add_row([counter, configProfileName, a['asset_type'], a['name'], a['id'], a['domain'], a['adv_action'], lswcloudstackops.LswCloudStackOps.translateSafetyLevel(a['adv_safetylevel']), a['adv_comment']])
+        t.add_row([counter, configProfileName, a['asset_type'], a['name'], a['id'], a['domain'], a['adv_action'], lswcloudstackopsbase.LswCloudStackOpsBase.translateSafetyLevel(a['adv_safetylevel']), a['adv_comment']])
 
     # Display table
     print t
@@ -301,7 +300,7 @@ def cmdRepair():
 
     debug(2, "cmdRepair : end")
 
-print "Applying filter: safetylevel == %s" % lswcloudstackops.LswCloudStackOps.translateSafetyLevel(opFilters['safetylevel'])
+print "Applying filter: safetylevel == %s" % lswcloudstackopsbase.LswCloudStackOpsBase.translateSafetyLevel(opFilters['safetylevel'])
 
 if command == 'list':
     cmdListAdvisories()
