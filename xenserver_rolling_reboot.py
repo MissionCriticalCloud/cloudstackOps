@@ -65,9 +65,9 @@ def handleArguments(argv):
         '\n  --clustername -n <clustername> \t\tName of the cluster to work with' + \
         '\n  --ignore-hosts <list>\t\t\t\tSkip work on the specified hosts (for example if you need to resume): ' \
         'Example: --ignore-hosts="host1, host2" ' + \
-        '\n  --threads <nr>\t\t\t\tUse this number or concurrent migration threads" ' + \
+        '\n  --threads <nr>\t\t\t\tUse this number or concurrent migration threads ' + \
         '\n  --halt\t\t\t\t\tInstead of the default reboot, halt the hypervisor (useful in case of hardware ' \
-        'upgrades)" ' + \
+        'upgrades) ' + \
         '\n  --debug\t\t\t\t\tEnable debug mode' + \
         '\n  --exec\t\t\t\t\tExecute for real' + \
         '\n  --prepare\t\t\t\t\tExecute some prepare commands'
@@ -268,6 +268,20 @@ else:
 checkBonds = True
 c.printHypervisors(clusterID, poolmaster.name, checkBonds)
 
+# Set to manage in CloudStack
+print "Note: Setting cluster " + clustername + " back to Managed in CloudStack"
+clusterUpdateReturn = c.updateCluster(
+    {'clusterid': clusterID, 'managedstate': 'Managed'})
+
+if clusterUpdateReturn == 1 or clusterUpdateReturn is None:
+    print "Error: Managing cluster " + clustername + " failed. Please check manually."
+    disconnect_all()
+    sys.exit(1)
+
+# Print cluster info
+print "Note: Some info about cluster '" + clustername + "':"
+c.printCluster(clusterID)
+
 # Then the other hypervisors, one-by-one
 for h in cluster_hosts:
     if h.name in ignoreHosts:
@@ -309,15 +323,6 @@ if pool_ha == "Error":
     disconnect_all()
     sys.ext(1)
 print "Note: The state of HA on cluster " + clustername + " is " + str(pool_ha)
-
-# Set to manage in CloudStack
-clusterUpdateReturn = c.updateCluster(
-    {'clusterid': clusterID, 'managedstate': 'Managed'})
-
-if clusterUpdateReturn == 1 or clusterUpdateReturn is None:
-    print "Error: Managing cluster " + clustername + " failed. Please check manually."
-    disconnect_all()
-    sys.exit(1)
 
 # Print cluster info
 print "Note: Some info about cluster '" + clustername + "':"
