@@ -55,13 +55,19 @@ def handleArguments(argv):
     ignoreHosts = ''
     global threads
     threads = 5
+    global halt_hypervisor
+    halt_hypervisor = False
 
     # Usage message
     help = "Usage: ./" + os.path.basename(__file__) + ' [options]' + \
-        '\n  --config-profile -c <profilename>\t\tSpecify the CloudMonkey profile name to get the credentials from (or specify in ./config file)' + \
+        '\n  --config-profile -c <profilename>\t\tSpecify the CloudMonkey profile name to ' \
+        'get the credentials from (or specify in ./config file)' + \
         '\n  --clustername -n <clustername> \t\tName of the cluster to work with' + \
-        '\n  --ignore-hosts <list>\t\t\t\tSkip work on the specified hosts (for example if you need to resume): Example: --ignore-hosts="host1, host2" ' + \
+        '\n  --ignore-hosts <list>\t\t\t\tSkip work on the specified hosts (for example if you need to resume): ' \
+        'Example: --ignore-hosts="host1, host2" ' + \
         '\n  --threads <nr>\t\t\t\tUse this number or concurrent migration threads" ' + \
+        '\n  --halt\t\t\t\t\tInstead of the default reboot, halt the hypervisor (useful in case of hardware ' \
+        'upgrades)" ' + \
         '\n  --debug\t\t\t\t\tEnable debug mode' + \
         '\n  --exec\t\t\t\t\tExecute for real' + \
         '\n  --prepare\t\t\t\t\tExecute some prepare commands'
@@ -69,7 +75,7 @@ def handleArguments(argv):
     try:
         opts, args = getopt.getopt(
             argv, "hc:n:t:p", [
-                "credentials-file=", "clustername=", "ignore-hosts=", "threads=", "debug", "exec", "prepare"])
+                "credentials-file=", "clustername=", "ignore-hosts=", "threads=", "halt", "debug", "exec", "prepare"])
     except getopt.GetoptError as e:
         print "Error: " + str(e)
         print help
@@ -87,6 +93,8 @@ def handleArguments(argv):
             threads = arg
         elif opt in ("--ignore-hosts"):
             ignoreHostList = arg
+        elif opt in ("--halt"):
+            halt_hypervisor = True
         elif opt in ("--debug"):
             DEBUG = 1
         elif opt in ("--exec"):
@@ -179,6 +187,10 @@ if DRYRUN == 0 or PREPARE == 1:
 checkBonds = True
 c.printHypervisors(clusterID, poolmaster.name, checkBonds)
 
+if halt_hypervisor:
+    print "Warning: Instead of reboot, we will halt the hypervisor. You need to start it yourself for the script to" \
+          " continue moving to the next hypervisor."
+
 if DRYRUN == 1:
     print
     print "Warning: We are running in DRYRUN mode."
@@ -189,7 +201,7 @@ if DRYRUN == 1:
     print "  - For any hypervisor it will do this (poolmaster " + poolmaster.name + " first):"
     print "      - put it to Disabled aka Maintenance in XenServer"
     print "      - live migrate all VMs off of it using XenServer evacuate command"
-    print "      - when empty, it will reboot the hypervisor"
+    print "      - when empty, it will reboot the hypervisor (halting is " + str(halt_hypervisor) + ")"
     print "      - will wait for it to come back online (checks SSH connection)"
     print "      - set the hypervisor to Enabled in XenServer"
     print "      - continues to the next hypervisor"
@@ -239,7 +251,7 @@ if poolmaster.name not in ignoreHosts:
     vm_count = x.host_get_vms(poolmaster)
     if vm_count:
         print "Note: " + poolmaster.name + " (poolmaster) has " + vm_count + " VMs running."
-        reboot_result = x.host_reboot(poolmaster)
+        reboot_result = x.host_reboot(poolmaster, halt_hypervisor)
         if reboot_result is False:
             print "Error: Stopping sequence, as a reboot failed. Please investigate."
             x.roll_back(poolmaster)
@@ -268,7 +280,7 @@ for h in cluster_hosts:
     vm_count = x.host_get_vms(h)
     if vm_count:
         print "Note: " + h.name + " has " + vm_count + " VMs running."
-        reboot_result = x.host_reboot(h)
+        reboot_result = x.host_reboot(h, halt_hypervisor)
         if reboot_result is False:
             print "Error: Stopping sequence, as a reboot failed. Please investigate."
             x.roll_back(h)
