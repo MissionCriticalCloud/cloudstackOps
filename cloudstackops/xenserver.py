@@ -49,7 +49,7 @@ output['warnings'] = False
 # Class to handle XenServer patching
 class xenserver():
 
-    def __init__(self, ssh_user='root', threads = 5):
+    def __init__(self, ssh_user='root', threads=5):
         self.ssh_user = ssh_user
         self.threads = threads
 
@@ -166,7 +166,7 @@ class xenserver():
             return False
 
     # Reboot a host when all conditions are met
-    def host_reboot(self, host):
+    def host_reboot(self, host, halt_hypervisor=False):
         # Disbale host
         if self.host_disable(host) is False:
             print "Error: Disabling host " + host.name + " failed."
@@ -184,10 +184,14 @@ class xenserver():
         print "Note: Host " + host.name + " has no VMs running, continuing"
 
         # Finally reboot it
-        print "Note: Rebooting host " + host.name
         try:
             with settings(host_string=self.ssh_user + "@" + host.ipaddress):
-                fab.run("xe host-reboot host=" + host.name)
+                if halt_hypervisor:
+                    print "Note: Halting host " + host.name
+                    fab.run("xe host-shutdown host=" + host.name)
+                else:
+                    print "Note: Rebooting host " + host.name
+                    fab.run("xe host-reboot host=" + host.name)
         except:
             print "Error: Rebooting host " + host.name + " failed."
             return False
