@@ -173,6 +173,33 @@ class CloudStackSQL(CloudStackOpsBase):
 
         return result
 
+    # list mac adress info
+    def getMacAddressData(self, macaddress):
+        if not self.conn:
+            return 1
+
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT networks.name, \
+        nics.mac_address, \
+        nics.ip4_address, \
+        nics.netmask, \
+        nics.broadcast_uri, \
+        nics.mode, \
+        nics.state, \
+        nics.created, \
+        vm_instance.name \
+        FROM cloud.nics, cloud.vm_instance, \
+        cloud.networks \
+        WHERE nics.instance_id = vm_instance.id \
+        AND nics.network_id = networks.id \
+        AND mac_address \
+        LIKE '%" + macaddress  + "%' \
+        AND nics.removed is null;")
+        result = cursor.fetchall()
+        cursor.close()
+
+        return result
+
     # get uuid of router volume
     def getRouterRootVolumeUUID(self, routeruuid):
         if not self.conn:
