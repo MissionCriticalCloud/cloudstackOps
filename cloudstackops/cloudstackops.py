@@ -334,6 +334,7 @@ class CloudStackOps(CloudStackOpsBase):
         if listAll == 'true':
             apicall.listAll = "true"
 
+        found_counter = 0
         try:
             data = self.cloudstack.marvin_request(apicall)
             if (data is None or len(data) == 0) and self.DEBUG == 1:
@@ -348,17 +349,22 @@ class CloudStackOps(CloudStackOpsBase):
                 for d in data:
                     # And make sure it's the correct one
                     if csname == d.name or csname == d.instancename:
+                        found_counter += 1
                         if self.DEBUG == 1:
-                            print "Found in loop " + str(d.name)
+                            print "Found in loop " + str(d.name) + " counter = " + str(found_counter)
 
                         csnameID = d.id
-                        break
                     elif self.DEBUG == 1:
-                        print "Not found in loop " + str(d.name)
+                        print "Not found in loop " + str(d.name) + " counter = " + str(found_counter)
 
                 if len(csnameID) < 1:
-                    print "Warning: '%s' could not be located in CloudStack database using '%s' or is not unique -- Exit." % (csname, csApiCall)
+                    print "Warning: '%s' could not be located in CloudStack database using '%s' -- Exit." % (csname, csApiCall)
                     sys.exit(1)
+
+                if found_counter >1:
+                    print "Error: '%s' could not be located in CloudStack database using '%s' because it is not unique -- Exit." % (csname, csApiCall)
+                    sys.exit(1)
+
             else:
                 print "Error: '%s' could not be located in CloudStack database using '%s' -- exit!" % (csname, csApiCall)
                 # Exit if not found
