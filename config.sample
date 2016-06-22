@@ -20,5 +20,10 @@ secretkey = 9Z0S5-ryeoCworyp2x_tuhw5E4bAJ4JTRrpNaftTiAl488q5rvUt8_pG7LxAeg3m_VY-
 timeout = 3600
 password = password
 
-[mysqlhostname]
+[slack]
+hookurl =
+
+[mysql-alias]
+mysqlhostname = mysqlhostname
 mysqlpassword = password
+mysqluser = username

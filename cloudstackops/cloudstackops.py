@@ -78,9 +78,17 @@ class CloudStackOps(CloudStackOpsBase):
         self.pp = pprint.PrettyPrinter(depth=6)
         self.ssh = None
         self.xenserver = None
+        self.kvm = None
+        self.slack = None
+        self.slack_custom_title = "Undefined"
+        self.slack_custom_value = "Undefined"
+        self.cluster = "Undefined"
+        self.instance_name = "Undefined"
+        self.task = "Undefined"
 
         self.printWelcome()
-        self.checkScreenAlike()
+        self.configure_slack()
+        self.check_screen_alike()
 
         signal.signal(signal.SIGINT, self.catch_ctrl_C)
 
@@ -88,7 +96,7 @@ class CloudStackOps(CloudStackOpsBase):
         print colored.green("Welcome to CloudStackOps")
 
     # Check if we run in a screen session
-    def checkScreen(self):
+    def check_screen_sty(self):
         try:
             if len(os.environ['STY']) > 0:
                 if self.DEBUG == 1:
@@ -98,7 +106,7 @@ class CloudStackOps(CloudStackOpsBase):
             return False
 
     # Check if we run in a tmux session
-    def checkTmux(self):
+    def check_tmux(self):
         try:
             if len(os.environ['TMUX']) > 0:
                 if self.DEBUG == 1:
@@ -107,10 +115,22 @@ class CloudStackOps(CloudStackOpsBase):
         except:
             return False
 
-    def checkScreenAlike(self):
-        if self.checkScreen():
+    # Check if we run in a tmux session
+    def check_screen_term(self):
+        try:
+            if os.environ['TERM'] == "screen":
+                if self.DEBUG == 1:
+                    print "DEBUG: We're running in a screen-alike program."
+                return True
+        except:
+            return False
+
+    def check_screen_alike(self):
+        if self.check_screen_sty():
             return True
-        if self.checkTmux():
+        if self.check_tmux():
+            return True
+        if self.check_screen_term():
             return True
         print colored.red("Warning: You are NOT running inside screen/tmux. Please start a screen/tmux session to keep commands running in case you get disconnected!")
 
@@ -318,6 +338,9 @@ class CloudStackOps(CloudStackOpsBase):
             apicall = listPods.listPodsCmd()
         elif csApiCall == "listZones":
             apicall = listZones.listZonesCmd()
+        elif csApiCall == "listTemplates":
+            apicall = listTemplates.listTemplatesCmd()
+            apicall.templatefilter = "all"
         else:
             print "No API command to call"
             sys.exit(1)
@@ -438,6 +461,26 @@ class CloudStackOps(CloudStackOpsBase):
 
         # Call CloudStack API
         return self._callAPI(apicall)
+
+    # Get host data
+    def getFirstHostFromCluster(self, clusterID):
+
+        hosts_list = self.getHostsFromCluster(clusterID)
+        cluster_data = self.listClusters({'clusterid': clusterID})
+
+        if cluster_data[0].name.endswith("cs01"):
+            host_to_find = "hv01"
+        elif cluster_data[0].name.endswith("cs02"):
+            host_to_find = "hv07"
+        elif cluster_data[0].name.endswith("cs03"):
+            host_to_find = "hv07"
+        else:
+            return hosts_list[0]
+
+        for h in hosts_list:
+            if host_to_find in h.name:
+                return h
+        return hosts_list[0]
 
     # Find enabled hosts in a given cluster excluding it's hosts which have been marked dedicated
     def getSharedHostsFromCluster(self, clusterID):
@@ -1692,3 +1735,19 @@ class CloudStackOps(CloudStackOpsBase):
 
       # Call CloudStack API
       return self._callAPI(apicall)
+
+    def extract_volume(self, uuid, zoneid):
+        # Export volume
+        apicall = extractVolume.extractVolumeCmd()
+        apicall.id = uuid
+        apicall.mode = "HTTP_DOWNLOAD"
+        apicall.zoneid = zoneid
+
+        result = self._callAPI(apicall)
+
+        if not result:
+            print "Error: Could not export vdi %s" % uuid
+            return False
+        if self.DEBUG == 1:
+            print "DEBUG: received this result:" + str(result)
+        return result.volume.url

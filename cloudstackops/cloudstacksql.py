@@ -24,13 +24,19 @@
 from cloudstackopsbase import *
 # Import our dependencies
 import mysql.connector
-from mysql.connector import errorcode
+from mysql.connector.errors import Error
 
 
 class CloudStackSQL(CloudStackOpsBase):
 
+    # Init function
+    def __init__(self, debug=0, dryrun=0, force=0):
+        self.DEBUG = debug
+        self.DRYRUN = dryrun
+        self.FORCE = force
+
     # Connect MySQL Cloud DB
-    def connectMySQL(self, mysqlhost, mysqlpassword=''):
+    def connectMySQL(self, mysqlhost, mysqlpassword='', mysqluser='cloud'):
         # Try to lookup password if not supplied
         if not mysqlpassword:
             # Try to read MySQL settings from config file
@@ -39,15 +45,18 @@ class CloudStackSQL(CloudStackOpsBase):
                 config = ConfigParser.RawConfigParser()
                 config.read(self.configfile)
                 mysqlpassword = config.get(mysqlhost, 'mysqlpassword')
+                mysqlhostname = config.get(mysqlhost, 'mysqlhostname')
+                mysqluser = config.get(mysqlhost, 'mysqluser')
             except:
-                print "Error: Tried to read password from config file 'config', but failed."
-                print "Error: Make sure there is a section [" + mysqlhost + "] with mysqlpassword=password or specify password on the command line."
+                print "Error: Tried to read username and password from config file 'config', but failed."
+                print "Error: Make sure there is a section [" + mysqlhost + "] with mysqlpassword=password and " \
+                      "mysqluser=user or specify password on the command line."
                 sys.exit(1)
 
         config = {
-            'user': 'cloud',
+            'user': mysqluser,
             'password': mysqlpassword,
-            'host': mysqlhost,
+            'host': mysqlhostname,
             'database': 'cloud',
             'raise_on_warnings': True,
         }
@@ -200,7 +209,7 @@ class CloudStackSQL(CloudStackOpsBase):
 
         return result
 
-    # get uuid of router volume
+    # Return uuid of router volume
     def getRouterRootVolumeUUID(self, routeruuid):
         if not self.conn:
             return 1
@@ -220,3 +229,237 @@ class CloudStackSQL(CloudStackOpsBase):
         cursor.close()
 
         return result
+
+    # Return volumes that belong to a given instance ID
+    def get_volumes_for_instance(self, instancename):
+        if not self.conn:
+            return 1
+        if not instancename:
+            return 1
+
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT volumes.name, volumes.path, volumes.uuid, vm_instance.state as vmstate, "
+                       "volumes.volume_type as voltype" +
+                       " FROM vm_instance, volumes" +
+                       " WHERE volumes.instance_id = vm_instance.id" +
+                       " AND instance_name='" + instancename + "';")
+        result = cursor.fetchall()
+        if self.DEBUG == 1:
+            print "DEBUG: Executed SQL: " + cursor.statement
+
+        cursor.close()
+
+        return result
+
+    # Return new template id
+    def get_template_id_from_name(self, template_name):
+        if not self.conn:
+            return False
+        if not template_name:
+            return False
+
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT id FROM vm_template WHERE name = '" + template_name + "' AND removed is NULL LIMIT 1;")
+        result = cursor.fetchall()
+        if self.DEBUG == 1:
+            print cursor.statement
+        cursor.close()
+
+        try:
+            return result[0][0]
+        except:
+            return False
+
+    # Return guest_os id
+    def get_guest_os_id_from_name(self, guest_os_name):
+        if not self.conn:
+            return False
+        if not guest_os_name:
+            return False
+
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT id from guest_os WHERE display_name ='"
+                       + guest_os_name + "' AND removed is NULL LIMIT 1;")
+        result = cursor.fetchall()
+        if self.DEBUG == 1:
+            print "DEBUG: Executed SQL: " + cursor.statement
+        cursor.close()
+
+        try:
+            return result[0][0]
+        except:
+            return False
+
+    # Return storage_pool id
+    def get_storage_pool_id_from_name(self, storage_pool_name):
+        if not self.conn:
+            return False
+        if not storage_pool_name:
+            return False
+
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT storage_pool.id FROM cluster, storage_pool WHERE storage_pool.cluster_id = cluster.id " +
+                       " AND storage_pool.name='" + storage_pool_name + "'" +
+                       " AND cluster.removed is NULL" +
+                       " AND storage_pool.removed is NULL LIMIT 1;")
+        if self.DEBUG == 1:
+            print "DEBUG: Executed SQL: " + cursor.statement
+
+        result = cursor.fetchall()
+        cursor.close()
+
+        try:
+            return result[0][0]
+        except:
+            return False
+
+    # Return instance_id
+    def get_istance_id_from_name(self, instance_name):
+        if not self.conn:
+            return False
+        if not instance_name:
+            return False
+
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT id from vm_instance WHERE instance_name ='"
+                       + instance_name + "' AND removed is NULL LIMIT 1;")
+        if self.DEBUG == 1:
+            print "DEBUG: Executed SQL: " + cursor.statement
+
+        result = cursor.fetchall()
+        cursor.close()
+
+        try:
+            return result[0][0]
+        except:
+            return False
+
+    # Set instance to KVM in the db
+    def update_instance_to_kvm(self, instance_name, vm_template_name, to_storage_pool_name,
+                               guest_os_name="Other PV (64-bit)"):
+        if not self.update_instance_from_xenserver_cluster_to_kvm_cluster(instance_name, vm_template_name,
+                                                                          guest_os_name):
+            print "Error: vm_instance query failed"
+            return False
+        if not self.update_all_volumes_of_instance_from_xenserver_cluster_to_kvm_cluster(instance_name,
+                                                                                         to_storage_pool_name):
+            print "Error: volumes query failed"
+            return False
+        return True
+
+    # Update db vm_instance table
+    def update_instance_from_xenserver_cluster_to_kvm_cluster(self, instance_name, vm_template_name, guest_os_name):
+        if not self.conn:
+            return False
+        if not vm_template_name or not guest_os_name or not instance_name:
+            return False
+
+        vm_template_id = self.get_template_id_from_name(vm_template_name)
+        guest_os_id = self.get_guest_os_id_from_name(guest_os_name)
+
+        if not vm_template_id or not guest_os_id:
+            print "Error: Template or GuestOS not found."
+            return False
+
+        cursor = self.conn.cursor()
+
+        try:
+            cursor.execute ("""
+               UPDATE vm_instance
+               SET last_host_id=NULL, hypervisor_type='KVM', vm_template_id=%s, guest_os_id=%s
+               WHERE instance_name=%s LIMIT 1
+            """, (vm_template_id, guest_os_id, instance_name))
+
+            if self.DRYRUN == 0:
+                self.conn.commit()
+            else:
+                print "Note: Would have executed: %s" % cursor.statement
+
+            if self.DEBUG == 1:
+                print "DEBUG: Executed SQL: " + cursor.statement
+
+        except mysql.connector.Error as err:
+            print("Error: MySQL: {}".format(err))
+            print cursor.statement
+            cursor.close()
+            return False
+
+        cursor.close()
+        return True
+
+    # Update db volumes table
+    def update_all_volumes_of_instance_from_xenserver_cluster_to_kvm_cluster(self, instance_name, to_storage_pool_name):
+        if not self.conn:
+            return 1
+        if not instance_name or not to_storage_pool_name:
+            return 1
+
+        instance_id = self.get_istance_id_from_name(instance_name)
+        to_storage_pool_id = self.get_storage_pool_id_from_name(to_storage_pool_name)
+
+        cursor = self.conn.cursor()
+
+        try:
+            cursor.execute ("""
+               UPDATE volumes
+               SET template_id=NULL, last_pool_id=NULL, format='QCOW2', pool_id=%s
+               WHERE instance_id=%s
+            """, (to_storage_pool_id, instance_id))
+
+            if self.DRYRUN == 0:
+                self.conn.commit()
+            else:
+                print "Note: Would have executed: %s" % cursor.statement
+
+            if self.DEBUG == 1:
+                print "DEBUG: Executed SQL: " + cursor.statement
+
+        except mysql.connector.Error as err:
+            print("Error: MySQL: {}".format(err))
+            print cursor.statement
+            cursor.close()
+            return False
+
+        cursor.close()
+        return True
+
+    # Generate revert queries
+    def get_current_config(self, instancename):
+
+        if not self.conn:
+            return False
+        if not instancename:
+            return False
+
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT vm_instance.id AS instance_id, vm_instance.vm_template_id AS vm_template_id, " +
+                       "vm_instance.guest_os_id AS guest_os_id, volumes.pool_id AS pool_id " +
+                       "FROM vm_instance, volumes " +
+                       "WHERE vm_instance.id = volumes.instance_id " +
+                       "AND vm_instance.instance_name='" + instancename + "' LIMIT 1;")
+
+        if self.DEBUG == 1:
+            print "DEBUG: Executed SQL: " + cursor.statement
+
+        result = cursor.fetchall()
+        cursor.close()
+
+        try:
+            return result[0]
+        except:
+            return False
+
+    # Generate revert query
+    def generate_revert_query(self, instancename):
+        instance_id, vm_template_id, guest_os_id, pool_id = self.get_current_config(instancename)
+
+        revert_sql_instance = "UPDATE vm_instance SET last_host_id=NULL, hypervisor_type='XenServer', " \
+                              "vm_template_id="+ str(vm_template_id) + ", guest_os_id=" + str(guest_os_id) + " " \
+                              "WHERE instance_name='" + str(instancename) + "' LIMIT 1;"
+
+        revert_sql_volume = "UPDATE volumes SET template_id=NULL, last_pool_id=NULL, format='VHD', " \
+                            "pool_id=" + str(pool_id) + " WHERE instance_id='" + str(instance_id) + "';"
+
+        print "Note: Should you want to revert, you simply stop the VM on KVM and then run this SQL:"
+        print "\t\t\t" +  revert_sql_instance
+        print "\t\t\t" + revert_sql_volume
