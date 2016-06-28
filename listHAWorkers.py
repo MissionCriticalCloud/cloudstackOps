@@ -158,7 +158,9 @@ for (domain,vmname, vm_type, state, created, taken, step, hypervisor, mgtname,
        continue
     counter = counter + 1
     displayname = (vmname[:28] + '..') if len(vmname) >= 31 else vmname
-    mgtname = mgtname.split(".")[0]
+    if mgtname is not None:
+        mgtname = mgtname.split(".")[0]
+    hvname = hypervisor.split(".")[0]
     t.add_row([
         domain,
         displayname,
@@ -167,7 +169,7 @@ for (domain,vmname, vm_type, state, created, taken, step, hypervisor, mgtname,
         created,
         taken,
         step,
-        hypervisor,
+        hvname,
         mgtname
     ])
 
