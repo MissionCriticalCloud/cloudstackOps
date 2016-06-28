@@ -218,16 +218,6 @@ if DRYRUN == 1:
 # Start time
 print "Note: Starting @ " + time.strftime("%Y-%m-%d %H:%M")
 
-# Set to unmanage in CloudStack
-print "Note: Setting cluster " + clustername + " to Unmanaged in CloudStack"
-clusterUpdateReturn = c.updateCluster(
-    {'clusterid': clusterID, 'managedstate': 'Unmanaged'})
-
-if clusterUpdateReturn == 1 or clusterUpdateReturn is None:
-    print "Error: Unmanaging cluster " + clustername + " failed. Halting."
-    disconnect_all()
-    sys.exit(1)
-
 # Check HA of Cluster
 pool_ha = x.pool_ha_check(poolmaster)
 if pool_ha == "Error":
@@ -248,6 +238,18 @@ if pool_ha:
 
 # Do the poolmaster first
 if poolmaster.name not in ignoreHosts:
+
+    # BEFORE: Set to Unmanage
+    print "Note: Setting cluster " + clustername + " to Unmanaged in CloudStack"
+    clusterUpdateReturn = c.updateCluster(
+        {'clusterid': clusterID, 'managedstate': 'Unmanaged'})
+
+    if clusterUpdateReturn == 1 or clusterUpdateReturn is None:
+        print "Error: Unmanaging cluster " + clustername + " failed. Halting."
+        disconnect_all()
+        sys.exit(1)
+
+    # Migrate all VMs off of pool master
     vm_count = x.host_get_vms(poolmaster)
     if vm_count:
         print "Note: " + poolmaster.name + " (poolmaster) has " + vm_count + " VMs running."
@@ -261,22 +263,23 @@ if poolmaster.name not in ignoreHosts:
         print "Error: Unable to contact the poolmaster " + poolmaster.name
         disconnect_all()
         sys.exit(1)
+
+    # AFTER: Set to Manage
+    print "Note: Setting cluster " + clustername + " back to Managed in CloudStack"
+    clusterUpdateReturn = c.updateCluster(
+        {'clusterid': clusterID, 'managedstate': 'Managed'})
+
+    if clusterUpdateReturn == 1 or clusterUpdateReturn is None:
+        print "Error: Managing cluster " + clustername + " failed. Please check manually."
+        disconnect_all()
+        sys.exit(1)
+
 else:
         print "Warning: Skipping " + poolmaster.name + " due to --ignore-hosts setting"
 
 # Print overview
 checkBonds = True
 c.printHypervisors(clusterID, poolmaster.name, checkBonds)
-
-# Set to manage in CloudStack
-print "Note: Setting cluster " + clustername + " back to Managed in CloudStack"
-clusterUpdateReturn = c.updateCluster(
-    {'clusterid': clusterID, 'managedstate': 'Managed'})
-
-if clusterUpdateReturn == 1 or clusterUpdateReturn is None:
-    print "Error: Managing cluster " + clustername + " failed. Please check manually."
-    disconnect_all()
-    sys.exit(1)
 
 # Print cluster info
 print "Note: Some info about cluster '" + clustername + "':"
