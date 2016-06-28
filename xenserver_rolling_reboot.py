@@ -141,7 +141,7 @@ if DEBUG == 1:
 
 # Check cloudstack IDs
 if DEBUG == 1:
-    print "Note: Checking CloudStack IDs of provided input.."
+    print "Note: Checking IDs of provided input.."
 clusterID = c.checkCloudStackName(
     {'csname': clustername, 'csApiCall': 'listClusters'})
 if clusterID == 1:
@@ -196,7 +196,7 @@ if DRYRUN == 1:
     print "Warning: We are running in DRYRUN mode."
     print
     print "This script will: "
-    print "  - Set cluster " + clustername + " to unmanage in CloudStack"
+    print "  - Set cluster " + clustername + " to Unmanage"
     print "  - Turn OFF XenServer poolHA for " + clustername
     print "  - For any hypervisor it will do this (poolmaster " + poolmaster.name + " first):"
     print "      - put it to Disabled aka Maintenance in XenServer"
@@ -206,8 +206,8 @@ if DRYRUN == 1:
     print "      - set the hypervisor to Enabled in XenServer"
     print "      - continues to the next hypervisor"
     print "  - When the rebooting is done, it enables XenServer poolHA again for " + clustername
-    print "  - Finally, it sets the " + clustername + " to Managed again in CloudStack"
-    print "  - CloudStack will update its admin according to the new situation"
+    print "  - Finally, it sets the " + clustername + " to Managed again"
+    print "  - Database will be updated according to the new situation"
     print "Then the reboot cyclus for " + clustername + " is done!"
     print
     print "To kick it off, run with the --exec flag."
@@ -240,7 +240,7 @@ if pool_ha:
 if poolmaster.name not in ignoreHosts:
 
     # BEFORE: Set to Unmanage
-    print "Note: Setting cluster " + clustername + " to Unmanaged in CloudStack"
+    print "Note: Setting cluster " + clustername + " to Unmanaged"
     clusterUpdateReturn = c.updateCluster(
         {'clusterid': clusterID, 'managedstate': 'Unmanaged'})
 
@@ -265,7 +265,7 @@ if poolmaster.name not in ignoreHosts:
         sys.exit(1)
 
     # AFTER: Set to Manage
-    print "Note: Setting cluster " + clustername + " back to Managed in CloudStack"
+    print "Note: Setting cluster " + clustername + " back to Managed"
     clusterUpdateReturn = c.updateCluster(
         {'clusterid': clusterID, 'managedstate': 'Managed'})
 
@@ -273,6 +273,9 @@ if poolmaster.name not in ignoreHosts:
         print "Error: Managing cluster " + clustername + " failed. Please check manually."
         disconnect_all()
         sys.exit(1)
+
+    print "Note: Waiting 30s to allow all hosts connect.."
+    time.sleep(30)
 
 else:
         print "Warning: Skipping " + poolmaster.name + " due to --ignore-hosts setting"
