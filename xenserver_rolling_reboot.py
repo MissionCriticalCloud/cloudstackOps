@@ -164,7 +164,7 @@ if len(ignoreHosts) > 0:
 # Get poolmaster
 poolmaster_name = x.get_poolmaster(first_host)
 if not poolmaster_name:
-    print "Error: unable to figure out the poolmaster while talking to " + first_hostname
+    print "Error: unable to figure out the poolmaster while talking to " + first_host
     disconnect_all()
     sys.exit(1)
 print "Note: The poolmaster of cluster " + clustername + " is " + poolmaster_name
