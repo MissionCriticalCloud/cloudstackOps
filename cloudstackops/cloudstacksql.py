@@ -78,7 +78,7 @@ class CloudStackSQL(CloudStackOpsBase):
             return 1
 
         if len(hypervisorName) > 0:
-            hypervisorNameWhere = " AND host.name = '" + hypervisorName + "'"
+            hypervisorNameWhere = " AND host.name LIKE '" + hypervisorName + "%'"
         else:
             hypervisorNameWhere = ""
 
