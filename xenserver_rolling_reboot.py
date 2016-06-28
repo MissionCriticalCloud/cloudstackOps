@@ -141,7 +141,7 @@ if DEBUG == 1:
 
 # Check cloudstack IDs
 if DEBUG == 1:
-    print "Note: Checking CloudStack IDs of provided input.."
+    print "Note: Checking IDs of provided input.."
 clusterID = c.checkCloudStackName(
     {'csname': clustername, 'csApiCall': 'listClusters'})
 if clusterID == 1:
@@ -196,7 +196,7 @@ if DRYRUN == 1:
     print "Warning: We are running in DRYRUN mode."
     print
     print "This script will: "
-    print "  - Set cluster " + clustername + " to unmanage in CloudStack"
+    print "  - Set cluster " + clustername + " to Unmanage"
     print "  - Turn OFF XenServer poolHA for " + clustername
     print "  - For any hypervisor it will do this (poolmaster " + poolmaster.name + " first):"
     print "      - put it to Disabled aka Maintenance in XenServer"
@@ -206,8 +206,8 @@ if DRYRUN == 1:
     print "      - set the hypervisor to Enabled in XenServer"
     print "      - continues to the next hypervisor"
     print "  - When the rebooting is done, it enables XenServer poolHA again for " + clustername
-    print "  - Finally, it sets the " + clustername + " to Managed again in CloudStack"
-    print "  - CloudStack will update its admin according to the new situation"
+    print "  - Finally, it sets the " + clustername + " to Managed again"
+    print "  - Database will be updated according to the new situation"
     print "Then the reboot cyclus for " + clustername + " is done!"
     print
     print "To kick it off, run with the --exec flag."
@@ -217,16 +217,6 @@ if DRYRUN == 1:
 
 # Start time
 print "Note: Starting @ " + time.strftime("%Y-%m-%d %H:%M")
-
-# Set to unmanage in CloudStack
-print "Note: Setting cluster " + clustername + " to Unmanaged in CloudStack"
-clusterUpdateReturn = c.updateCluster(
-    {'clusterid': clusterID, 'managedstate': 'Unmanaged'})
-
-if clusterUpdateReturn == 1 or clusterUpdateReturn is None:
-    print "Error: Unmanaging cluster " + clustername + " failed. Halting."
-    disconnect_all()
-    sys.exit(1)
 
 # Check HA of Cluster
 pool_ha = x.pool_ha_check(poolmaster)
@@ -248,6 +238,18 @@ if pool_ha:
 
 # Do the poolmaster first
 if poolmaster.name not in ignoreHosts:
+
+    # BEFORE: Set to Unmanage
+    print "Note: Setting cluster " + clustername + " to Unmanaged"
+    clusterUpdateReturn = c.updateCluster(
+        {'clusterid': clusterID, 'managedstate': 'Unmanaged'})
+
+    if clusterUpdateReturn == 1 or clusterUpdateReturn is None:
+        print "Error: Unmanaging cluster " + clustername + " failed. Halting."
+        disconnect_all()
+        sys.exit(1)
+
+    # Migrate all VMs off of pool master
     vm_count = x.host_get_vms(poolmaster)
     if vm_count:
         print "Note: " + poolmaster.name + " (poolmaster) has " + vm_count + " VMs running."
@@ -261,22 +263,26 @@ if poolmaster.name not in ignoreHosts:
         print "Error: Unable to contact the poolmaster " + poolmaster.name
         disconnect_all()
         sys.exit(1)
+
+    # AFTER: Set to Manage
+    print "Note: Setting cluster " + clustername + " back to Managed"
+    clusterUpdateReturn = c.updateCluster(
+        {'clusterid': clusterID, 'managedstate': 'Managed'})
+
+    if clusterUpdateReturn == 1 or clusterUpdateReturn is None:
+        print "Error: Managing cluster " + clustername + " failed. Please check manually."
+        disconnect_all()
+        sys.exit(1)
+
+    print "Note: Waiting 30s to allow all hosts connect.."
+    time.sleep(30)
+
 else:
         print "Warning: Skipping " + poolmaster.name + " due to --ignore-hosts setting"
 
 # Print overview
 checkBonds = True
 c.printHypervisors(clusterID, poolmaster.name, checkBonds)
-
-# Set to manage in CloudStack
-print "Note: Setting cluster " + clustername + " back to Managed in CloudStack"
-clusterUpdateReturn = c.updateCluster(
-    {'clusterid': clusterID, 'managedstate': 'Managed'})
-
-if clusterUpdateReturn == 1 or clusterUpdateReturn is None:
-    print "Error: Managing cluster " + clustername + " failed. Please check manually."
-    disconnect_all()
-    sys.exit(1)
 
 # Print cluster info
 print "Note: Some info about cluster '" + clustername + "':"
