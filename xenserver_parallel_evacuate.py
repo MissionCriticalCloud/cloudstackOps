@@ -90,13 +90,16 @@ class xenserver_parallel_evacuation(object):
                                            xe host-compute-free-memory host=$h;done")
 
     # Get overview of VMs and their memory
-    def get_vms_with_memory_from_hypervisor(self):
+    def get_vms_with_memory_from_hypervisor(self, grep_for=None):
         try:
+            grep_command = ""
+            if grep_for is not None:
+                grep_command = "| grep %s" % grep_for
             return self.run_local_command("xe vm-list resident-on=$(xe host-list params=uuid \
                                            name-label=$HOSTNAME --minimal) \
                                            params=name-label,memory-static-max is-control-domain=false |\
                                            tr '\\n' ' ' | sed 's/name-label/\\n/g' | \
-                                           awk {'print $4 \",\" $8'} | sed '/^,$/d'")
+                                           awk {'print $4 \",\" $8'} | sed '/^,$/d'" + grep_command)
         except:
             return False
 
@@ -126,7 +129,7 @@ class xenserver_parallel_evacuation(object):
         return sorted(self.poolmember.items(),key = lambda x :x[1]['memory_free'],reverse = True)[:1][0][1]
 
     # Generate migration plan
-    def generate_migration_plan(self):
+    def generate_migration_plan(self, grep_for=None):
         # Make sure host is disabled
         if self.is_host_enabled() is not False:
             print "Error: Host should be disabled first."
@@ -140,7 +143,7 @@ class xenserver_parallel_evacuation(object):
         # Generate migration plan
         migration_cmds = ""
         if self.vmlist == False:
-            self.vmlist = self.get_vms_with_memory_from_hypervisor()
+            self.vmlist = self.get_vms_with_memory_from_hypervisor(grep_for)
 
         vmlist_iter = self.vmlist.split('\n')
 
@@ -170,9 +173,9 @@ class xenserver_parallel_evacuation(object):
         return migration_cmds
 
     # Execute migration plan
-    def execute_migration_plan(self):
+    def execute_migration_plan(self, grep_for=None):
          try:
-            migration_cmds = self.generate_migration_plan()
+            migration_cmds = self.generate_migration_plan(grep_for)
             if migration_cmds == False:
                 return False
             return self.run_local_command("nohup echo \"" + migration_cmds + "\" | \
@@ -214,9 +217,18 @@ if __name__ == "__main__":
         print "Note: Running in DRY-run mode, not executing. Use --exec to execute."
         print "Note: Calculating migration plan.."
         print "Note: This is the migration plan:"
-        print x.generate_migration_plan()
+        print "Instances (threads = %s)" % str(x.threads)
+        print x.generate_migration_plan("i-")
+        x.threads = 1
+        x.vmlist = False
+        print "Routers (threads = %s)" % str(x.threads)
+        print x.generate_migration_plan("r-")
         sys.exit(0)
 
+    print "Note: Executing migration plan using " + str(x.threads) + " threads.."
+    print x.execute_migration_plan("i-")
+    x.threads = 1
+    x.vmlist = False
     print "Note: Executing migration plan using " + str(x.threads) + " threads.."
     print x.execute_migration_plan()
 
