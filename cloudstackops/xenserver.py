@@ -49,9 +49,12 @@ output['warnings'] = False
 # Class to handle XenServer patching
 class xenserver():
 
-    def __init__(self, ssh_user='root', threads=5):
+    def __init__(self, ssh_user='root', threads=5, pre_empty_script='xenserver_pre_empty_script.sh',
+                 post_empty_script='xenserver_post_empty_script.sh'):
         self.ssh_user = ssh_user
         self.threads = threads
+        self.pre_empty_script = pre_empty_script
+        self.post_empty_script = post_empty_script
 
     # Wait for hypervisor to become alive again
     def check_connect(self, host):
@@ -169,9 +172,14 @@ class xenserver():
 
     # Reboot a host when all conditions are met
     def host_reboot(self, host, halt_hypervisor=False):
-        # Disbale host
+        # Disable host
         if self.host_disable(host) is False:
             print "Error: Disabling host " + host.name + " failed."
+            return False
+
+        # Execute pre-empty-script
+        if self.exec_script_on_hypervisor(host, self.pre_empty_script) is False:
+            print "Error: Executing script '" + self.pre_empty_script + "' on host " + host.name + " failed."
             return False
 
         # Then evacuate it
@@ -184,6 +192,11 @@ class xenserver():
             print "Error: Host " + host.name + " not empty, cannot reboot!"
             return False
         print "Note: Host " + host.name + " has no VMs running, continuing"
+
+        # Execute post-empty-script
+        if self.exec_script_on_hypervisor(host, self.post_empty_script) is False:
+            print "Error: Executing script '" + self.post_empty_script + "' on host " + host.name + " failed."
+            return False
 
         # Finally reboot it
         try:
@@ -207,6 +220,15 @@ class xenserver():
         # Enable host
         if self.host_enable(host) is False:
             print "Error: Enabling host " + host.name + " failed."
+            return False
+
+    # Execute script on hypervisor
+    def exec_script_on_hypervisor(self, host, script):
+        print "Note: Executing script %s on host %s.." % (script, host.name)
+        try:
+            with settings(show('output'), host_string=self.ssh_user + "@" + host.ipaddress):
+                return fab.run("bash /tmp/" + script)
+        except:
             return False
 
     # Get VM count of a hypervisor
@@ -275,6 +297,12 @@ class xenserver():
                     '/tmp/xenserver_fake_pvtools.sh', mode=0755)
                 put('xenserver_parallel_evacuate.py',
                     '/tmp/xenserver_parallel_evacuate.py', mode=0755)
+                if len(self.pre_empty_script) > 0:
+                    put(self.pre_empty_script,
+                        '/tmp/' + self.pre_empty_script, mode=0755)
+                if len(self.post_empty_script) > 0:
+                    put(self.post_empty_script,
+                        '/tmp/' + self.post_empty_script, mode=0755)
             return True
         except:
             print "Warning: Could not upload check scripts to host " + host.name + ". Continuing anyway."

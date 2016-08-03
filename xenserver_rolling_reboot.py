@@ -57,7 +57,10 @@ def handleArguments(argv):
     threads = 5
     global halt_hypervisor
     halt_hypervisor = False
-
+    global pre_empty_script
+    pre_empty_script = 'xenserver_pre_empty_script.sh'
+    global post_empty_script
+    post_empty_script = 'xenserver_post_empty_script.sh'
     # Usage message
     help = "Usage: ./" + os.path.basename(__file__) + ' [options]' + \
         '\n  --config-profile -c <profilename>\t\tSpecify the CloudMonkey profile name to ' \
@@ -68,6 +71,10 @@ def handleArguments(argv):
         '\n  --threads <nr>\t\t\t\tUse this number or concurrent migration threads ' + \
         '\n  --halt\t\t\t\t\tInstead of the default reboot, halt the hypervisor (useful in case of hardware ' \
         'upgrades) ' + \
+        '\n  --pre-empty-script\t\t\t\tBash script to run on hypervisor before starting the live migrations to empty ' \
+        'hypervisor (expected in same folder as this script)' + \
+        '\n  --post-empty-script\t\t\t\tBash script to run on hypervisor after a hypervisor has no more VMs running' \
+        '(expected in same folder as this script)' + \
         '\n  --debug\t\t\t\t\tEnable debug mode' + \
         '\n  --exec\t\t\t\t\tExecute for real' + \
         '\n  --prepare\t\t\t\t\tExecute some prepare commands'
@@ -75,7 +82,8 @@ def handleArguments(argv):
     try:
         opts, args = getopt.getopt(
             argv, "hc:n:t:p", [
-                "credentials-file=", "clustername=", "ignore-hosts=", "threads=", "halt", "debug", "exec", "prepare"])
+                "credentials-file=", "clustername=", "ignore-hosts=", "threads=", "pre-empty-script=",
+                "post-empty-script=", "halt", "debug", "exec", "prepare"])
     except getopt.GetoptError as e:
         print "Error: " + str(e)
         print help
@@ -95,6 +103,10 @@ def handleArguments(argv):
             ignoreHostList = arg
         elif opt in ("--halt"):
             halt_hypervisor = True
+        elif opt in ("--pre-empty-script"):
+            pre_empty_script = arg
+        elif opt in ("--post-empty-script"):
+            post_empty_script = arg
         elif opt in ("--debug"):
             DEBUG = 1
         elif opt in ("--exec"):
