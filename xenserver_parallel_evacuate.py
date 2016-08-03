@@ -34,12 +34,13 @@ class handleArguments(object):
         self.DEBUG = 0
         self.DRYRUN = 1
         self.threads = 5
+        self.skip_checks = False
 
         # Usage message
-        help = "Usage: " + os.path.basename(__file__) + ' --threads [--debug --exec ]'
+        help = "Usage: " + os.path.basename(__file__) + ' --threads [--debug --exec --skip-checks]'
 
         try:
-            opts, args = getopt.getopt(argv,"ht:",["threads=","debug","exec"])
+            opts, args = getopt.getopt(argv,"ht:",["threads=","debug","exec","skip-checks"])
         except getopt.GetoptError:
             print help
             sys.exit(2)
@@ -53,6 +54,8 @@ class handleArguments(object):
                 self.DEBUG = 1
             elif opt in ("--exec"):
                 self.DRYRUN = 0
+            elif opt in ("--skip-checks"):
+                self.skip_checks = True
 
 # Class to handle XenServer parallel evactation
 class xenserver_parallel_evacuation(object):
@@ -64,6 +67,7 @@ class xenserver_parallel_evacuation(object):
         self.poolmember = False
         self.vmlist = False
         self.hvlist = False
+        self.skip_checks = arg.skip_checks
 
     # Run local command
     def run_local_command(self, command):
@@ -130,15 +134,16 @@ class xenserver_parallel_evacuation(object):
 
     # Generate migration plan
     def generate_migration_plan(self, grep_for=None):
-        # Make sure host is disabled
-        if self.is_host_enabled() is not False:
-            print "Error: Host should be disabled first."
-            return False
+        if self.skip_checks is False:
+            # Make sure host is disabled
+            if self.is_host_enabled() is not False:
+                print "Error: Host should be disabled first."
+                return False
 
-        # Make sure pool HA is turned off
-        if self.pool_ha_check() is not False:
-            print "Error: Pool HA should be disabled first."
-            return False
+            # Make sure pool HA is turned off
+            if self.pool_ha_check() is not False:
+                print "Error: Pool HA should be disabled first."
+                return False
 
         # Generate migration plan
         migration_cmds = ""
