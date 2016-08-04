@@ -24,6 +24,7 @@ import socket
 import sys
 import time
 import os
+import requests
 
 # Fabric
 from fabric.api import *
@@ -224,7 +225,7 @@ class xenserver():
 
     # Execute script on hypervisor
     def exec_script_on_hypervisor(self, host, script):
-        print "Note: Executing script %s on host %s.." % (script, host.name)
+        print "Note: Executing script '%s' on host %s.." % (script, host.name)
         try:
             with settings(show('output'), host_string=self.ssh_user + "@" + host.ipaddress):
                 return fab.run("bash /tmp/" + script)
@@ -334,5 +335,67 @@ class xenserver():
         try:
             with settings(host_string=self.ssh_user + "@" + host.ipaddress):
                 return fab.run("python /tmp/xenserver_check_bonds.py | awk {'print $1'} | tr -d \":\"")
+        except:
+            return False
+
+    # Download XenServer patch
+    def download_patch(self, url):
+        filename = url.split("/")[-1]
+
+        directory = "xenserver_patches"
+        if not os.path.exists(directory):
+            os.makedirs(directory)
+
+        destination_file = os.getcwd() + '/' + directory + '/' + filename
+        try:
+            local_length = int(os.path.getsize(destination_file))
+        except:
+            local_length = 0
+
+        print "Note: Executing request.."
+        try:
+            response = requests.get(url, stream=True)
+            remote_length = int(response.headers.get('Content-Length', 0))
+            if not response.ok:
+                return False
+        except:
+            return False
+
+        # Do we need to download?
+        print "Note: The remote length is %s, local length is %s" % (remote_length, local_length)
+
+        if remote_length == local_length:
+            print "Note: Skipping download because file is already downloaded."
+            return True
+
+        with open(destination_file, 'wb') as handle:
+            # Download file
+            print "Note: Downloading file.."
+
+            for block in response.iter_content(1024):
+                handle.write(block)
+            return True
+
+    # Upload patches to poolmaster
+    def put_patches_to_poolmaster(self, host):
+        print "Note: Uploading patches to poolmaster.."
+        try:
+            with settings(host_string=self.ssh_user + "@" + host.ipaddress):
+                run('rm -rf /root/xenserver_patches/')
+                run('mkdir -p /root/xenserver_patches')
+                put('xenserver_patches/*', '/root/xenserver_patches')
+                put('xenserver_upload_patches_to_poolmaster.sh',
+                    '/root/xenserver_patches/xenserver_upload_patches_to_poolmaster.sh', mode=0755)
+            return True
+        except:
+            print "Warning: Could not upload patches to host " + host.name + "."
+            return False
+
+    # Upload patches to XenServer
+    def upload_patches_to_xenserver(self, host):
+        print "Note: We're uploading the patches to XenServer"
+        try:
+            with settings(show('output'), host_string=self.ssh_user + "@" + host.ipaddress):
+                return fab.run("bash /root/xenserver_patches/xenserver_upload_patches_to_poolmaster.sh")
         except:
             return False

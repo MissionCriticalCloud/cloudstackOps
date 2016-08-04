@@ -3,3 +3,4 @@
 config
 *.iml
 .idea/
+xenserver_patches/

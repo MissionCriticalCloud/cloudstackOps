@@ -61,6 +61,8 @@ def handleArguments(argv):
     pre_empty_script = 'xenserver_pre_empty_script.sh'
     global post_empty_script
     post_empty_script = 'xenserver_post_empty_script.sh'
+    global patch_list_file
+    patch_list_file = 'xenserver_patches_to_install.txt'
     # Usage message
     help = "Usage: ./" + os.path.basename(__file__) + ' [options]' + \
         '\n  --config-profile -c <profilename>\t\tSpecify the CloudMonkey profile name to ' \
@@ -74,6 +76,7 @@ def handleArguments(argv):
         '\n  --pre-empty-script\t\t\t\tBash script to run on hypervisor before starting the live migrations to empty ' \
         'hypervisor (expected in same folder as this script)' + \
         '\n  --post-empty-script\t\t\t\tBash script to run on hypervisor after a hypervisor has no more VMs running' \
+        '\n  --patch-list-file\t\t\t\tText file with URLs of patches to download and install. One per line. ' \
         '(expected in same folder as this script)' + \
         '\n  --debug\t\t\t\t\tEnable debug mode' + \
         '\n  --exec\t\t\t\t\tExecute for real' + \
@@ -83,7 +86,7 @@ def handleArguments(argv):
         opts, args = getopt.getopt(
             argv, "hc:n:t:p", [
                 "credentials-file=", "clustername=", "ignore-hosts=", "threads=", "pre-empty-script=",
-                "post-empty-script=", "halt", "debug", "exec", "prepare"])
+                "post-empty-script=", "patch-list-file=", "halt", "debug", "exec", "prepare"])
     except getopt.GetoptError as e:
         print "Error: " + str(e)
         print help
@@ -107,6 +110,8 @@ def handleArguments(argv):
             pre_empty_script = arg
         elif opt in ("--post-empty-script"):
             post_empty_script = arg
+        elif opt in ("--patch-list-file"):
+            patch_list_file = arg
         elif opt in ("--debug"):
             DEBUG = 1
         elif opt in ("--exec"):
@@ -137,7 +142,7 @@ if __name__ == '__main__':
 c = cloudstackops.CloudStackOps(DEBUG, DRYRUN)
 
 # Init XenServer class
-x = xenserver.xenserver('root', threads)
+x = xenserver.xenserver('root', threads, pre_empty_script, post_empty_script)
 c.xenserver = x
 
 # make credentials file known to our class
@@ -212,7 +217,10 @@ if DRYRUN == 1:
     print "  - Turn OFF XenServer poolHA for " + clustername
     print "  - For any hypervisor it will do this (poolmaster " + poolmaster.name + " first):"
     print "      - put it to Disabled aka Maintenance in XenServer"
+    print "      - download the patches in file --patch-list-file '" + patch_list_file + "'"
+    print "      - execute the --pre-empty-script script '" + pre_empty_script + "' on the hypervisor"
     print "      - live migrate all VMs off of it using XenServer evacuate command"
+    print "      - execute the --post-empty-script script '" + post_empty_script + "' on the hypervisor"
     print "      - when empty, it will reboot the hypervisor (halting is " + str(halt_hypervisor) + ")"
     print "      - will wait for it to come back online (checks SSH connection)"
     print "      - set the hypervisor to Enabled in XenServer"
@@ -260,6 +268,19 @@ if poolmaster.name not in ignoreHosts:
         print "Error: Unmanaging cluster " + clustername + " failed. Halting."
         disconnect_all()
         sys.exit(1)
+
+    # Download all XenServer patches
+    print "Note: Reading patches list '%s'" % patch_list_file
+    with open(patch_list_file) as file_pointer:
+        patches = file_pointer.read().splitlines()
+
+    for patch_url in patches:
+        print "Note: Processing patch '%s'" % patch_url
+        x.download_patch(patch_url)
+
+    # Upload the patches to poolmaster, then to XenServer
+    x.put_patches_to_poolmaster(poolmaster)
+    x.upload_patches_to_xenserver(poolmaster)
 
     # Migrate all VMs off of pool master
     vm_count = x.host_get_vms(poolmaster)
