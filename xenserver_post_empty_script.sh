@@ -54,3 +54,6 @@ done
 echo "Upgrading drivers"
 yum -y install bnx2x-* fnic* qla2* glnic* qlge* tg3* hpsa* openvswitch-modules-xen*
 yum -y upgrade nicira-ovs-hypervisor-node
+
+echo "Fixing openvswitch installation back to the newest"
+yum reinstall openvswitch
