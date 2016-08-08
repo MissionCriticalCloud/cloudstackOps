@@ -53,11 +53,23 @@ done
 
 echo "Upgrading drivers"
 yum -y install bnx2x-* fnic* qla2* glnic* qlge* tg3* openvswitch-modules-xen*
+if [ $? -eq 0 ]; then
+    echo "Yum commnand returned non-zero"
+    exit 1
+fi
 
 SYSTEM_HARDWARE=$(dmidecode -s system-product-name | grep -v "#")
 if [[ "${SYSTEM_HARDWARE}" == "ProLiant DL380 G7" ]]; then
     echo "Skip HPSA on HP ProLiant DL380 G7 or else the box won't boot"
 else
     yum -y install hpsa*
+    if [ $? -eq 0 ]; then
+    echo "Yum commnand returned non-zero"
+    exit 1
+fi
 fi
 yum -y upgrade nicira-ovs-hypervisor-node
+if [ $? -eq 0 ]; then
+    echo "Yum commnand returned non-zero"
+    exit 1
+fi

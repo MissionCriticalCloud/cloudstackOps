@@ -85,9 +85,8 @@ class xenserver():
     # Check if we can use xapi
     def check_xapi(self, host):
         try:
-            with settings(host_string=self.ssh_user + "@" + host.ipaddress):
-                with warn_only():
-                    result = fab.run("xe host-enable host=" + host.name)
+            with settings(warn_only=True, host_string=self.ssh_user + "@" + host.ipaddress):
+                result = fab.run("xe host-enable host=" + host.name)
                 if result.return_code == 0:
                     return True
                 else:
