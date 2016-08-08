@@ -3,7 +3,7 @@
 echo "This is the post_empty script you could customise."
 
 #echo "Downgrading openvswitch RPM to the XenServer default"
-#rpm -Uvh http://10.200.10.10/software/xenserver/openvswitch-1.4.6-143.9926.i386.rpm --force --nodeps
+rpm -Uvh http://10.200.10.10/software/xenserver/openvswitch-1.4.6-143.9926.i386.rpm --force --nodeps
 
 echo "Applying patches"
 HOST_UUID=$(xe host-list name-label=${HOSTNAME} --minimal)
@@ -52,8 +52,12 @@ for patch in ${XEN_ALL_PATCHES}; do
 done
 
 echo "Upgrading drivers"
-yum -y install bnx2x-* fnic* qla2* glnic* qlge* tg3* hpsa* openvswitch-modules-xen*
-yum -y upgrade nicira-ovs-hypervisor-node
+yum -y install bnx2x-* fnic* qla2* glnic* qlge* tg3* openvswitch-modules-xen*
 
-echo "Fixing openvswitch installation back to the newest"
-yum reinstall openvswitch
+SYSTEM_HARDWARE=$(dmidecode -s system-product-name | grep -v "#")
+if [[ "${SYSTEM_HARDWARE}" == "ProLiant DL380 G7" ]]; then
+    echo "Skip HPSA on HP ProLiant DL380 G7 or else the box won't boot"
+else
+    yum -y install hpsa*
+fi
+yum -y upgrade nicira-ovs-hypervisor-node
