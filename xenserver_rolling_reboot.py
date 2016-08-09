@@ -125,7 +125,7 @@ def handleArguments(argv):
 
     # Ignore host list
     if len(ignoreHostList) > 0:
-        ignoreHosts = ignoreHostList.split(", ")
+        ignoreHosts = ignoreHostList.replace(' ', '').split(",")
     else:
         ignoreHosts = []
 
