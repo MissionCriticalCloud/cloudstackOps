@@ -224,6 +224,7 @@ class xenserver():
 
     # Execute script on hypervisor
     def exec_script_on_hypervisor(self, host, script):
+        host = host.split('/')[-1]
         print "Note: Executing script '%s' on host %s.." % (script, host.name)
         try:
             with settings(show('output'), host_string=self.ssh_user + "@" + host.ipaddress):
@@ -299,10 +300,10 @@ class xenserver():
                     '/tmp/xenserver_parallel_evacuate.py', mode=0755)
                 if len(self.pre_empty_script) > 0:
                     put(self.pre_empty_script,
-                        '/tmp/' + self.pre_empty_script, mode=0755)
+                        '/tmp/' + self.pre_empty_script.split('/')[-1], mode=0755)
                 if len(self.post_empty_script) > 0:
                     put(self.post_empty_script,
-                        '/tmp/' + self.post_empty_script, mode=0755)
+                        '/tmp/' + self.post_empty_script.split('/')[-1], mode=0755)
             return True
         except:
             print "Warning: Could not upload check scripts to host " + host.name + ". Continuing anyway."
