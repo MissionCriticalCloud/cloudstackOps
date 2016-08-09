@@ -307,8 +307,8 @@ if poolmaster.name not in ignoreHosts:
         disconnect_all()
         sys.exit(1)
 
-    print "Note: Waiting 30s to allow all hosts connect.."
-    time.sleep(30)
+    print "Note: Waiting 60s to allow all hosts connect.."
+    time.sleep(60)
 
 else:
         print "Warning: Skipping " + poolmaster.name + " due to --ignore-hosts setting"
