@@ -224,7 +224,7 @@ class xenserver():
 
     # Execute script on hypervisor
     def exec_script_on_hypervisor(self, host, script):
-        host = host.split('/')[-1]
+        script = script.split('/')[-1]
         print "Note: Executing script '%s' on host %s.." % (script, host.name)
         try:
             with settings(show('output'), host_string=self.ssh_user + "@" + host.ipaddress):
