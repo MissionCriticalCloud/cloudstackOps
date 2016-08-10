@@ -78,8 +78,8 @@ class xenserver():
         # Remove progress indication
         sys.stdout.write("\033[F")
         print "Note: Host " + host.name + " is able to do XE stuff again!                                  "
-        print "Note: Waiting 30s to allow the hypervisor to connect.."
-        time.sleep(30)
+        print "Note: Waiting 60s to allow the hypervisor to connect.."
+        time.sleep(60)
         return True
 
     # Check if we can use xapi
