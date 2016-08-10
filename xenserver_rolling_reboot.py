@@ -28,6 +28,7 @@ import socket
 import time
 import os
 import getopt
+import glob
 from cloudstackops import cloudstackops
 from cloudstackops import xenserver
 # Fabric
@@ -63,6 +64,9 @@ def handleArguments(argv):
     post_empty_script = 'xenserver_post_empty_script.sh'
     global patch_list_file
     patch_list_file = 'xenserver_patches_to_install.txt'
+    global preserve_downloads
+    preserve_downloads = False
+
     # Usage message
     help = "Usage: ./" + os.path.basename(__file__) + ' [options]' + \
         '\n  --config-profile -c <profilename>\t\tSpecify the CloudMonkey profile name to ' \
@@ -78,6 +82,7 @@ def handleArguments(argv):
         '\n  --post-empty-script\t\t\t\tBash script to run on hypervisor after a hypervisor has no more VMs running' \
         '\n  --patch-list-file\t\t\t\tText file with URLs of patches to download and install. One per line. ' \
         '(expected in same folder as this script)' + \
+        '\n  --preserve-downloads\t\t\t\tPreserve downloads instead of wiping them and downloading again.' + \
         '\n  --debug\t\t\t\t\tEnable debug mode' + \
         '\n  --exec\t\t\t\t\tExecute for real' + \
         '\n  --prepare\t\t\t\t\tExecute some prepare commands'
@@ -86,7 +91,7 @@ def handleArguments(argv):
         opts, args = getopt.getopt(
             argv, "hc:n:t:p", [
                 "credentials-file=", "clustername=", "ignore-hosts=", "threads=", "pre-empty-script=",
-                "post-empty-script=", "patch-list-file=", "halt", "debug", "exec", "prepare"])
+                "post-empty-script=", "patch-list-file=", "preserve-downloads", "halt", "debug", "exec", "prepare"])
     except getopt.GetoptError as e:
         print "Error: " + str(e)
         print help
@@ -112,6 +117,8 @@ def handleArguments(argv):
             post_empty_script = arg
         elif opt in ("--patch-list-file"):
             patch_list_file = arg
+        elif opt in ("--preserve-downloads"):
+            preserve_downloads = True
         elif opt in ("--debug"):
             DEBUG = 1
         elif opt in ("--exec"):
@@ -218,6 +225,7 @@ if DRYRUN == 1:
     print "  - For any hypervisor it will do this (poolmaster " + poolmaster.name + " first):"
     print "      - put it to Disabled aka Maintenance in XenServer"
     print "      - download the patches in file --patch-list-file '" + patch_list_file + "'"
+    print "         (preserve downloads is set to " + str(preserve_downloads) + ")"
     print "      - execute the --pre-empty-script script '" + pre_empty_script + "' on the hypervisor"
     print "      - live migrate all VMs off of it using XenServer evacuate command"
     print "      - execute the --post-empty-script script '" + post_empty_script + "' on the hypervisor"
@@ -270,6 +278,13 @@ if poolmaster.name not in ignoreHosts:
         sys.exit(1)
 
     # Download all XenServer patches
+    if not preserve_downloads:
+        print "Note: Deleting previously downloaded patches"
+        files = glob.glob('xenserver_patches/*.zip')
+        for f in files:
+            print "Note: Removing previously downloaded patch " + f
+            os.remove(f)
+
     print "Note: Reading patches list '%s'" % patch_list_file
     with open(patch_list_file) as file_pointer:
         patches = file_pointer.read().splitlines()
