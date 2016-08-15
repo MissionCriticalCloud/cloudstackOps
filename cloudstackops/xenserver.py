@@ -24,6 +24,7 @@ import socket
 import sys
 import time
 import os
+import requests
 
 # Fabric
 from fabric.api import *
@@ -49,9 +50,12 @@ output['warnings'] = False
 # Class to handle XenServer patching
 class xenserver():
 
-    def __init__(self, ssh_user='root', threads=5):
+    def __init__(self, ssh_user='root', threads=5, pre_empty_script='xenserver_pre_empty_script.sh',
+                 post_empty_script='xenserver_post_empty_script.sh'):
         self.ssh_user = ssh_user
         self.threads = threads
+        self.pre_empty_script = pre_empty_script
+        self.post_empty_script = post_empty_script
 
     # Wait for hypervisor to become alive again
     def check_connect(self, host):
@@ -74,16 +78,15 @@ class xenserver():
         # Remove progress indication
         sys.stdout.write("\033[F")
         print "Note: Host " + host.name + " is able to do XE stuff again!                                  "
-        print "Note: Waiting 30s to allow the hypervisor to connect.."
-        time.sleep(30)
+        print "Note: Waiting 60s to allow the hypervisor to connect.."
+        time.sleep(60)
         return True
 
     # Check if we can use xapi
     def check_xapi(self, host):
         try:
-            with settings(host_string=self.ssh_user + "@" + host.ipaddress):
-                with warn_only():
-                    result = fab.run("xe host-enable host=" + host.name)
+            with settings(warn_only=True, host_string=self.ssh_user + "@" + host.ipaddress):
+                result = fab.run("xe host-enable host=" + host.name)
                 if result.return_code == 0:
                     return True
                 else:
@@ -169,9 +172,14 @@ class xenserver():
 
     # Reboot a host when all conditions are met
     def host_reboot(self, host, halt_hypervisor=False):
-        # Disbale host
+        # Disable host
         if self.host_disable(host) is False:
             print "Error: Disabling host " + host.name + " failed."
+            return False
+
+        # Execute pre-empty-script
+        if self.exec_script_on_hypervisor(host, self.pre_empty_script) is False:
+            print "Error: Executing script '" + self.pre_empty_script + "' on host " + host.name + " failed."
             return False
 
         # Then evacuate it
@@ -184,6 +192,11 @@ class xenserver():
             print "Error: Host " + host.name + " not empty, cannot reboot!"
             return False
         print "Note: Host " + host.name + " has no VMs running, continuing"
+
+        # Execute post-empty-script
+        if self.exec_script_on_hypervisor(host, self.post_empty_script) is False:
+            print "Error: Executing script '" + self.post_empty_script + "' on host " + host.name + " failed."
+            return False
 
         # Finally reboot it
         try:
@@ -207,6 +220,16 @@ class xenserver():
         # Enable host
         if self.host_enable(host) is False:
             print "Error: Enabling host " + host.name + " failed."
+            return False
+
+    # Execute script on hypervisor
+    def exec_script_on_hypervisor(self, host, script):
+        script = script.split('/')[-1]
+        print "Note: Executing script '%s' on host %s.." % (script, host.name)
+        try:
+            with settings(show('output'), host_string=self.ssh_user + "@" + host.ipaddress):
+                return fab.run("bash /tmp/" + script)
+        except:
             return False
 
     # Get VM count of a hypervisor
@@ -275,6 +298,12 @@ class xenserver():
                     '/tmp/xenserver_fake_pvtools.sh', mode=0755)
                 put('xenserver_parallel_evacuate.py',
                     '/tmp/xenserver_parallel_evacuate.py', mode=0755)
+                if len(self.pre_empty_script) > 0:
+                    put(self.pre_empty_script,
+                        '/tmp/' + self.pre_empty_script.split('/')[-1], mode=0755)
+                if len(self.post_empty_script) > 0:
+                    put(self.post_empty_script,
+                        '/tmp/' + self.post_empty_script.split('/')[-1], mode=0755)
             return True
         except:
             print "Warning: Could not upload check scripts to host " + host.name + ". Continuing anyway."
@@ -306,5 +335,67 @@ class xenserver():
         try:
             with settings(host_string=self.ssh_user + "@" + host.ipaddress):
                 return fab.run("python /tmp/xenserver_check_bonds.py | awk {'print $1'} | tr -d \":\"")
+        except:
+            return False
+
+    # Download XenServer patch
+    def download_patch(self, url):
+        filename = url.split("/")[-1]
+
+        directory = "xenserver_patches"
+        if not os.path.exists(directory):
+            os.makedirs(directory)
+
+        destination_file = os.getcwd() + '/' + directory + '/' + filename
+        try:
+            local_length = int(os.path.getsize(destination_file))
+        except:
+            local_length = 0
+
+        print "Note: Executing request.."
+        try:
+            response = requests.get(url, stream=True)
+            remote_length = int(response.headers.get('Content-Length', 0))
+            if not response.ok:
+                return False
+        except:
+            return False
+
+        # Do we need to download?
+        print "Note: The remote length is %s, local length is %s" % (remote_length, local_length)
+
+        if remote_length == local_length:
+            print "Note: Skipping download because file is already downloaded."
+            return True
+
+        with open(destination_file, 'wb') as handle:
+            # Download file
+            print "Note: Downloading file.."
+
+            for block in response.iter_content(1024):
+                handle.write(block)
+            return True
+
+    # Upload patches to poolmaster
+    def put_patches_to_poolmaster(self, host):
+        print "Note: Uploading patches to poolmaster.."
+        try:
+            with settings(host_string=self.ssh_user + "@" + host.ipaddress):
+                run('rm -rf /root/xenserver_patches/')
+                run('mkdir -p /root/xenserver_patches')
+                put('xenserver_patches/*', '/root/xenserver_patches')
+                put('xenserver_upload_patches_to_poolmaster.sh',
+                    '/root/xenserver_patches/xenserver_upload_patches_to_poolmaster.sh', mode=0755)
+            return True
+        except:
+            print "Warning: Could not upload patches to host " + host.name + "."
+            return False
+
+    # Upload patches to XenServer
+    def upload_patches_to_xenserver(self, host):
+        print "Note: We're uploading the patches to XenServer"
+        try:
+            with settings(show('output'), host_string=self.ssh_user + "@" + host.ipaddress):
+                return fab.run("bash /root/xenserver_patches/xenserver_upload_patches_to_poolmaster.sh")
         except:
             return False
