@@ -166,6 +166,8 @@ class xenserver():
                     break
                 time.sleep(5)
             print "Note: Done evacuating host " + host.name + " @ " + time.strftime("%Y-%m-%d %H:%M")
+            print "Note: Sleeping 2 minutes to allow Cosmic to sync the state of VMs.."
+            time.sleep(120)
             return True
         except:
             return False
