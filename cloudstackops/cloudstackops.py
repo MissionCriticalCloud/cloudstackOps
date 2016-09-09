@@ -1062,8 +1062,10 @@ class CloudStackOps(CloudStackOpsBase):
 
     # Find storage pool of selected cluster
     def getStoragePoolTags(self, toClusterID):
-        targetStorageID = self.getStoragePool(toClusterID)
+        targetStorageID = self.getStoragePool(toClusterID)[0].id
         targetStoragePoolData = self.getStoragePoolData(targetStorageID)
+        if targetStoragePoolData[0].tags is None:
+            return ""
         return targetStoragePoolData[0].tags
 
     def getZoneId(self, zonename):
@@ -1104,7 +1106,7 @@ class CloudStackOps(CloudStackOpsBase):
             print "Error: could not find cluster with id " + routerClusterID
             return 1
 
-        targetStorageID = self.getStoragePool(toClusterID)
+        targetStorageID = self.getStoragePool(toClusterID)[0].id
         storagepooltags = self.getStoragePoolTags(toClusterID)
         targetStoragePoolData = self.getStoragePoolData(targetStorageID)
 
