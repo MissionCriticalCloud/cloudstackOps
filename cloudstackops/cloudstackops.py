@@ -398,7 +398,7 @@ class CloudStackOps(CloudStackOpsBase):
             print "DEBUG: Selected storage pool: " + targetStorageID + " (" + toStorageData.name + ")" + " for cluster " + clusterID
 
         return targetStorageID
-    
+
     # Find storagePool for Cluster
     def getStoragePool(self, clusterID):
         apicall = listStoragePools.listStoragePoolsCmd()
@@ -410,7 +410,7 @@ class CloudStackOps(CloudStackOpsBase):
         # Select a random storage pool that belongs to this cluster
 
         return data
-    
+
     # Get storagePool data
     def getStoragePoolData(self, storagepoolID):
         apicall = listStoragePools.listStoragePoolsCmd()
@@ -640,9 +640,12 @@ class CloudStackOps(CloudStackOpsBase):
     # Send an e-mail
     def sendMail(self, mailfrom, mailto, subject, htmlcontent):
         msg = MIMEMultipart('alternative')
-        msg['Subject'] = subject
-        msg['From'] = mailfrom
-        msg['To'] = mailto
+        msg['Subject'] = subject.decode('ascii', 'ignore')
+        msg['From'] = mailfrom.decode('ascii', 'ignore')
+        msg['To'] = mailto.decode('ascii', 'ignore')
+
+        # htmlcontent to proper ASCII
+        htmlcontent = htmlcontent.decode('ascii', 'ignore')
 
         # HTML part
         htmlpart = MIMEText(htmlcontent, 'html')
@@ -1069,36 +1072,36 @@ class CloudStackOps(CloudStackOpsBase):
         return targetStoragePoolData[0].tags
 
     def getZoneId(self, zonename):
-        
+
         apicall = listZones.listZonesCmd()
         apicall.name = zonename
-        
+
         # Call CloudStack API
-        result = self._callAPI(apicall)    
-       
+        result = self._callAPI(apicall)
+
         if result is not None:
             return result[0].id
         else:
             return None
-        
+
     def getDetachedVolumes(self, storagepoolid):
-  
+
         volumes = self.listVolumes(storagepoolid,False)
-              
-        orphans = []   
-        
+
+        orphans = []
+
         if volumes is not None:
             # sort results by domain
             volumes.sort(key=lambda vol: vol.domain, reverse=True)
-        
+
             # select volumes with no vmname attached
             for volume in volumes:
                 if volume.vmname is None:
                     orphans.append(volume)
-            
+
         #return selected detached volumes
-        return orphans      
-        
+        return orphans
+
     # Check zone
     def checkZone(self, routerClusterID, toClusterID):
         routerClusterData = self.listClusters({'clusterid': routerClusterID})
@@ -1689,4 +1692,3 @@ class CloudStackOps(CloudStackOpsBase):
 
       # Call CloudStack API
       return self._callAPI(apicall)
-
