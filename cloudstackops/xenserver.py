@@ -298,6 +298,8 @@ class xenserver():
                     '/tmp/xenserver_check_bonds.py', mode=0755)
                 put('xenserver_fake_pvtools.sh',
                     '/tmp/xenserver_fake_pvtools.sh', mode=0755)
+                put('xenserver_create_vlans.sh',
+                    '/tmp/xenserver_create_vlans.sh', mode=0755)
                 put('xenserver_parallel_evacuate.py',
                     '/tmp/xenserver_parallel_evacuate.py', mode=0755)
                 if len(self.pre_empty_script) > 0:
@@ -329,6 +331,15 @@ class xenserver():
                 return fab.run("xe vm-list PV-drivers-up-to-date='<not in database>' is-control-domain=false\
                     resident-on=$(xe host-list name-label=$HOSTNAME --minimal) params=uuid --minimal\
                     |tr ', ' '\n'| grep \"-\" | awk {'print \"/tmp/xenserver_fake_pvtools.sh \" $1'} | sh")
+        except:
+            return False
+
+    # Create VLANs
+    def create_vlans(self, host):
+        print "Note: We're creating the missing VLAN's on hypervisor " + host.name
+        try:
+            with settings(host_string=self.ssh_user + "@" + host.ipaddress):
+                return fab.run("/tmp/xenserver_create_vlans.sh")
         except:
             return False
 
