@@ -198,6 +198,7 @@ for h in cluster_hosts:
     x.put_scripts(h)
     if DRYRUN == 0 or PREPARE == 1:
         x.fake_pv_tools(h)
+        x.create_vlans(h)
     if h.name == poolmaster_name:
         poolmaster = h
 
