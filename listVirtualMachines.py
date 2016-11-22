@@ -676,6 +676,7 @@ for clusterid, clustername in clusters.items():
         else:
             print " Total allocated RAM: " + str(memoryTotal) + " GB"
             print " Total allocated cores: " + str(hostCoresTotal)
+            print " Total allocated storage: " + str(storageSizeTotal) + " GB"
 
         print ""
         grandCounter = grandCounter + counter
@@ -703,6 +704,7 @@ if len(clusters) > 1 and display == "onlySummary":
     else:
         print " Total allocated RAM: " + str(grandMemoryTotal) + " GB"
         print " Total allocated cores: " + str(grandCoresTotal)
+        print " Total allocated storage: " + str(grandStorageSizeTotal) + " GB"
 
     print "================================================"
     print ""
