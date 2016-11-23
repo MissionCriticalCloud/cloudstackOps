@@ -699,24 +699,34 @@ class CloudStackOps(CloudStackOpsBase):
         s.quit()
 
     # Stop virtualvirtualmachine
-    def stopVirtualMachine(self, vmid):
-        apicall = stopVirtualMachine.stopVirtualMachineCmd()
-        apicall.id = str(vmid)
-        apicall.forced = "false"
+    def stopVirtualMachine(self, vmid, timeout=900):
+        try:
+            with Timeout(timeout):
+                apicall = stopVirtualMachine.stopVirtualMachineCmd()
+                apicall.id = str(vmid)
+                apicall.forced = "false"
 
-        # Call CloudStack API
-        return self._callAPI(apicall)
+                # Call CloudStack API
+                return self._callAPI(apicall)
+        except Timeout.Timeout:
+            print "Timeout!"
+            return 1
 
     # Start virtualvirtualmachine
-    def startVirtualMachine(self, vmid, hostid=""):
-        apicall = startVirtualMachine.startVirtualMachineCmd()
-        apicall.id = str(vmid)
-        apicall.forced = "false"
-        if len(hostid) > 0:
-            apicall.hostid = hostid
+    def startVirtualMachine(self, vmid, hostid="", timeout=900):
+        try:
+            with Timeout(timeout):
+                apicall = startVirtualMachine.startVirtualMachineCmd()
+                apicall.id = str(vmid)
+                apicall.forced = "false"
+                if len(hostid) > 0:
+                    apicall.hostid = hostid
 
-        # Call CloudStack API
-        return self._callAPI(apicall)
+                # Call CloudStack API
+                return self._callAPI(apicall)
+        except Timeout.Timeout:
+            print "Timeout!"
+            return 1
 
     # migrateVirtualMachine
     def migrateVirtualMachine(self, vmid, hostid):
