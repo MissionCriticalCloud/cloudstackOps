@@ -1346,12 +1346,13 @@ class CloudStackOps(CloudStackOpsBase):
             return False
         else:
             # Get vm count
-            try:
+            if foundHostData.hypervisor == "XenServer":
                 retcode, vmcount = self.ssh.getXapiVmCount(
                     foundHostData.ipaddress)
-            except:
-                vmcount = "?"
-            print "\nNote: Preparing host '" + hostname + "' for maintenance, " + vmcount + " VMs to migrate.."
+            if foundHostData.hypervisor == "KVM":
+                vmcount = self.kvm.host_get_vms(
+                    foundHostData)
+            print "\nNote: Preparing host '" + hostname + "' for maintenance, " + str(vmcount) + " VMs to migrate.."
 
             # Maintenance
             maintenanceResult = self.prepareHostForMaintenance(hostID)
@@ -1383,24 +1384,31 @@ class CloudStackOps(CloudStackOpsBase):
 
                 # Get vm count
                 try:
-                    retcode, vmcount = self.ssh.getXapiVmCount(
-                        foundHostData.ipaddress)
+                    if hostData.hypervisor == "XenServer":
+                        retcode, vmcount = self.ssh.getXapiVmCount(
+                            foundHostData.ipaddress)
+                    if hostData.hypervisor == "KVM":
+                        retcode, vmcount = self.kvm.host_get_vms(
+                            foundHostData.ipaddress)
                 except:
                     pass
 
             if foundHostData.resourcestate == "PrepareForMaintenance":
-                print "Note: Resource state currently is '" + foundHostData.resourcestate + "'. Number of VMs still to be migrated: " + vmcount + "    "
+                print "Note: Resource state currently is '" + foundHostData.resourcestate + \
+                      "'. Number of VMs still to be migrated: " + str(vmcount) + "    "
                 sys.stdout.write("\033[F")
 
                 # Wait before checking again
                 time.sleep(6)
 
             elif foundHostData.resourcestate == "Enabled":
-                print "Note: Resource state currently is '" + foundHostData.resourcestate + "', maintenance must have been cancelled, returning"
+                print "Note: Resource state currently is '" + foundHostData.resourcestate + \
+                      "', maintenance must have been cancelled, returning"
                 break
             else:
                 # lots of spaces to clear previous line
-                print "Note: Resource state currently is '" + foundHostData.resourcestate + "', that's looking good! Returning..                "
+                print "Note: Resource state currently is '" + foundHostData.resourcestate + \
+                      "', that's looking good! Returning..                "
                 break
 
             # Return if the same for 100x6 sec
@@ -1409,7 +1417,8 @@ class CloudStackOps(CloudStackOpsBase):
             else:
                 vmcount_same_counter = 0
             if vmcount_same_counter >= 100:
-                print "Warning: The number of vm's still to migrate is still " + vmcount + " for 600s, returning and trying manual migration instead"
+                print "Warning: The number of vm's still to migrate is still " + vmcount + \
+                      " for 600s, returning and trying manual migration instead"
                 break
 
             if self.DEBUG == 1:
@@ -1426,10 +1435,12 @@ class CloudStackOps(CloudStackOpsBase):
             print "Note: Host '" + hostname + "' did not yet enter Maintenance.. will try to migrate vm's manually"
             return False
         elif foundHostData.resourcestate == "Enabled":
-            print "Note: Host '" + hostname + "' maintenance was cancelled outside of script.. will try to migrate vm's manually"
+            print "Note: Host '" + hostname + "' maintenance was cancelled outside of script.. " \
+                                              "will try to migrate vm's manually"
             return False
         else:
-            print "Note: Host '" + hostname + "' did not yet enter Maintenance. Cancel maintenance and trying to migrate vm's manually"
+            print "Note: Host '" + hostname + "' did not yet enter Maintenance. Cancel maintenance and trying " \
+                                              "to migrate vm's manually"
             self.cancelHostMaintenance(hostID)
             return False
 
@@ -1451,7 +1462,7 @@ class CloudStackOps(CloudStackOpsBase):
         return safe
 
     # print hypervisor table
-    def printHypervisors(self, clusterid, poolmaster=False, checkBonds=False):
+    def printHypervisors(self, clusterid, poolmaster=False, checkBonds=False, hypervisor="XenServer"):
 
         print "Note: Checking.."
         clusterHostsData = self.getAllHostsFromCluster(clusterid)
@@ -1470,32 +1481,45 @@ class CloudStackOps(CloudStackOpsBase):
             sys.stdout.write(clusterhost.name + ", ")
             sys.stdout.flush()
 
-            if not poolmaster:
+            pm = "n/a"
+            if hypervisor == "XenServer" and not poolmaster:
                 if self.DEBUG == 1:
                     print "Debug: Looking for poolmaster"
                 poolmaster = self.xenserver.get_poolmaster(clusterhost)
 
-            # Poolmaster
-            if clusterhost.name == poolmaster.strip():
-                pm = "<------"
-            else:
-                pm = ""
+                # Poolmaster
+                if clusterhost.name == poolmaster.strip():
+                    pm = "<------"
+                else:
+                    pm = ""
 
             # Check bonds
+            bondstatus = "UNTESTED"
             if checkBonds is True:
                 try:
-                    bondscripts = self.xenserver.put_scripts(
-                        clusterhost)
-                    bondstatus = self.xenserver.get_bond_status(
-                        clusterhost)
+                    if hypervisor == "XenServer":
+                        bondscripts = self.xenserver.put_scripts(
+                            clusterhost)
+                        bondstatus = self.xenserver.get_bond_status(
+                            clusterhost)
+                    if hypervisor == "KVM":
+                        bondscripts = self.kvm.put_scripts(
+                            clusterhost)
+                        bondstatus = self.kvm.get_bond_status(
+                            clusterhost)
                 except:
                     bondstatus = "UNKNOWN"
             else:
                 bondstatus = "UNTESTED"
 
+            vmcount = "UNKNOWN"
             try:
-                vmcount = self.xenserver.host_get_vms(
-                    clusterhost)
+                if hypervisor == "XenServer":
+                    vmcount = self.xenserver.host_get_vms(
+                        clusterhost)
+                if hypervisor == "KVM":
+                    vmcount = self.kvm.host_get_vms(
+                        clusterhost)
             except:
                 vmcount = "UNKNOWN"
 
@@ -1582,6 +1606,7 @@ class CloudStackOps(CloudStackOpsBase):
             clusterID,
             currentHostname,
             requestedMemory):
+
         # All hosts from cluster
         clusterHosts = self.getHostsFromCluster(clusterID)
         bestAvailableMemory = 0
@@ -1600,26 +1625,13 @@ class CloudStackOps(CloudStackOpsBase):
                 # Check memory availability
                 # Available memory in Bytes
                 memoryavailable = h.memorytotal - h.memoryallocated
-                if self.DEBUG == 1:
-                    print "Note: host " + h.name + " has free mem: " + str(memoryavailable)
-                # Don't try if host has less than 10GB memory left or if vm does not fit at all
+                print "Note: host " + h.name + " has free mem: " + str(memoryavailable) + " and we need " + \
+                      str(requestedMemory)
+
                 # vm.memory is in Mega Bytes
                 if requestedMemory is not None:
-                    if memoryavailable < (
-                            10 *
-                            1024 *
-                            1024 *
-                            1024) or memoryavailable < (
-                            requestedMemory *
-                            1024 *
-                            1024):
-                        if self.DEBUG == 1:
-                            print "Warning: Skipping " + h.name + " as it has not enough memory."
-                        continue
-                else:
-                    if memoryavailable < (10 * 1024 * 1024 * 1024):
-                        if self.DEBUG == 1:
-                            print "Warning: Skipping " + h.name + " as it has not enough memory."
+                    if memoryavailable < requestedMemory:
+                        print "Warning: Skipping " + h.name + " as it has not enough memory."
                         continue
 
                 # Find host with most memory free
@@ -1672,10 +1684,13 @@ class CloudStackOps(CloudStackOpsBase):
                     sys.stdout.flush()
                     vmresult = 1
                     if self.DRYRUN == 0:
+                        if vm.memory is None:
+                            vm.memory = 1024
+                        requested_memory = int(vm.memory) * 1024 * 1024
                         migrationHost = self.findBestMigrationHost(
                             foundHostData.clusterid,
                             hostname,
-                            vm.memory)
+                            requested_memory)
                         if not migrationHost:
                             print "\nError: No hosts with enough capacity to migrate vm's to. Please migrate manually to another cluster."
                             sys.exit(1)
@@ -1702,14 +1717,17 @@ class CloudStackOps(CloudStackOpsBase):
                             if vmresult is None or vmresult == 1:
                                 sys.stdout.write(
                                     vm.name +
-                                    " (failed using CloudStack, trying XAPI " +
+                                    " (failed) " +
                                     instance +
                                     "..), ")
                                 sys.stdout.flush()
-                                xapiresult, xapioutput = self.ssh.migrateVirtualMachineViaXapi(
-                                    {'hostname': hostname, 'desthostname': migrationHost.name, 'vmname': instance})
-                                if self.DEBUG == 1:
-                                    print "Debug: Output: " + str(xapioutput) + " code " + str(xapiresult)
+                                if foundHostData.hypervisor == "XenServer":
+                                    xapiresult, xapioutput = self.ssh.migrateVirtualMachineViaXapi(
+                                        {'hostname': hostname, 'desthostname': migrationHost.name, 'vmname': instance})
+                                    if self.DEBUG == 1:
+                                        print "Debug: Output: " + str(xapioutput) + " code " + str(xapiresult)
+                                if foundHostData.hypervisor == "KVM":
+                                    pass
                             elif self.DEBUG == 1:
                                 print "Debug: VM " + vm.name + " migrated OK"
                         except:
@@ -1717,7 +1735,7 @@ class CloudStackOps(CloudStackOpsBase):
                         if vmresult == 1:
                             sys.stdout.write(
                                 vm.name +
-                                " (failed using CloudStack and XAPI!), ")
+                                " (failed), ")
                             sys.stdout.flush()
                             return False
         return True

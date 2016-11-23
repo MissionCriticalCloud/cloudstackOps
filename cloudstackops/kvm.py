@@ -255,7 +255,23 @@ class Kvm(hypervisor.hypervisor):
                 if len(self.post_empty_script) > 0:
                     put(self.post_empty_script,
                         '/tmp/' + self.post_empty_script.split('/')[-1], mode=0755, use_sudo=True)
+                put('kvm_check_bonds.sh',
+                    '/tmp/kvm_check_bonds.sh', mode=0755, use_sudo=True)
             return True
         except:
             print "Error: Could not upload check scripts to host " + host.name + "."
             return False
+
+    # Get bond status
+    def get_bond_status(self, host):
+        try:
+            with settings(host_string=self.ssh_user + "@" + host.ipaddress):
+                return fab.run("bash /tmp/kvm_check_bonds.sh | awk {'print $1'} | tr -d \":\"")
+        except:
+            return False
+
+    # Get VM count of a hypervisor
+    def host_get_vms(self, host):
+        with settings(host_string=self.ssh_user + "@" + host.ipaddress):
+            return fab.run("virsh list | grep running | wc -l")
+

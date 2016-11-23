@@ -29,12 +29,9 @@ import getopt
 from cloudstackops import cloudstackops
 from cloudstackops import cloudstackopsssh
 from cloudstackops import xenserver
+from cloudstackops import kvm
 import os.path
-from random import choice
-import subprocess
-from subprocess import Popen, PIPE
-from prettytable import PrettyTable
-import re
+import getpass
 
 # Function to handle our arguments
 
@@ -109,8 +106,18 @@ if __name__ == "__main__":
 c = cloudstackops.CloudStackOps(DEBUG, DRYRUN)
 ssh = cloudstackopsssh.CloudStackOpsSSH(DEBUG, DRYRUN)
 c.ssh = ssh
-x = xenserver.xenserver()
+
+# Init XenServer class
+x = xenserver.xenserver('root')
+x.DEBUG = DEBUG
+x.DRYRUN = DRYRUN
 c.xenserver = x
+
+# Init KVM class
+k = kvm.Kvm(ssh_user=getpass.getuser())
+k.DEBUG = DEBUG
+k.DRYRUN = DRYRUN
+c.kvm = k
 
 if DEBUG == 1:
     print "Warning: Debug mode is enabled!"
@@ -147,8 +154,8 @@ for host in hostData:
 clusterHostsData = c.getAllHostsFromCluster(foundHostData.clusterid)
 print "Note: Host '" + hostname + "' belongs to cluster '" + foundHostData.clustername + "'"
 
-if foundHostData.hypervisor != "XenServer":
-    print "Error: This is only tested for XenServer at the moment!"
+if foundHostData.hypervisor not in ("XenServer", "KVM"):
+    print "Error: This is only tested for KVM and XenServer at the moment!"
     sys.exit(1)
 
 # Test SSH connection
@@ -157,19 +164,23 @@ if retcode != 0:
     sys.exit(1)
 
 # Poolmaster
-retcode, poolmaster = ssh.getPoolmaster(foundHostData.ipaddress)
-print "Note: Poolmaster is: '" + poolmaster + "'"
+poolmaster = "n/a"
+if foundHostData.hypervisor == "XenServer":
+    retcode, poolmaster = ssh.getPoolmaster(foundHostData.ipaddress)
+    print "Note: Poolmaster is: '" + poolmaster + "'"
+
 print "Note: Looking for other hosts in this cluster and checking their health.."
 
 # Print overview
-c.printHypervisors(foundHostData.clusterid, poolmaster, checkBonds)
+c.printHypervisors(foundHostData.clusterid, poolmaster, checkBonds, foundHostData.hypervisor)
 
 # Look for hosts without XenTools
-retcode, output = ssh.fakePVTools(foundHostData.ipaddress)
-if retcode != 0:
-    print "Error: something went wrong. Got return code " + str(retcode)
-else:
-    print "Note: Command executed OK."
+if foundHostData.hypervisor == "XenServer":
+    retcode, output = ssh.fakePVTools(foundHostData.ipaddress)
+    if retcode != 0:
+        print "Error: something went wrong. Got return code " + str(retcode)
+    else:
+        print "Note: Command executed OK."
 
 # Cancel maintenance
 if cancelmaintenance == 1 and DRYRUN == 0:
@@ -197,7 +208,7 @@ if cancelmaintenance == 1 and DRYRUN == 0:
             break
     print "Note: Cancel maintenance succeeded for host '" + hostname + "'"
     # Print overview
-    c.printHypervisors(foundHostData.clusterid, poolmaster, checkBonds)
+    c.printHypervisors(foundHostData.clusterid, poolmaster, checkBonds, foundHostData.hypervisor)
     print "Note: We're done!"
     sys.exit(0)
 elif cancelmaintenance == 1 and DRYRUN == 1:
@@ -209,7 +220,8 @@ elif DRYRUN == 1:
 # Check if we are safe to put a hypervisor in Maintenance
 safe = c.safeToPutInMaintenance(foundHostData.clusterid)
 if safe == False and force == 0:
-    print "Error: All hosts should be in resouce state 'Enabled' before putting a host to maintenance. Use --force to to ignore WARNING states. Halting."
+    print "Error: All hosts should be in resouce state 'Enabled' before putting a host to maintenance. " \
+          "Use --force to to ignore WARNING states. Halting."
     sys.exit(1)
 elif safe == False and force == 1:
     print "Warning: To be safe, all hosts should be in resouce state 'Enabled' before putting a host to maintenance"
@@ -227,7 +239,7 @@ c.emptyHypervisor(hostID)
 maintenanceresult = c.startMaintenance(hostID, hostname)
 if maintenanceresult:
     # Print overview
-    c.printHypervisors(foundHostData.clusterid, poolmaster, checkBonds)
+    c.printHypervisors(foundHostData.clusterid, poolmaster, checkBonds, foundHostData.hypervisor)
     print "Note: We're done!"
     sys.exit(0)
 elif DRYRUN == 0:
@@ -237,4 +249,4 @@ elif DRYRUN == 1:
 
 if DRYRUN == 0:
     # Print overview
-    c.printHypervisors(foundHostData.clusterid, poolmaster, checkBonds)
+    c.printHypervisors(foundHostData.clusterid, poolmaster, checkBonds, foundHostData.hypervisor)
