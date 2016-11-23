@@ -35,6 +35,7 @@ import random
 import commands
 from urlparse import urlparse
 from prettytable import PrettyTable
+import slackweb
 import pprint
 # Colored terminals
 try:
@@ -59,17 +60,78 @@ class CloudStackOpsBase(object):
         self.errors_to = ''
         self.configfile = os.getcwd() + '/config'
         self.pp = pprint.PrettyPrinter(depth=6)
+        self.slack = None
+        self.slack_custom_title = "Undefined"
+        self.slack_custom_value = "Undefined"
+        self.cluster = "Undefined"
+        self.instance_name = "Undefined"
+        self.task = "Undefined"
 
         self.printWelcome()
+        self.configure_slack()
 
         signal.signal(signal.SIGINT, self.catch_ctrl_C)
 
     def printWelcome(self):
         pass
 
+    def configure_slack(self):
+        slack_url = ""
+        try:
+            self.configfile = os.getcwd() + '/config'
+            config = ConfigParser.RawConfigParser()
+            config.read(self.configfile)
+            slack_url = config.get('slack', 'hookurl')
+
+        except:
+            print "Warning: No Slack integration found, so not using. See config file to setup."
+
+        if len(slack_url) > 0:
+            self.slack = slackweb.Slack(url=slack_url)
+
+    def print_message(self, message, message_type="Note", to_slack=False):
+        print "%s: %s" % (message_type.title(), message)
+
+        if to_slack:
+            color = "good"
+            if message_type.lower() == "error":
+                color = "danger"
+            if message_type.lower() == "warning":
+                color = "warning"
+            self.send_slack_message(message, color)
+
+    def send_slack_message(self, message, color="good"):
+
+        attachments = []
+        attachment = {"text": message, "color": color, "fields": [
+            {
+                "title": str(self.slack_custom_title),
+                "value": str(self.slack_custom_value),
+                "short": "true"
+            },
+            {
+                "title": "Task",
+                "value": self.task,
+                "short": "true"
+            },
+            {
+                "title": "Cluster",
+                "value": self.cluster,
+                "short": "true"
+            },
+            {
+                "title": "Instance ID",
+                "value": self.instance_name,
+                "short": "true"
+            }
+        ]}
+
+        attachments.append(attachment)
+        self.slack.notify(attachments=attachments, icon_emoji=":robot_face:", username="cloudstackOps")
+
     # Handle unwanted CTRL+C presses
     def catch_ctrl_C(self, sig, frame):
-        print "Warning: do not interupt! If you really want to quit, use kill -9."
+        print "Warning: do not interrupt! If you really want to quit, use kill -9."
 
     # Read config files
     def readConfigFile(self):

@@ -25,6 +25,8 @@ import sys
 import time
 import os
 import requests
+import hypervisor
+import uuid
 
 # Fabric
 from fabric.api import *
@@ -47,15 +49,19 @@ output['stdin'] = False
 output['output'] = False
 output['warnings'] = False
 
+
 # Class to handle XenServer patching
-class xenserver():
+class xenserver(hypervisor.hypervisor):
 
     def __init__(self, ssh_user='root', threads=5, pre_empty_script='xenserver_pre_empty_script.sh',
                  post_empty_script='xenserver_post_empty_script.sh'):
+        hypervisor.__init__(ssh_user, threads)
         self.ssh_user = ssh_user
         self.threads = threads
         self.pre_empty_script = pre_empty_script
         self.post_empty_script = post_empty_script
+        self.mountpoint = None
+        self.migration_path = None
 
     # Wait for hypervisor to become alive again
     def check_connect(self, host):
@@ -93,18 +99,6 @@ class xenserver():
                     return False
         except:
             return False
-
-    # Check if we are really offline
-    def check_offline(self, host):
-        print "Note: Waiting for " + host.name + " to go offline"
-        while os.system("ping -c 1 " + host.ipaddress + " 2>&1 >/dev/null") == 0:
-            # Progress indication
-            sys.stdout.write(".")
-            sys.stdout.flush()
-            time.sleep(5)
-        # Remove progress indication
-        sys.stdout.write("\033[F")
-        print "Note: Host " + host.name + " is now offline!                           "
 
     # Return host of poolmaster
     def get_poolmaster(self, host):
@@ -411,4 +405,74 @@ class xenserver():
             with settings(show('output'), host_string=self.ssh_user + "@" + host.ipaddress):
                 return fab.run("bash /root/xenserver_patches/xenserver_upload_patches_to_poolmaster.sh")
         except:
+            return False
+
+    def prepare_xenserver(self, host):
+        if self.DRYRUN:
+            print "Note: Would have created migration folder on %s" % host.name
+            return True
+        result = self.create_migration_nfs_dir(host)
+        if self.DEBUG == 1:
+            print "DEBUG: received this result:" + str(result)
+        if result is False:
+            print "Error: Could not prepare the migration folder on XenServer host " + host.name
+            return False
+        return True
+
+    def create_migration_nfs_dir(self, host):
+        mountpoint = self.find_nfs_mountpoint(host)
+        if mountpoint is False:
+            return False
+        if len(mountpoint) == 0:
+            print "Error: mountpoint cannot be empty"
+            return False
+        print "Note: Creating migration folder %s" % self.get_migration_path()
+        try:
+            with settings(host_string=self.ssh_user + "@" + host.ipaddress):
+                command = "mkdir -p " + self.get_migration_path()
+                return fab.run(command)
+        except:
+            return False
+
+    def find_nfs_mountpoint(self, host):
+        print "Note: Looking for NFS mount on XenServer host %s" % host.name
+        if self.mountpoint is not None:
+            print "Note: Found " + str(self.mountpoint)
+            return self.mountpoint
+        try:
+            with settings(host_string=self.ssh_user + "@" + host.ipaddress):
+                command = "mount | grep storage | awk {'print $3'}"
+                self.mountpoint = fab.run(command)
+                print "Note: Found " + str(self.mountpoint)
+                return self.mountpoint
+        except:
+            return False
+
+    def get_migration_path(self):
+        if self.migration_path is None:
+            self.migration_path = self.mountpoint + "/migration/" + str(uuid.uuid4()) + "/"
+        return self.migration_path
+
+    # Extract volume
+    def extract_volume_wrapper(self, path, host):
+        extract_result = self.extract_volume(host, path)
+        if extract_result is False:
+            print "Error: Extracting the volume went wrong"
+            return False
+        uuid_folder = self.get_migration_path().split("/migration/")[-1]
+        download_url = "http://%s:5001/%s%s" % (host.ipaddress, uuid_folder, path)
+        print "Note: Download url is %s" % download_url
+        return download_url
+
+    def extract_volume(self, host, path):
+        print "Note: We're exporting disk with name (on disk) '%s' and make it available for HTTP download" % path
+        try:
+            with settings(show('output'), host_string=self.ssh_user + "@" + host.ipaddress):
+                return fab.run("DISKPATH=" + path + "; DISKUUID=$(xe vdi-list location=${DISKPATH} "
+                                                    "params=uuid --minimal);"
+                                                    "nice -n 19 xe vdi-export uuid=${DISKUUID} filename="
+                               + self.get_migration_path() + "${DISKPATH} format=vhd; chmod 644 "
+                               + self.get_migration_path() + "${DISKPATH}")
+        except:
+            print "Error: extract_folume failed!"
             return False
