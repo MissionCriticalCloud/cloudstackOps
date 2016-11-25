@@ -251,6 +251,10 @@ for key, value in template_dict.iteritems():
             continue
         newBaseTemplate = value
 
+if 'Netscaler' in newBaseTemplate or 'NSVPX' in newBaseTemplate:
+    print "Warning: Setting doVirtvtov = False due to Netscaler detected"
+    doVirtvtov = False
+
 templateID = c.checkCloudStackName(
     {'csname': newBaseTemplate, 'csApiCall': 'listTemplates'})
 
