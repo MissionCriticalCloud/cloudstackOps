@@ -153,7 +153,6 @@ if DRYRUN == 1:
 # Init CloudStackOps class
 c = cloudstackops.CloudStackOps(DEBUG, DRYRUN)
 c.task = "XenServer -> KVM migration"
-c.instance_name = instancename
 c.slack_custom_title = "Migration details"
 
 # Init XenServer class
@@ -226,6 +225,7 @@ if vmdata is None:
     sys.exit(1)
 
 vm = vmdata[0]
+c.instance_name = vm.instancename
 c.slack_custom_title = "Migration details for %s" % vm.domain
 
 # Convert template
@@ -450,7 +450,7 @@ if k.put_scripts(kvm_host) is False:
     sys.exit(1)
 
 # Get all volumes
-volumes_result = s.get_volumes_for_instance(instancename)
+volumes_result = s.get_volumes_for_instance(vm.instancename)
 for (name, path, uuid, vmstate, voltype) in volumes_result:
     message = "Processing volume '%s', filename '%s', uuid '%s'" % (name, path, uuid)
     to_slack = True
@@ -628,7 +628,10 @@ if autoStartVM:
 
 else:
     message = "Not starting %s automatically because when migration started it was also in Stopped state!" % vm.name
-    c.print_message(message=message, message_type="Warning", to_slack=True)
+    to_slack = True
+    if DRYRUN == 1:
+        to_slack = False
+    c.print_message(message=message, message_type="Warning", to_slack=to_slack)
 
     # Get user data to e-mail
     adminData = c.getDomainAdminUserData(vm.domainid)
