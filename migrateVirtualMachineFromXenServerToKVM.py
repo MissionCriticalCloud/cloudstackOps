@@ -628,7 +628,10 @@ if autoStartVM:
 
 else:
     message = "Not starting %s automatically because when migration started it was also in Stopped state!" % vm.name
-    c.print_message(message=message, message_type="Warning", to_slack=True)
+    to_slack = True
+    if DRYRUN == 1:
+        to_slack = False
+    c.print_message(message=message, message_type="Warning", to_slack=to_slack)
 
     # Get user data to e-mail
     adminData = c.getDomainAdminUserData(vm.domainid)
