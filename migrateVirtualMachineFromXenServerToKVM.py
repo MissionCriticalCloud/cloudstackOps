@@ -126,10 +126,9 @@ def handleArguments(argv):
         configProfileName = "config"
 
     # We need at least these vars
-    if len(instancename) == 0 or len(toCluster) == 0 or len(newBaseTemplate) == 0 or len(mysqlHost) == 0:
+    if len(instancename) == 0 or len(toCluster) == 0 or len(mysqlHost) == 0:
         print help
         sys.exit()
-
 
 def exit_script(message):
     print "Fatal Error: %s" % message
@@ -212,16 +211,55 @@ message = "Cluster ID found for %s is %s" % (toCluster, toClusterID)
 c.print_message(message=message, message_type="Note", to_slack=False)
 c.cluster = toCluster
 
-templateID = c.checkCloudStackName(
-    {'csname': newBaseTemplate, 'csApiCall': 'listTemplates'})
-
-message = "Template ID found for %s is %s" % (newBaseTemplate, templateID)
-c.print_message(message=message, message_type="Note", to_slack=False)
 
 if toClusterID == 1 or toClusterID is None:
     message = "Cluster with name '%s' can not be found! Halting!" % toCluster
     c.print_message(message=message, message_type="Error", to_slack=False)
     sys.exit(1)
+
+# Get data from vm
+vmdata = c.getVirtualmachineData(vmID)
+if vmdata is None:
+    message = "Error: Could not find vm %s !" % instancename
+    c.print_message(message=message, message_type="Error", to_slack=False)
+    sys.exit(1)
+
+vm = vmdata[0]
+c.slack_custom_title = "Migration details for %s" % vm.domain
+
+# Convert template
+template_dict = {
+    'Win2012R2': 'Win2012R2-DC-SBP_CIS-KVM-2016-10',
+    'Windows 2012 DC R2': 'Win2012R2-DC-SBP_CIS-KVM-2016-10',
+    'win2008r2ee': 'Win2012R2-DC-SBP_CIS-KVM-2016-10',
+    'Win81': 'Win81x64_for_kvmvdi_v1.5',
+    'Centos7': 'Centos7-x86_64-Sbp_cis-KVM-latest',
+    'Rhel7': 'Rhel7-x86_64-Sbp_cis-KVM-latest',
+    'Rhel6': 'Rhel7-x86_64-Sbp_cis-KVM-latest',
+    'Centos6': 'Centos6-x86_64-Sbp_cis-KVM-latest',
+    'NSVPX-XEN': 'Netscaler 11.1.47.14f',
+    'Netscaler': 'Netscaler 11.1.47.14f',
+    'Ubuntu12': 'Ubuntu1204-x86_64-Sbp_cis-KVM-latest',
+    'Ubuntu14': 'Ubuntu1404-x86_64-Sbp_cis-KVM-latest'
+}
+
+for key, value in template_dict.iteritems():
+    if key in vm.templatedisplaytext:
+        if len(newBaseTemplate) > 0 and newBaseTemplate != value:
+            print "Warning: Would have guessed to use template '%s' but now using overridden value '%s'" \
+                  % (value, newBaseTemplate)
+            continue
+        newBaseTemplate = value
+
+if 'Netscaler' in newBaseTemplate or 'NSVPX' in newBaseTemplate:
+    print "Warning: Setting doVirtvtov = False due to Netscaler detected"
+    doVirtvtov = False
+
+templateID = c.checkCloudStackName(
+    {'csname': newBaseTemplate, 'csApiCall': 'listTemplates'})
+
+message = "Template ID found for %s is %s" % (newBaseTemplate, templateID)
+c.print_message(message=message, message_type="Note", to_slack=False)
 
 if templateID == 1 or templateID is None:
     message = "Template with name '%s' can not be found! Halting!" % newBaseTemplate
@@ -241,16 +279,6 @@ storagepoolname = targetStoragePoolData[0].name
 toClusterHostsData = c.getHostsFromCluster(toClusterID)
 if DEBUG == 1:
     print "Note: You selected a storage pool with tags '" + str(storagepooltags) + "'"
-
-# Get data from vm
-vmdata = c.getVirtualmachineData(vmID)
-if vmdata is None:
-    message = "Error: Could not find vm %s !" % instancename
-    c.print_message(message=message, message_type="Error", to_slack=False)
-    sys.exit(1)
-
-vm = vmdata[0]
-c.slack_custom_title = "Migration details for %s" % vm.domain
 
 if vm.hypervisor == "KVM":
     message = "VM %s aka '%s' is already happily running on KVM!" % (vm.instancename, vm.name)
