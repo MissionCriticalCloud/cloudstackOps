@@ -68,7 +68,8 @@ def handleArguments(argv):
     help = "Usage: ./" + os.path.basename(__file__) + ' [options] ' + \
         '\n  --config-profile -c <profilename>\tSpecify the CloudMonkey profile name to get the credentials from ' \
         '(or specify in ./config file)' + \
-        '\n  --instance-name -i <instancename>\tMigrate VM with this instance name (i-123-12345-VM)' + \
+        '\n  --instance-name -i <instancename>\tMigrate VM with this instance name (i-123-12345-VM). VM name is also' \
+        'supported as long as it is unique.' + \
         '\n  --tocluster -t <clustername>\t\tMigrate router to this cluster' + \
         '\n  --new-base-template -b <template>\tKVM template to link the VM to. Won\'t do much, mostly needed for ' \
         'properties like tags. We need to record it in the DB as it cannot be NULL and the XenServer one obviously ' \
@@ -527,12 +528,12 @@ elif DEBUG == 1:
     print s.conn
 
 # Revery Query
-s.generate_revert_query(instancename)
+s.generate_revert_query(vm.instancename)
 
 message = "Updating the database to activate the VM on KVM"
 c.print_message(message=message, message_type="Note", to_slack=False)
 
-if not s.update_instance_to_kvm(instancename, newBaseTemplate, storagepoolname):
+if not s.update_instance_to_kvm(vm.instancename, newBaseTemplate, storagepoolname):
     message = "Updating the database failed"
     c.print_message(message=message, message_type="Error", to_slack=True)
     message = "Nothing has changed, you can either retry or start the VM on XenServer"
