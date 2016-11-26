@@ -231,6 +231,7 @@ c.slack_custom_title = "Migration details for %s" % vm.domain
 # Convert template
 template_dict = {
     'Win2012R2': 'Win2012R2-DC-SBP_CIS-KVM-2016-10',
+    'Windows2012R2': 'Win2012R2-DC-SBP_CIS-KVM-2016-10',
     'Windows 2012 DC R2': 'Win2012R2-DC-SBP_CIS-KVM-2016-10',
     'win2008r2ee': 'Win2012R2-DC-SBP_CIS-KVM-2016-10',
     'Win81': 'Win81x64_for_kvmvdi_v1.5',
@@ -251,6 +252,11 @@ for key, value in template_dict.iteritems():
                   % (value, newBaseTemplate)
             continue
         newBaseTemplate = value
+
+if len(newBaseTemplate) == 0:
+    print "Error: Was unable to detect a KVM template for this vm. Please specify one using the --new-base-template " \
+          "flag and try again."
+    sys.exit(1)
 
 if 'Netscaler' in newBaseTemplate or 'NSVPX' in newBaseTemplate:
     print "Warning: Setting doVirtvtov = False due to Netscaler detected"
