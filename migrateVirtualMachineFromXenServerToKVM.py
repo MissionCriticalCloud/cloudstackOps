@@ -273,6 +273,13 @@ if templateID == 1 or templateID is None:
     c.print_message(message=message, message_type="Error", to_slack=False)
     sys.exit(1)
 
+# Detach any isos
+if vm.isoid is not None:
+    print "Note: Detaching any connected ISO from vm %s" % vm.name
+    c.detach_iso(vm.id)
+else:
+    print "Note: No ISOs connected to detach"
+
 # Get cluster hosts
 kvm_host = c.getFirstHostFromCluster(toClusterID)
 
