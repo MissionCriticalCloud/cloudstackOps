@@ -1779,3 +1779,16 @@ class CloudStackOps(CloudStackOpsBase):
         if self.DEBUG == 1:
             print "DEBUG: received this result:" + str(result)
         return result.volume.url
+
+    def detach_iso(self, virtualmachineid):
+
+        apicall = detachIso.detachIsoCmd()
+        apicall.virtualmachineid = virtualmachineid
+
+        # Call CloudStack API
+        result = self._callAPI(apicall)
+
+        if result is not None:
+            return False
+        else:
+            return True
