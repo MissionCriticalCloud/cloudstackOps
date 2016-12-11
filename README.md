@@ -25,7 +25,7 @@ At any time, add `--debug` as a parameter and the script will add some useful de
 
 E-mail notifications
 --------------------
-All scripts that do stuff that impacts users, will lookup an e-mailadres in CloudStack, and send an e-mail notification when maintenance starts and completes. An example is the `upgradeRouterVM.py` that you use to upgrade a router vm to a new templete, for example after an CloudStack upgrade.
+All scripts that do stuff that impacts users, will lookup an e-mailadres in CloudStack, and send an e-mail notification when maintenance starts and completes. An example is the `rebootRouterVM.py` that you use to upgrade a router vm to a new templete, for example after an CloudStack upgrade (using --only-when-required).
 
 Please be sure to edit the `config` file, to edit the e-mail settings before sending e-mail.
 
@@ -263,7 +263,7 @@ For usage, run:
 * To migrate offline volumes from CLUSTER-6 to CLUSTER-12:
 `./migrateOfflineVolumes.py --fromcluster CLUSTER-6 --tocluster CLUSTER-12 --exec`
 
-Upgrade a router VM
+Reboot a router VM
 --------------------
 This script will upgrade a router to a new systemVM template. CloudStack will destroy it and re-create it using the same instance-id when you just reboot it. This script works on CloudStack 4.3 and above, because it uses the `requiresUpgrade` flag.
 
@@ -272,14 +272,17 @@ The script is most powerful when used in combination with the `listVirtualMachin
 When a router does not need an update, the script will do nothing.
 
 For usage, run:
-`./upgradeRouterVM.py`
+`./rebootRouterVM.py`
 
 **Examples:**
 * To upgrade a router VM:
-`./upgradeRouterVM.py --routerinstance-name r-12345-VM --exec`
+`./rebootRouterVM.py --routerinstance-name r-12345-VM --exec`
 
 * To upgrade a router VM that belongs to a project:
-`./upgradeRouterVM.py --routerinstance-name r-12345-VM --is-projectrouter --exec`
+`./rebootRouterVM.py --routerinstance-name r-12345-VM --is-projectrouter --exec`
+
+* To only reboot when this is required (needs new template):
+`./rebootRouterVM.py --routerinstance-name r-12345-VM --only-when-required --exec`
 
 Update a hosts hosttags
 -----------------------
@@ -417,7 +420,7 @@ This selects all routers on 'CLUSTER-3' that have 2 nics, and upgrade those:
 
 ```
 ./listVirtualMachines.py -c config_cloud_admin --oncluster CLUSTER-3 --only-routers-to-be-upgraded --router-nic-count=2 |\
-grep -E '[r]\-(.*)\-VM' | cut -d\| -f6 | awk {'print "./upgradeRouterVM.py -r " $1 '} | sh
+grep -E '[r]\-(.*)\-VM' | cut -d\| -f6 | awk {'print "./rebootRouterVM.py -r " $1 '} | sh
 ```
 
 You could also use the output from a CloudMonkey select, straight to one of the scripts. Like this when using table display:

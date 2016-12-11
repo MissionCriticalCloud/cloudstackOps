@@ -45,19 +45,22 @@ def handleArguments(argv):
     configProfileName = ''
     global isProjectVm
     isProjectVm = 0
+    global onlyRequired
+    onlyRequired = 0
 
     # Usage message
     help = "Usage: ./" + os.path.basename(__file__) + ' [options] ' + \
         '\n  --config-profile -c <profilename>\tSpecify the CloudMonkey profile name to get the credentials from (or specify in ./config file)' + \
         '\n  --routerinstance-name -r <name>\tWork with this router (r-12345-VM)' + \
         '\n  --is-projectrouter\t\t\tThe specified router belongs to a project' + \
+        '\n  --only-when-required\t\t\tOnly reboot when the RequiresUpgrade flag is set' + \
         '\n  --debug\t\t\t\tEnable debug mode' + \
         '\n  --exec\t\t\t\tExecute for real'
 
     try:
         opts, args = getopt.getopt(
             argv, "hc:r:p", [
-                "config-profile=", "routerinstance-name=", "debug", "exec", "is-projectrouter"])
+                "config-profile=", "routerinstance-name=", "debug", "exec", "is-projectrouter", "only-when-required"])
     except getopt.GetoptError:
         print help
         sys.exit(2)
@@ -75,6 +78,8 @@ def handleArguments(argv):
             DRYRUN = 0
         elif opt in ("--is-projectrouter"):
             isProjectVm = 1
+        elif opt in ("--only-when-required"):
+            onlyRequired = 1
 
     # Default to cloudmonkey default config file
     if len(configProfileName) == 0:
@@ -135,12 +140,11 @@ print "Note: Found router " + router.name + " that belongs to account " + str(ro
 print "Note: This router has " + str(len(router.nic)) + " nics."
 
 # Does this router need an upgrade?
-if router.requiresupgrade == 1:
-    print "Note: This router needs to be upgraded. Let's reboot.."
-else:
-    print "Note: This router does not need to be upgraded."
+if onlyRequired == 1 and router.requiresupgrade == 0:
+    print "Note: This router does not need to be upgraded. Won't reboot because of --only-when-required flag. When you remove the flag and run the script again it will reboot anyway."
     sys.exit(0)
 
+print "Note: Let's reboot the router VM.."
 
 # Get user data to e-mail
 adminData = c.getDomainAdminUserData(router.domainid)
@@ -151,7 +155,7 @@ else:
     if not adminData.email:
         print "Warning: Skipping mailing due to missing e-mail address."
 
-    templatefile = open("email_template/upgradeRouterVM.txt", "r")
+    templatefile = open("email_template/rebootRouterVM.txt", "r")
     emailbody = templatefile.read()
     emailbody = emailbody.replace("FIRSTNAME", adminData.firstname)
     emailbody = emailbody.replace("LASTNAME", adminData.lastname)
@@ -198,7 +202,7 @@ else:
     if not adminData.email:
         print "Warning: Skipping mailing due to missing e-mail address."
 
-    templatefile = open("email_template/upgradeRouterVM_done.txt", "r")
+    templatefile = open("email_template/rebootRouterVM_done.txt", "r")
     emailbody = templatefile.read()
     emailbody = emailbody.replace("FIRSTNAME", adminData.firstname)
     emailbody = emailbody.replace("LASTNAME", adminData.lastname)
