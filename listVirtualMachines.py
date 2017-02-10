@@ -411,7 +411,7 @@ for clusterid, clustername in clusters.items():
     if fromClusterHostsData == 1 or fromClusterHostsData is None:
         print
         sys.stdout.write("\033[F")
-        print "No (enabled) hosts found on cluster " + clustername
+        print "No (enabled) hosts found on cluster " + str(clustername)
         continue
 
     # Look for VMs on each of the cluster hosts
