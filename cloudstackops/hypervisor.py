@@ -66,3 +66,13 @@ class hypervisor(object):
         # Remove progress indication
         sys.stdout.write("\033[F")
         print "Note: Host " + host.name + " is now offline!                           "
+
+    # Execute script on hypervisor
+    def exec_script_on_hypervisor(self, host, script):
+        script = script.split('/')[-1]
+        print "Note: Executing script '%s' on host %s.." % (script, host.name)
+        try:
+            with settings(show('output'), host_string=self.ssh_user + "@" + host.ipaddress):
+                return fab.run("bash /tmp/" + script)
+        except:
+            return False
