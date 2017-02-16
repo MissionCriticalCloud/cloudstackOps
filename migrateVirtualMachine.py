@@ -202,6 +202,11 @@ for vol in voldata:
         print "Warning: No need to migrate volume " + vol.name + " -- already on the desired storage pool. Skipping."
         continue
 
+    currentStorageData = c.getStoragePoolData(currentStorageID)[0]
+    if currentStorageData.scope == "ZONE":
+        print "Note: No need to migrate volume " + vol.name + " -- scope of this volume is ZONE. Skipping."
+        continue
+
     # Save ids for later -- we first need to find out if it's worth stopping
     # the vm
     volIDs.append(vol.id)
