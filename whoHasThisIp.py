@@ -112,6 +112,7 @@ elif DEBUG == 1:
 
 ipaddresses = s.getIpAddressData(ipaddress)
 counter = 0
+networknamenone = 0
 t = PrettyTable(["VM name",
                  "Network Name",
                  "Mac Address",
@@ -134,6 +135,8 @@ for (
         created,
         vmname) in ipaddresses:
     counter = counter + 1
+    if networkname is None:
+      networknamenone =  networknamenone + 1
 
     vmname = (vmname[:22] + '..') if len(vmname) > 24 else vmname
     networkname = (
@@ -148,8 +151,52 @@ for (
                state,
                created])
 
+# When not found a vm name in the VPC query check the bridged networks
+if counter == networknamenone:
+  countera = 0
+  ipaddresses = s.getpIpAddressData(ipaddress)
+  r = PrettyTable(["VM name",
+                   "State",
+                   "Ipv4",
+                   "Network Name",
+                   "Created"])
+  r.align["VM name"] = "l"
+  r.align["Network Name"] = "l"
+
+  r = PrettyTable(["VM name",
+                   "State",
+                   "Ipv4",
+                   "Network Name",
+                   "Created"])
+  r.align["VM name"] = "l"
+  r.align["Network Name"] = "l"
+
+  for (
+          vmname,
+          ip4_address,
+          created,
+          state,
+          networkname) in ipaddresses:
+      countera = countera + 1 
+
+      vmname = (vmname[:22] + '..') if len(vmname) > 24 else vmname
+      networkname = (
+          networkname[:22] + '..') if networkname is not None \
+          and len(networkname) > 24 else networkname
+      r.add_row([vmname,
+                 networkname,
+                 ip4_address,
+                 state,
+                 created])
+
 # Disconnect MySQL
 s.disconnectMySQL()
 
+print "VPC results:"
 print t
 print "Note: Found " + str(counter) + " results."
+print "\n"
+print "Bridge results:"
+print r 
+print "Note: Found " + str(countera) + " results."
+
