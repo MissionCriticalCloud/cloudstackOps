@@ -182,6 +182,25 @@ class CloudStackSQL(CloudStackOpsBase):
 
         return result
 
+    # list ip adress info
+    def getpIpAddressData(self, ipaddress):
+        if not self.conn:
+            return 1
+
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT DISTINCT \
+        vm_instance.name, public_ip_address, update_time, networks.name, user_ip_address.state \
+        FROM vm_instance \
+        JOIN vm_network_map ON vm_network_map.vm_id = vm_instance.id \
+        JOIN networks ON networks.id = vm_network_map.network_id \
+        JOIN user_ip_address ON networks.id = user_ip_address.network_id \
+        WHERE user_ip_address.public_ip_address LIKE '%" + ipaddress  + "%' ;")
+
+        result = cursor.fetchall()
+        cursor.close()
+
+        return result
+
     # list mac adress info
     def getMacAddressData(self, macaddress):
         if not self.conn:
