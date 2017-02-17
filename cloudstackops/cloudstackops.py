@@ -1337,6 +1337,8 @@ class CloudStackOps(CloudStackOpsBase):
     # Prepare host for maintenance
     def startMaintenance(self, hostID, hostname):
         hostData = self.getHostData({'hostname': hostname})
+        if hostData == 1:
+            return False
         for host in hostData:
             if host.name == hostname:
                 foundHostData = host
@@ -1352,7 +1354,7 @@ class CloudStackOps(CloudStackOpsBase):
             if foundHostData.hypervisor == "KVM":
                 vmcount = self.kvm.host_get_vms(
                     foundHostData)
-            print "\nNote: Preparing host '" + hostname + "' for maintenance, " + str(vmcount) + " VMs to migrate.."
+            print "Note: Preparing host '" + hostname + "' for maintenance, " + str(vmcount) + " VMs to migrate.."
 
             # Maintenance
             maintenanceResult = self.prepareHostForMaintenance(hostID)
@@ -1361,7 +1363,7 @@ class CloudStackOps(CloudStackOpsBase):
         if maintenanceResult is None or maintenanceResult == 1:
             print "Error: Got an empty result from prepareForMaintenance call"
             print "Error: Please investigate manually. Halting."
-            sys.exit(1)
+            return False
 
         if self.DEBUG == 1:
             print maintenanceResult
@@ -1537,7 +1539,7 @@ class CloudStackOps(CloudStackOpsBase):
         print t.get_string(sortby="Hostname")
 
     # Print cluster table
-    def printCluster(self, clusterID):
+    def printCluster(self, clusterID, hypervisor="XenServer"):
         clusterData = self.listClusters({'clusterid': clusterID})
         t = PrettyTable(["Cluster name",
                          "Allocation state",
@@ -1550,27 +1552,31 @@ class CloudStackOps(CloudStackOpsBase):
         t.max_width["Patch level"] = 32
 
         try:
+            xenserver_ha_state = "N/A"
             clusterHostsData = self.getAllHostsFromCluster(clusterID)
-            xenserver_ha_state = self.xenserver.pool_ha_check(
-                clusterHostsData[0])
+            if hypervisor == "XenServer":
+                xenserver_ha_state = self.xenserver.pool_ha_check(clusterHostsData[0])
         except:
+            clusterHostsData = False
             xenserver_ha_state = "N/A"
 
         try:
             if not clusterHostsData:
                 clusterHostsData = self.getAllHostsFromCluster(clusterID)
-            xenserver_patch_level = self.xenserver.get_patch_level(
-                clusterHostsData[0])
-        except:
-            xenserver_patch_level = "N/A"
+            if hypervisor == "XenServer":
+                patch_level = self.xenserver.get_patch_level(clusterHostsData[0])
+            elif hypervisor == "KVM":
+                patch_level = self.kvm.get_patch_level(clusterHostsData)
 
+        except:
+                patch_level = "N/A"
 
         for cluster in clusterData:
             t.add_row([cluster.name,
                        cluster.allocationstate,
                        cluster.managedstate,
                        xenserver_ha_state,
-                       xenserver_patch_level,
+                       patch_level,
                        cluster.podname,
                        cluster.zonename])
         # Print table
@@ -1625,8 +1631,9 @@ class CloudStackOps(CloudStackOpsBase):
                 # Check memory availability
                 # Available memory in Bytes
                 memoryavailable = h.memorytotal - h.memoryallocated
-                print "Note: host " + h.name + " has free mem: " + str(memoryavailable) + " and we need " + \
-                      str(requestedMemory)
+                if self.DEBUG == 1:
+                    print "Note: host " + h.name + " has free mem: " + str(memoryavailable/1024/1024) + "MB and we need " + \
+                          str(requestedMemory/1024/1024) + " MB"
 
                 # vm.memory is in Mega Bytes
                 if requestedMemory is not None:
@@ -1657,13 +1664,9 @@ class CloudStackOps(CloudStackOpsBase):
         foundHostData = hostData[0]
         hostname = foundHostData.name
         if self.DEBUG == 1:
-            print "xxxxxxxxx"
             print hostData
-            print "xxxxxxxxx"
             print foundHostData
-            print "xxxxxxxxx"
             print hostname
-            print "xxxxxxxxx"
 
         # Check vm's still running on this host
         all_vmdata = self.getVirtualMachinesRunningOnHost(hostID)
@@ -1685,7 +1688,16 @@ class CloudStackOps(CloudStackOpsBase):
                     vmresult = 1
                     if self.DRYRUN == 0:
                         if vm.memory is None:
-                            vm.memory = 1024
+                            # Try to get the memory of systemvms from their offering
+                            if bool(re.search('[rvs]-([\d])*-VM', vm.name)) and vm.serviceofferingid is not None:
+                                serviceOfferingData = self.listServiceOfferings(
+                                    {'serviceofferingid': vm.serviceofferingid, 'issystem': 'true'})
+                                vm.memory = serviceOfferingData[0].memory
+                                if self.DEBUG == 1:
+                                    print "DEBUG: Set memory to the value in the service offering: %s" % str(serviceOfferingData[0].memory)
+                            # Else, fail back to a 1GB default
+                            else:
+                                vm.memory = 1024
                         requested_memory = int(vm.memory) * 1024 * 1024
                         migrationHost = self.findBestMigrationHost(
                             foundHostData.clusterid,

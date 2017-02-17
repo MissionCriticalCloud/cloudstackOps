@@ -21,6 +21,9 @@
 
 # We depend on these
 import uuid
+import sys
+import time
+import socket
 
 # Fabric
 from fabric.api import *
@@ -47,16 +50,20 @@ output['warnings'] = False
 
 class Kvm(hypervisor.hypervisor):
 
-    def __init__(self, ssh_user='root', threads=5, pre_empty_script='', post_empty_script='', helper_scripts_path=None):
+    def __init__(self, ssh_user='root', threads=5, pre_empty_script='', post_empty_script='', post_reboot_script='',
+                 helper_scripts_path=None):
         hypervisor.__init__(ssh_user, threads)
         self.ssh_user = ssh_user
         self.threads = threads
         self.pre_empty_script = pre_empty_script
         self.post_empty_script = post_empty_script
+        self.post_reboot_script = post_reboot_script
         self.mountpoint = None
         self.migration_path = None
         self.helper_scripts_path = helper_scripts_path
         self.os_family = None
+        self.DRYRUN = True
+        self.PREPARE = False
 
     def prepare_kvm(self, kvmhost):
         if self.DRYRUN:
@@ -241,8 +248,8 @@ class Kvm(hypervisor.hypervisor):
             return False
 
     def put_scripts(self, host):
-        if self.DRYRUN:
-            print "Note: Would have scripts to %s" % host.name
+        if self.DRYRUN and not self.PREPARE:
+            print "Note: Would have uploaded scripts to %s" % host.name
             return True
         try:
             with settings(host_string=self.ssh_user + "@" + host.ipaddress):
@@ -255,6 +262,9 @@ class Kvm(hypervisor.hypervisor):
                 if len(self.post_empty_script) > 0:
                     put(self.post_empty_script,
                         '/tmp/' + self.post_empty_script.split('/')[-1], mode=0755, use_sudo=True)
+                if len(self.post_reboot_script) > 0:
+                    put(self.post_reboot_script,
+                        '/tmp/' + self.post_reboot_script.split('/')[-1], mode=0755, use_sudo=True)
                 put('kvm_check_bonds.sh',
                     '/tmp/kvm_check_bonds.sh', mode=0755, use_sudo=True)
             return True
@@ -265,13 +275,107 @@ class Kvm(hypervisor.hypervisor):
     # Get bond status
     def get_bond_status(self, host):
         try:
-            with settings(host_string=self.ssh_user + "@" + host.ipaddress):
+            with settings(host_string=self.ssh_user + "@" + host.ipaddress, use_sudo=True):
                 return fab.run("bash /tmp/kvm_check_bonds.sh | awk {'print $1'} | tr -d \":\"")
         except:
             return False
 
     # Get VM count of a hypervisor
     def host_get_vms(self, host):
-        with settings(host_string=self.ssh_user + "@" + host.ipaddress):
+        with settings(host_string=self.ssh_user + "@" + host.ipaddress, use_sudo=True):
             return fab.run("virsh list | grep running | wc -l")
 
+    # Reboot host and execute scripts
+    def host_reboot(self, host, halt_hypervisor=False, force_reset_hypervisor=False):
+
+        # Count VMs to be sure
+        if self.host_get_vms(host) != "0":
+            print "Error: Host " + host.name + " not empty, cannot reboot!"
+            return False
+        print "Note: Host " + host.name + " has no VMs running, continuing"
+
+        # Execute post-empty-script
+        if self.exec_script_on_hypervisor(host, self.post_empty_script) is False:
+            print "Error: Executing script '" + self.post_empty_script + "' on host " + host.name + " failed."
+            return False
+
+        # Reboot methods: reboot, force-reset, halt
+        try:
+            with settings(host_string=self.ssh_user + "@" + host.ipaddress, command_timeout=10, use_sudo=True):
+                if halt_hypervisor:
+                    print "Note: Halting host %s in 60s. Undo with 'sudo shutdown -c'" % host.name
+                    fab.run("sudo shutdown -h 1")
+                elif force_reset_hypervisor:
+                    print "Note: Immediately force-resetting host %s" % host.name
+                    fab.run("sudo sync; sudo echo b > /proc/sysrq-trigger")
+                else:
+                    print "Note: Rebooting host %s in 60s. Undo with 'sudo shutdown -c' " % host.name
+                    fab.run("sudo shutdown -r 1")
+        except:
+            print "Warning: Got an exception on reboot/reset/halt, but that's most likely due to the the host " \
+                  "shutting itself down, so ignoring it."
+
+        # Check the host is really offline
+        self.check_offline(host)
+
+        # Wait until the host is back
+        self.check_connect(host)
+
+        # Execute post-reboot-script
+        if self.exec_script_on_hypervisor(host, self.post_reboot_script) is False:
+            print "Error: Executing script '" + self.post_reboot_script + "' on host " + host.name + " failed."
+            return False
+
+        return True
+
+    # Wait for hypervisor to become alive again
+    def check_connect(self, host):
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        print "Note: Waiting for " + host.name + "(" + host.ipaddress + ") to return"
+        while s.connect_ex((host.ipaddress, 22)) > 0:
+            # Progress indication
+            sys.stdout.write(".")
+            sys.stdout.flush()
+            time.sleep(5)
+        # Remove progress indication
+        sys.stdout.write("\033[F")
+        print "Note: Host " + host.name + " responds to SSH again!                           "
+        time.sleep(10)
+        print "Note: Waiting until we can successfully run a command against the cluster.."
+        while self.check_libvirt(host) is False:
+            # Progress indication
+            sys.stdout.write(".")
+            sys.stdout.flush()
+            time.sleep(5)
+        # Remove progress indication
+        sys.stdout.write("\033[F")
+        print "Note: Host " + host.name + " is able to do libvirt stuff again!                                  "
+        return True
+
+    # Check if we can use libvirt
+    def check_libvirt(self, host):
+        try:
+            with settings(warn_only=True, host_string=self.ssh_user + "@" + host.ipaddress, use_sudo=True):
+                result = fab.run("virsh list")
+                if result.return_code == 0:
+                    return True
+                else:
+                    return False
+        except:
+            return False
+
+    # Get current patchlevel
+    def get_patch_level(self, hosts):
+        return_string = ""
+        for host in hosts:
+            try:
+                with settings(host_string=self.ssh_user + "@" + host.ipaddress, use_sudo=True):
+                    patch_level = fab.run("yum check-update -q | wc -l") + " updates to install"
+                    if len(return_string) == 0:
+                        hostname = host.name
+                    else:
+                        hostname = "\n" + host.name
+                    return_string = return_string + hostname + ": " + patch_level + " "
+            except:
+                return False
+        return return_string

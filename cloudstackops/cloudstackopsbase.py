@@ -35,8 +35,15 @@ import random
 import commands
 from urlparse import urlparse
 from prettytable import PrettyTable
-import slackweb
 import pprint
+# Slackweb
+try:
+    import slackweb
+except:
+    print "Error: Please install slackweb library to support Slack messaging:"
+    print "       pip install slackweb"
+    sys.exit(1)
+
 # Colored terminals
 try:
     from clint.textui import colored
@@ -105,13 +112,14 @@ class CloudStackOpsBase(object):
         except:
             print "Warning: No Slack integration found, so not using. See config file to setup."
 
+        self.slack = None
         if len(slack_url) > 0:
             self.slack = slackweb.Slack(url=slack_url)
 
     def print_message(self, message, message_type="Note", to_slack=False):
         print "%s: %s" % (message_type.title(), message)
 
-        if to_slack:
+        if to_slack and self.slack is not None:
             color = "good"
             if message_type.lower() == "error":
                 color = "danger"

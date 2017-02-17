@@ -25,19 +25,23 @@ from cloudstackopsbase import *
 # Import our dependencies
 import subprocess
 from subprocess import Popen, PIPE
+import getpass
 
 
 class CloudStackOpsSSH(CloudStackOpsBase):
 
     # Run SSH remoteCmd
     def runSSHCommand(self, hostname, remoteCmd):
+
+        ssh_user=getpass.getuser()
+
         if self.DEBUG == 1:
             print "Debug: Running SSH command on " + hostname + " :" + remoteCmd
         p = subprocess.Popen(['ssh',
                               '-oStrictHostKeyChecking=no',
                               '-oUserKnownHostsFile=/dev/null',
                               '-q',
-                              'root@' + hostname,
+                              ssh_user + '@' + hostname,
                               remoteCmd],
                              stdout=subprocess.PIPE)
         output = ""
@@ -53,7 +57,7 @@ class CloudStackOpsSSH(CloudStackOpsBase):
     def __parseReturnCode(self, retcode, hostname):
         if retcode != 0:
             print "Error: SSH connection to '" + hostname + "' returned code " + str(retcode)
-            print "Note: Please make sure 'ssh root@" + hostname + "' works key-based and try again."
+            print "Note: Please make sure 'ssh " + hostname + "' works key-based and try again."
         elif self.DEBUG == 1:
             print "Note: SSH remoteCmd executed OK."
         return retcode
