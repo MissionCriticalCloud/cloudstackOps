@@ -457,6 +457,7 @@ class CloudStackOps(CloudStackOpsBase):
         apicall = listHosts.listHostsCmd()
         apicall.clusterid = str(clusterID)
         apicall.resourcestate = "Enabled"
+        apicall.state = "Up"
         apicall.listAll = "true"
 
         # Call CloudStack API
