@@ -35,8 +35,25 @@ class CloudStackSQL(CloudStackOpsBase):
         self.DRYRUN = dryrun
         self.FORCE = force
 
+    # Get all DB's
+    def getAllDB(self):
+        db = [] 
+        try:
+            self.configfile = os.getcwd() + '/config'
+            config = ConfigParser.RawConfigParser()
+            config.read(self.configfile)
+            for each_section in config.sections():
+                for item, value in config.items(each_section):
+                    if item == 'mysqlhostname':
+                         db.append(each_section)
+        except:
+            print "Error: Tried to read username and password from config file 'config', but failed."
+            sys.exit(1)
+        return db
+ 
     # Connect MySQL Cloud DB
     def connectMySQL(self, mysqlhost, mysqlpassword='', mysqluser='cloud'):
+
         # Try to lookup password if not supplied
         if not mysqlpassword:
             # Try to read MySQL settings from config file
