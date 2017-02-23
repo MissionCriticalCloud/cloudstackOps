@@ -51,6 +51,7 @@ def handleArguments(argv):
         '(partial is allowed)' + \
         '\n  --mysqlserver -s <mysql hostname>\tSpecify MySQL server ' + \
         'to read HA worker table from' + \
+        '\n\t\t\t\t\tuse any for all databases from config file' + \
         '\n  --mysqlpassword <passwd>\t\tSpecify password to cloud ' + \
         'MySQL user' + \
         '\n  --debug\t\t\t\tEnable debug mode' + \
@@ -101,102 +102,110 @@ if DEBUG == 1:
 if DRYRUN == 1:
     print "# Warning: dry-run mode is enabled, not running any commands!"
 
-# Connect MySQL
-result = s.connectMySQL(mysqlHost, mysqlPasswd)
-if result > 0:
-    print "Error: MySQL connection failed"
-    sys.exit(1)
-elif DEBUG == 1:
-    print "DEBUG: MySQL connection successful"
-    print s.conn
+db = []
+if mysqlHost == 'any':
+    db = s.getAllDB()
+else:
+    db.append(mysqlHost)
+print "\nConnecting to the following DB's: " + str(db) + "\n"
 
-ipaddresses = s.getIpAddressData(ipaddress)
-counter = 0
-networknamenone = 0
-t = PrettyTable(["VM name",
-                 "Network Name",
-                 "Mac Address",
-                 "Ipv4",
-                 "Netmask",
-                 "Mode",
-                 "State",
-                 "Created"])
-t.align["VM name"] = "l"
-t.align["Network Name"] = "l"
+for mysqlHost in db:
+    # Connect MySQL
+    result = s.connectMySQL(mysqlHost, mysqlPasswd)
+    if result > 0:
+        print "Error: MySQL connection failed"
+        sys.exit(1)
+    elif DEBUG == 1:
+        print "DEBUG: MySQL connection successful"
+        print s.conn
 
-for (
-        networkname,
-        mac_address,
-        ip4_address,
-        netmask,
-        broadcast_uri,
-        mode,
-        state,
-        created,
-        vmname) in ipaddresses:
-    counter = counter + 1
-    if networkname is None:
-      networknamenone =  networknamenone + 1
-
-    vmname = (vmname[:22] + '..') if len(vmname) > 24 else vmname
-    networkname = (
-        networkname[:22] + '..') if networkname is not None \
-        and len(networkname) > 24 else networkname
-    t.add_row([vmname,
-               networkname,
-               mac_address,
-               ip4_address,
-               netmask,
-               mode,
-               state,
-               created])
-
-# When not found a vm name in the VPC query check the bridged networks
-if counter == networknamenone:
-  countera = 0
-  ipaddresses = s.getpIpAddressData(ipaddress)
-  r = PrettyTable(["VM name",
-                   "State",
-                   "Ipv4",
-                   "Network Name",
-                   "Created"])
-  r.align["VM name"] = "l"
-  r.align["Network Name"] = "l"
-
-  r = PrettyTable(["VM name",
-                   "State",
-                   "Ipv4",
-                   "Network Name",
-                   "Created"])
-  r.align["VM name"] = "l"
-  r.align["Network Name"] = "l"
-
-  for (
-          vmname,
-          ip4_address,
-          created,
-          state,
-          networkname) in ipaddresses:
-      countera = countera + 1 
-
-      vmname = (vmname[:22] + '..') if len(vmname) > 24 else vmname
-      networkname = (
-          networkname[:22] + '..') if networkname is not None \
-          and len(networkname) > 24 else networkname
-      r.add_row([vmname,
-                 networkname,
-                 ip4_address,
-                 state,
-                 created])
-
-# Disconnect MySQL
-s.disconnectMySQL()
-
-print "VPC results:"
-print t
-print "Note: Found " + str(counter) + " results."
-print "\n"
-print "Bridge results:"
-print r 
-print "Note: Found " + str(countera) + " results."
-
+    ipaddresses = s.getIpAddressData(ipaddress)
+    counter = 0
+    networknamenone = 0
+    t = PrettyTable(["VM name",
+                     "Network Name",
+                     "Mac Address",
+                     "Ipv4",
+                     "Netmask",
+                     "Mode",
+                     "State",
+                     "Created"])
+    t.align["VM name"] = "l"
+    t.align["Network Name"] = "l"
+    
+    for (
+            networkname,
+            mac_address,
+            ip4_address,
+            netmask,
+            broadcast_uri,
+            mode,
+            state,
+            created,
+            vmname) in ipaddresses:
+        counter = counter + 1
+        if networkname is None:
+          networknamenone =  networknamenone + 1
+    
+        vmname = (vmname[:22] + '..') if len(vmname) > 24 else vmname
+        networkname = (
+            networkname[:22] + '..') if networkname is not None \
+            and len(networkname) > 24 else networkname
+        t.add_row([vmname,
+                   networkname,
+                   mac_address,
+                   ip4_address,
+                   netmask,
+                   mode,
+                   state,
+                   created])
+    
+    # When not found a vm name in the VPC query check the bridged networks
+    if counter == networknamenone:
+      countera = 0
+      ipaddresses = s.getpIpAddressData(ipaddress)
+      r = PrettyTable(["VM name",
+                       "State",
+                       "Ipv4",
+                       "Network Name",
+                       "Created"])
+      r.align["VM name"] = "l"
+      r.align["Network Name"] = "l"
+    
+      r = PrettyTable(["VM name",
+                       "State",
+                       "Ipv4",
+                       "Network Name",
+                       "Created"])
+      r.align["VM name"] = "l"
+      r.align["Network Name"] = "l"
+    
+      for (
+              vmname,
+              ip4_address,
+              created,
+              state,
+              networkname) in ipaddresses:
+          countera = countera + 1 
+    
+          vmname = (vmname[:22] + '..') if len(vmname) > 24 else vmname
+          networkname = (
+              networkname[:22] + '..') if networkname is not None \
+              and len(networkname) > 24 else networkname
+          r.add_row([vmname,
+                     networkname,
+                     ip4_address,
+                     state,
+                     created])
+    
+    # Disconnect MySQL
+    s.disconnectMySQL()
+   
+    if counter <> 0 and countera <> 0:
+        print "VPC results:"
+        print t
+        print "Note: Found " + str(counter) + " results."
+        print "\nBridge results:"
+        print r 
+        print "Note: Found " + str(countera) + " results."
+        
