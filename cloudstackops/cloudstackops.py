@@ -1231,6 +1231,20 @@ class CloudStackOps(CloudStackOpsBase):
         # Call CloudStack API
         return self._callAPI(apicall)
 
+    # updateHost
+    def updateHost(self, args):
+        args = self.remove_empty_values(args)
+
+        apicall = updateHost.updateHostCmd()
+        apicall.id = str(args['hostid'])
+        apicall.allocationstate = (
+            str(
+                args['allocationstate'])) if 'allocationstate' in args and len(
+            args['allocationstate']) > 0 else None
+
+        # Call CloudStack API
+        return self._callAPI(apicall)
+
     # list domains
     def listDomains(self, domainid=''):
         apicall = listDomains.listDomainsCmd()
