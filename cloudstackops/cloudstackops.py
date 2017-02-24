@@ -1592,6 +1592,8 @@ class CloudStackOps(CloudStackOpsBase):
             {'hostid': hostID, 'listAll': 'true', 'isProjectVm': 'true'}))
         all_vmdata.append(
             self.getRouterData({'hostid': hostID, 'listAll': 'true'}))
+        all_vmdata.append(
+            self.getRouterData({'hostid': hostID, 'listAll': 'true', 'isProjectVm': 'true'}))
         all_vmdata.append(self.getSystemVmData({'hostid': hostID}))
 
         if self.DEBUG == 1:
