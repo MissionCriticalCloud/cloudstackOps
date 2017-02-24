@@ -19,7 +19,7 @@
 #      specific language governing permissions and limitations
 #      under the License.
 
-# Patch KVM hypervisors that are registered in CloudStack
+# Patch KVM hypervisors that are registered in Cosmic
 # Remi Bergsma, rbergsma@schubergphilis.com
 
 # We depend on these modules
@@ -239,14 +239,15 @@ if DRYRUN == 1:
     print "This script will: "
     print "  - For any hypervisor it will do this:"
     print "      - execute the --pre-empty-script script '" + pre_empty_script + "' on the hypervisor"
+    print "      - disable the host in Cosmic"
     print "      - live migrate all VMs off of it"
-    print "      - set hypervisor in Maintenance mode"
     print "      - execute the --post-empty-script script '" + post_empty_script + "' on the hypervisor"
     print "      - when empty, it will reboot the hypervisor"
     print "        (halting is " + str(halt_hypervisor) + ") and (force_reset is " + str(force_reset_hypervisor) + ")"
     print "      - will wait for it to come back online (checks SSH connection)"
     print "      - execute the --post-reboot-script script '" + post_reboot_script + "' on the hypervisor"
-    print "      - cancel Maintenance mode"
+    print "      - enable the host in Cosmic"
+    print "      - waits until host is Connected & Up in Cosmic"
     print "      - continues to the next hypervisor"
     print "Then the reboot cyclus for " + clustername + " is done!"
     print
@@ -289,6 +290,33 @@ for host in cluster_hosts:
         c.print_message(message=message, message_type="Error", to_slack=True)
         sys.exit(1)
 
+    # Start with disabling the host
+    if host.resourcestate != "Disabled":
+        # Disable host to prevent new VMs landing on it
+        if not c.updateHost({'hostid': host.id, 'allocationstate': "Disable"}):
+            message = "Disabling host %s failed! Please investigate.." \
+                      % (host.name)
+            c.print_message(message=message, message_type="Warning", to_slack=True)
+
+        message = "Waiting for host %s to reach Disabled state" % host.name
+        c.print_message(message=message, message_type="Note", to_slack=True)
+
+        while True:
+            hostData = c.getHostData({'hostid': host.id})
+            if hostData[0].resourcestate == "Disabled":
+                break
+            sys.stdout.write(".")
+            sys.stdout.flush()
+            time.sleep(5)
+
+    message = "Host %s reached Disabled state" % host.name
+    c.print_message(message=message, message_type="Note", to_slack=True)
+
+    running_vms = k.host_get_vms(host)
+
+    message = "Found %s VMs running on host %s. Will now start migrating them to other hosts in the same cluster" % (running_vms, host.name)
+    c.print_message(message=message, message_type="Note", to_slack=True)
+
     # Migrate all vm's and empty hypervisor
     retries = 0
     while not c.emptyHypervisor(host.id):
@@ -302,38 +330,8 @@ for host in cluster_hosts:
     message = "Emptying hypervisor %s succeeded." % host.name
     c.print_message(message=message, message_type="Note", to_slack=True)
 
-    # Check current status of host
-    message = "Current resource state for %s is %s" % (host.name, host.resourcestate)
-    c.print_message(message=message, message_type="Note", to_slack=True)
-
-    if host.resourcestate != "Maintenance":
-        # Put host in CloudStack Maintenance
-        if not c.startMaintenance(host.id, host.name):
-            running_vms = k.host_get_vms(host)
-            message = "Enabling maintenance mode for %s failed, we have %s VMs still running. Will retry.." \
-                  % (host.name, running_vms)
-            c.print_message(message=message, message_type="Warning", to_slack=True)
-
-            if not c.startMaintenance(host.id, host.name):
-                message = "Enabling maintenance mode hypervisor %s failed again." % host.name
-                c.print_message(message=message, message_type="Warning", to_slack=True)
-
-        message = "Waiting for host %s to reach Maintenance state" % host.name
-        c.print_message(message=message, message_type="Note", to_slack=True)
-
-        while True:
-            hostData = c.getHostData({'hostid': host.id})
-            if hostData[0].resourcestate == "Maintenance":
-                break
-            sys.stdout.write(".")
-            sys.stdout.flush()
-            time.sleep(5)
-
-    message = "Host %s is in Maintenance state" % host.name
-    c.print_message(message=message, message_type="Note", to_slack=True)
-
     # Reboot host
-    message = "About to reboot hypervisor %s" % host.name
+    message = "Will execute post_empty scripts, then reboot hypervisor %s" % host.name
     if halt_hypervisor:
         message = "About to halt hypervisor %s. Be sure to start it manually for the procedure to continue!" % host.name
     if force_reset_hypervisor:
@@ -348,10 +346,11 @@ for host in cluster_hosts:
     message = "Reboot/Halt/Force-reset was successful for %s." % host.name
     c.print_message(message=message, message_type="Note", to_slack=True)
 
-    # Cancel maintenance mode
-    message = "Cancelling Maintenance mode for %s" % host.name
-    c.print_message(message=message, message_type="Note", to_slack=False)
-    c.cancelHostMaintenance(host.id)
+    # Enable host
+    if not c.updateHost({'hostid': host.id, 'allocationstate': "Enable"}):
+        message = "Enabling host %s failed! Please investigate.." \
+                  % (host.name)
+        c.print_message(message=message, message_type="Warning", to_slack=True)
 
     # Wait until agent is connected
     message = "Waiting for %s to connect to Cosmic.." % host.name
