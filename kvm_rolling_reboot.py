@@ -319,7 +319,7 @@ for host in cluster_hosts:
 
     if not k.host_reboot(host, halt_hypervisor=halt_hypervisor, force_reset_hypervisor=force_reset_hypervisor):
         message = "Reboot/Halt/Force-reset failed for %s. Please investigate.." % host.name
-        c.print_message(message=message, message_type="Note", to_slack=True)
+        c.print_message(message=message, message_type="Error", to_slack=True)
         sys.exit(1)
 
     message = "Reboot/Halt/Force-reset was successful for %s." % host.name
