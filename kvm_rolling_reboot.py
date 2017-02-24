@@ -53,6 +53,10 @@ def handleArguments(argv):
     ignoreHostList = ""
     global ignoreHosts
     ignoreHosts = ''
+    global onlyHosts
+    onlyHosts = ''
+    global onlyHostList
+    onlyHostList = ""
     global threads
     threads = 5
     global halt_hypervisor
@@ -75,6 +79,8 @@ def handleArguments(argv):
         '\n  --clustername -n <clustername> \t\tName of the cluster to work with' + \
         '\n  --ignore-hosts <list>\t\t\t\tSkip work on the specified hosts (for example if you need to resume): ' \
         'Example: --ignore-hosts="host1, host2" ' + \
+        '\n  --only-hosts <list>\t\t\t\tOnly execute work on the specified hosts (for example if you need to resume): ' \
+        'Example: --only-hosts="host1, host2" ' + \
         '\n  --threads <nr>\t\t\t\tUse this number or concurrent migration threads ' + \
         '\n  --halt\t\t\t\t\tInstead of the default reboot, halt the hypervisor (useful in case of hardware ' \
         'upgrades) ' + \
@@ -92,7 +98,7 @@ def handleArguments(argv):
     try:
         opts, args = getopt.getopt(
             argv, "hc:n:t:p", [
-                "credentials-file=", "clustername=", "ignore-hosts=", "threads=", "pre-empty-script=",
+                "credentials-file=", "clustername=", "ignore-hosts=", "only-hosts=", "threads=", "pre-empty-script=",
                 "post-empty-script=", "force-reset-hypervisor", "no-bond-check", "halt", "debug", "exec",
                 "post-reboot-script=", "prepare"])
     except getopt.GetoptError as e:
@@ -112,6 +118,8 @@ def handleArguments(argv):
             threads = arg
         elif opt in ("--ignore-hosts"):
             ignoreHostList = arg
+        elif opt in ("--only-hosts"):
+            onlyHostList = arg
         elif opt in ("--halt"):
             halt_hypervisor = True
         elif opt in ("--force-reset-hypervisor"):
@@ -140,6 +148,12 @@ def handleArguments(argv):
         ignoreHosts = ignoreHostList.replace(' ', '').split(",")
     else:
         ignoreHosts = []
+
+    # Only host list
+    if len(onlyHostList) > 0:
+        onlyHosts = onlyHostList.replace(' ', '').split(",")
+    else:
+        onlyHosts = []
 
     # We need at least a cluster name
     if len(clustername) == 0:
@@ -197,10 +211,6 @@ first_host = cluster_hosts[0]
 print "Note: Gathering some info about cluster '" + clustername + "':"
 c.printCluster(clusterID, "KVM")
 
-# Hosts to ignore
-if len(ignoreHosts) > 0:
-    print "Note: Ignoring these hosts: " + str(ignoreHosts)
-
 # Put the scripts we need
 for host in cluster_hosts:
     k.put_scripts(host)
@@ -240,6 +250,14 @@ if DRYRUN == 1:
     print "      - continues to the next hypervisor"
     print "Then the reboot cyclus for " + clustername + " is done!"
     print
+
+    # Hosts to ignore
+    if len(ignoreHosts) > 0:
+        print "Note: Ignoring these hosts: " + str(ignoreHosts)
+
+    if len(onlyHosts) > 0:
+        print "Note: Only processing these hosts: " + str(onlyHosts)
+
     print "To kick it off, run with the --exec flag."
     print
     disconnect_all()
@@ -254,6 +272,11 @@ for host in cluster_hosts:
     c.slack_custom_value = host.name
     if host.name in ignoreHosts:
         message = "Skipping %s due to --ignore-hosts setting" % host.name
+        c.print_message(message=message, message_type="Warning", to_slack=False)
+        continue
+
+    if len(onlyHosts) > 0 and host.name not in onlyHosts:
+        message = "Skipping %s due to --only-hosts setting" % host.name
         c.print_message(message=message, message_type="Warning", to_slack=False)
         continue
 
