@@ -276,7 +276,7 @@ class Kvm(hypervisor.hypervisor):
     def get_bond_status(self, host):
         try:
             with settings(host_string=self.ssh_user + "@" + host.ipaddress, use_sudo=True):
-                return fab.run("bash /tmp/kvm_check_bonds.sh | awk {'print $1'} | tr -d \":\"")
+                return fab.run("bash /tmp/kvm_check_bonds.sh bond0 | awk {'print $1'} | tr -d \":\"")
         except:
             return False
 
