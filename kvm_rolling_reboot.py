@@ -235,6 +235,7 @@ if DRYRUN == 1:
     print "      - when empty, it will reboot the hypervisor"
     print "        (halting is " + str(halt_hypervisor) + ") and (force_reset is " + str(force_reset_hypervisor) + ")"
     print "      - will wait for it to come back online (checks SSH connection)"
+    print "      - execute the --post-reboot-script script '" + post_reboot_script + "' on the hypervisor"
     print "      - cancel Maintenance mode"
     print "      - continues to the next hypervisor"
     print "Then the reboot cyclus for " + clustername + " is done!"
