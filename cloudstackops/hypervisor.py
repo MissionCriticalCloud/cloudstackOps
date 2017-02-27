@@ -66,6 +66,7 @@ class hypervisor(object):
         # Remove progress indication
         sys.stdout.write("\033[F")
         print "Note: Host " + host.name + " is now offline!                           "
+        time.sleep(120)
 
     # Execute script on hypervisor
     def exec_script_on_hypervisor(self, host, script):

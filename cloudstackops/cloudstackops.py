@@ -1654,7 +1654,8 @@ class CloudStackOps(CloudStackOpsBase):
                 # vm.memory is in Mega Bytes
                 if requestedMemory is not None:
                     if memoryavailable < requestedMemory:
-                        print "Warning: Skipping " + h.name + " as it has not enough memory."
+                        if self.DEBUG == 1:
+                            print "Warning: Skipping " + h.name + " as it has not enough memory."
                         continue
 
                 # Find host with most memory free
