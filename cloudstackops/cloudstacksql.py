@@ -200,7 +200,7 @@ class CloudStackSQL(CloudStackOpsBase):
         return result
 
     # list ip adress info
-    def getpIpAddressData(self, ipaddress):
+    def getIpAddressDataBridge(self, ipaddress):
         if not self.conn:
             return 1
 
@@ -212,6 +212,27 @@ class CloudStackSQL(CloudStackOpsBase):
         JOIN networks ON networks.id = vm_network_map.network_id \
         JOIN user_ip_address ON networks.id = user_ip_address.network_id \
         WHERE user_ip_address.public_ip_address LIKE '%" + ipaddress  + "%' ;")
+
+        result = cursor.fetchall()
+        cursor.close()
+
+        return result
+
+    # list ip adress info
+    def getIpAddressDataInfra(self, ipaddress):
+        if not self.conn:
+            return 1
+
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT DISTINCT \
+        name, \
+        nics.vm_type, \
+        nics.state, \
+        ip4_address, \
+        instance_id \
+        FROM nics \
+        JOIN vm_instance on vm_instance.id = nics.instance_id \
+        WHERE nics.ip4_address LIKE '%" + ipaddress  + "%' ;")
 
         result = cursor.fetchall()
         cursor.close()
@@ -240,6 +261,9 @@ class CloudStackSQL(CloudStackOpsBase):
         AND mac_address \
         LIKE '%" + macaddress  + "%' \
         AND nics.removed is null;")
+        result = cursor.fetchall()
+        cursor.close()
+
         result = cursor.fetchall()
         cursor.close()
 
