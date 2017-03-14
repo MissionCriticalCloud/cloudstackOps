@@ -103,6 +103,7 @@ if DRYRUN == 1:
     print "# Warning: dry-run mode is enabled, not running any commands!"
 
 db = []
+dbHost = ''
 if mysqlHost == 'any':
     db = s.getAllDB()
 else:
@@ -144,6 +145,7 @@ for mysqlHost in db:
             created,
             vmname) in ipaddresses:
         counter = counter + 1
+        dbHost = mysqlHost
         if networkname is None:
           networknamenone =  networknamenone + 1
     
@@ -163,7 +165,7 @@ for mysqlHost in db:
     # When not found a vm name in the VPC query check the bridged networks
     if counter == networknamenone:
       countera = 0
-      ipaddresses = s.getpIpAddressData(ipaddress)
+      ipaddresses = s.getIpAddressDataBridge(ipaddress)
       r = PrettyTable(["VM name",
                        "State",
                        "Ipv4",
@@ -187,6 +189,7 @@ for mysqlHost in db:
               state,
               networkname) in ipaddresses:
           countera = countera + 1 
+          dbHost = mysqlHost
     
           vmname = (vmname[:22] + '..') if len(vmname) > 24 else vmname
           networkname = (
@@ -197,15 +200,57 @@ for mysqlHost in db:
                      ip4_address,
                      state,
                      created])
-    
+
+    # When not found a vm name in the VPC query and the bridged networks check the infra
+    if counter == networknamenone and countera == networknamenone:
+      counterb = 0
+      ipaddresses = s.getIpAddressDataInfra(ipaddress)
+      u = PrettyTable(["VM name",
+                       "VM Type",
+                       "Ipv4",
+                       "Instance ID",
+                       "State"])
+      u.align["VM name"] = "l"
+      u.align["VM Type"] = "l"
+
+      u = PrettyTable(["VM name",
+                       "VM Type",
+                       "Ipv4",
+                       "Instance ID",
+                       "State"])
+      u.align["VM name"] = "l"
+      u.align["Ipv4"] = "l"
+
+      for (
+              vmname,
+              vmtype,
+              ip4_address,
+              instance_id,
+              state) in ipaddresses:
+          counterb = counterb + 1
+          dbHost = mysqlHost
+
+          vmname = (vmname[:22] + '..') if len(vmname) > 24 else vmname
+          u.add_row([vmname,
+                     vmtype,
+                     ip4_address,
+                     instance_id,
+                     state])
+
     # Disconnect MySQL
     s.disconnectMySQL()
    
-    if counter <> 0 and countera <> 0:
-        print "VPC results:"
+    if counter <> 0:
+        print "Results: " + dbHost + "\n"
         print t
         print "Note: Found " + str(counter) + " results."
-        print "\nBridge results:"
-        print r 
+    elif countera <> 0:
+        print "Results: " + dbHost + "\n"
+        print r
         print "Note: Found " + str(countera) + " results."
-        
+    elif counterb <> 0:
+        print "Results:"  + dbHost + "\n"
+        print u
+        print "Note: Found " + str(counterb) + " results."
+
+
