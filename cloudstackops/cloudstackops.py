@@ -24,6 +24,7 @@
 from cloudstackopsbase import *
 # Import our dependencies
 import smtplib
+import operator
 from email.mime.text import MIMEText
 from email.mime.image import MIMEImage
 from email.mime.multipart import MIMEMultipart
@@ -1598,29 +1599,34 @@ class CloudStackOps(CloudStackOpsBase):
 
     # Check vm's still running on this host
     def getVirtualMachinesRunningOnHost(self, hostID):
+        all_vmdata = ()
+        vms = self.listVirtualmachines({'hostid': hostID, 'listAll': 'true'}),
+        pvms = self.listVirtualmachines({'hostid': hostID, 'listAll': 'true', 'isProjectVm': 'true'}),
+        routers = self.getRouterData({'hostid': hostID, 'listAll': 'true'}),
+        prouters = self.getRouterData({'hostid': hostID, 'listAll': 'true', 'isProjectVm': 'true'}),
+        svms = self.getSystemVmData({'hostid': hostID})
 
-        all_vmdata = []
-        all_vmdata.append(
-            self.listVirtualmachines({'hostid': hostID, 'listAll': 'true'}))
-        all_vmdata.append(self.listVirtualmachines(
-            {'hostid': hostID, 'listAll': 'true', 'isProjectVm': 'true'}))
-        all_vmdata.append(
-            self.getRouterData({'hostid': hostID, 'listAll': 'true'}))
-        all_vmdata.append(
-            self.getRouterData({'hostid': hostID, 'listAll': 'true', 'isProjectVm': 'true'}))
-        all_vmdata.append(self.getSystemVmData({'hostid': hostID}))
+        if not None in vms:
+            all_vmdata += vms
+        if not None in pvms:
+            all_vmdata += pvms
+        if not None in routers:
+            all_vmdata += routers
+        if not None in prouters:
+            all_vmdata += prouters
+        if svms is not None:
+            for vm in svms:
+                all_vmdata[0].append(vm)
 
-        if self.DEBUG == 1:
-            if all_vmdata is not None:
-                for vmdata in all_vmdata:
-                    if vmdata is not None:
-                        for v in vmdata:
-                            if v is not None:
-                                print v.name
-            print "Debug: Combined vmdata"
+        # Sort VM list on memory
+        if len(all_vmdata) > 0 :
+            all_vmdata[0].sort(key=operator.attrgetter('memory'), reverse=True)
+
+        if self.DEBUG:
             print all_vmdata
 
         return all_vmdata
+
 
     # Find suitable host
     def findBestMigrationHost(
