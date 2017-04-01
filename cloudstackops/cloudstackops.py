@@ -563,6 +563,7 @@ class CloudStackOps(CloudStackOpsBase):
         apicall.networkid = (
             str(args['networkid'])) if 'networkid' in args else None
         apicall.name = (str(args['name'])) if 'name' in args else None
+        apicall.id = (str(args['id'])) if 'id' in args else None
         apicall.listAll = (args['listAll']) if 'listAll' in args else 'true'
         apicall.requiresupgrade = (
             str(args['requiresupgrade'])) if 'requiresupgrade' in args else None
@@ -739,10 +740,31 @@ class CloudStackOps(CloudStackOpsBase):
         return self._callAPI(apicall)
 
     # migrateSystemVm
-    def migrateSystemVm(self, vmid, hostid):
+    def migrateSystemVm(self, args):
+        args = self.remove_empty_values(args)
+        if not 'vmid' in args:
+            return False
+        if not 'projectParam' in args:
+            args['projectParam'] = "false"
+        systemvm = self.getRouterData({'id': args['vmid'], 'isProjectVm': args['projectParam']})[0]
+        if self.DEBUG:
+            print "Received systemvm:"
+            print systemvm
+
+        if not 'hostid' in args:
+            requested_memory = self.get_needed_memory(systemvm)
+            host_data = self.getHostData({'hostid': systemvm.hostid})[0]
+            if self.DEBUG:
+                print "Received host_data:"
+                print host_data
+            migration_host = self.findBestMigrationHost(
+                host_data.clusterid,
+                host_data.name,
+                requested_memory)
+
         apicall = migrateSystemVm.migrateSystemVmCmd()
-        apicall.virtualmachineid = str(vmid)
-        apicall.hostid = str(hostid)
+        apicall.virtualmachineid = (str(args['vmid'])) if 'vmid' in args else None
+        apicall.hostid = (str(args['hostid'])) if 'hostid' in args else migration_host.id
 
         # Call CloudStack API
         return self._callAPI(apicall)
@@ -1710,18 +1732,7 @@ class CloudStackOps(CloudStackOpsBase):
                     sys.stdout.flush()
                     vmresult = 1
                     if self.DRYRUN == 0:
-                        if vm.memory is None:
-                            # Try to get the memory of systemvms from their offering
-                            if bool(re.search('[rvs]-([\d])*-VM', vm.name)) and vm.serviceofferingid is not None:
-                                serviceOfferingData = self.listServiceOfferings(
-                                    {'serviceofferingid': vm.serviceofferingid, 'issystem': 'true'})
-                                vm.memory = serviceOfferingData[0].memory
-                                if self.DEBUG == 1:
-                                    print "DEBUG: Set memory to the value in the service offering: %s" % str(serviceOfferingData[0].memory)
-                            # Else, fail back to a 1GB default
-                            else:
-                                vm.memory = 1024
-                        requested_memory = int(vm.memory) * 1024 * 1024
+                        requested_memory = self.get_needed_memory(vm)
                         migrationHost = self.findBestMigrationHost(
                             foundHostData.clusterid,
                             hostname,
@@ -1735,9 +1746,10 @@ class CloudStackOps(CloudStackOpsBase):
 
                             # Systemvm or instance
                             if bool(re.search('[rvs]-([\d])*-VM', vm.name)):
-                                vmresult = self.migrateSystemVm(
-                                    vm.id,
-                                    migrationHost.id)
+                                vmresult = self.migrateSystemVm({
+                                    'vmid': vm.id,
+                                    'hostid': migrationHost.id
+                                })
                                 instance = vm.name
                             else:
                                 vmresult = self.migrateVirtualMachine(
@@ -1827,3 +1839,17 @@ class CloudStackOps(CloudStackOpsBase):
             return False
         else:
             return True
+
+    def get_needed_memory(self, system_vm):
+        if system_vm.memory is None:
+            # Try to get the memory of systemvms from their offering
+            if bool(re.search('[rvs]-([\d])*-VM', system_vm.name)) and system_vm.serviceofferingid is not None:
+                serviceOfferingData = self.listServiceOfferings(
+                    {'serviceofferingid': system_vm.serviceofferingid, 'issystem': 'true'})
+                system_vm.memory = serviceOfferingData[0].memory
+                if self.DEBUG == 1:
+                    print "DEBUG: Set memory to the value in the service offering: %s" % str(serviceOfferingData[0].memory)
+                # Else, fail back to a 1GB default
+            else:
+                system_vm.memory = 1024
+        return int(system_vm.memory) * 1024 * 1024
