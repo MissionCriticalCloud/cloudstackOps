@@ -148,7 +148,8 @@ if vm.state != "Running":
     c.print_message(message=message, message_type="Error", to_slack=to_slack)
     sys.exit(1)
 
-clusterData = c.listClusters({'id': vm.clusterid})
+hostData = c.getHostData({'hostid': vm.hostid})[0]
+clusterData = c.listClusters({'id': hostData.clusterid})
 c.cluster = clusterData[0].name
 
 # Get user data to e-mail
