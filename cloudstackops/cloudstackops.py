@@ -1527,6 +1527,7 @@ class CloudStackOps(CloudStackOpsBase):
                     print "Debug: Looking for poolmaster"
                 poolmaster = self.xenserver.get_poolmaster(clusterhost)
 
+            if hypervisor == "XenServer":
                 # Poolmaster
                 if clusterhost.name == poolmaster.strip():
                     pm = "<------"
