@@ -403,7 +403,7 @@ class xenserver(hypervisor.hypervisor):
         print "Note: We're uploading the patches to XenServer"
         try:
             with settings(show('output'), host_string=self.ssh_user + "@" + host.ipaddress):
-                return fab.run("bash /root/xenserver_patches/xenserver_upload_patches_to_poolmaster.sh")
+                return fab.run("/usr/bin/test -f /root/xenserver_patches/xenserver_upload_patches_to_poolmaster.sh && bash /root/xenserver_patches/xenserver_upload_patches_to_poolmaster.sh")
         except:
             return False
 
