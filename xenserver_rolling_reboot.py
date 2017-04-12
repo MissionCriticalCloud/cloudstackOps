@@ -316,14 +316,20 @@ if poolmaster.name not in ignoreHosts:
     with open(patch_list_file) as file_pointer:
         patches = file_pointer.read().splitlines()
 
+    patch_count = 0
     for patch_url in patches:
         message = "Processing patch '%s'" % patch_url
         c.print_message(message=message, message_type="Note", to_slack=False)
         x.download_patch(patch_url)
+        patch_count += 1
 
-    # Upload the patches to poolmaster, then to XenServer
-    x.put_patches_to_poolmaster(poolmaster)
-    x.upload_patches_to_xenserver(poolmaster)
+    if patch_count > 0:
+        # Upload the patches to poolmaster, then to XenServer
+        x.put_patches_to_poolmaster(poolmaster)
+        x.upload_patches_to_xenserver(poolmaster)
+    else:
+        message = "No patches to apply, just rebooting"
+        c.print_message(message=message, message_type="Note", to_slack=to_slack)
 
     # Migrate all VMs off of pool master
     vm_count = x.host_get_vms(poolmaster)
