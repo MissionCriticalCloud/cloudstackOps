@@ -147,6 +147,11 @@ if __name__ == '__main__':
 
 # Init CloudStack class
 c = cloudstackops.CloudStackOps(DEBUG, DRYRUN)
+c.task = "XenServer Rolling Reboot"
+c.slack_custom_title = "Hypervisor"
+c.slack_custom_value = ""
+c.instance_name = "N/A"
+c.cluster = clustername
 
 # Init XenServer class
 x = xenserver.xenserver('root', threads, pre_empty_script, post_empty_script)
@@ -163,6 +168,10 @@ if DEBUG == 1:
     print "ApiKey: " + c.apikey
     print "SecretKey: " + c.secretkey
 
+to_slack = True
+if DRYRUN == 1:
+    to_slack = False
+
 # Check cloudstack IDs
 if DEBUG == 1:
     print "Note: Checking IDs of provided input.."
@@ -178,20 +187,25 @@ cluster_hosts = c.getAllHostsFromCluster(clusterID)
 first_host = cluster_hosts[0]
 
 # Print cluster info
-print "Note: Some info about cluster '" + clustername + "':"
+message = "Some info about cluster '" + clustername + "':"
+c.print_message(message=message, message_type="Note", to_slack=False)
 c.printCluster(clusterID)
 
 # Hosts to ignore
 if len(ignoreHosts) > 0:
-    print "Note: Ignoring these hosts: " + str(ignoreHosts)
+    message = "Ignoring these hosts: " + str(ignoreHosts)
+    c.print_message(message=message, message_type="Note", to_slack=to_slack)
 
 # Get poolmaster
 poolmaster_name = x.get_poolmaster(first_host)
 if not poolmaster_name:
-    print "Error: unable to figure out the poolmaster while talking to " + first_host
+    message = "unable to figure out the poolmaster while talking to " + first_host
+    c.print_message(message=message, message_type="Error", to_slack=to_slack)
     disconnect_all()
     sys.exit(1)
-print "Note: The poolmaster of cluster " + clustername + " is " + poolmaster_name
+message = "The poolmaster of cluster " + clustername + " is " + poolmaster_name
+c.print_message(message=message, message_type="Note", to_slack=to_slack)
+c.slack_custom_value = poolmaster_name
 
 # Put the scripts we need
 for h in cluster_hosts:
@@ -206,15 +220,17 @@ for h in cluster_hosts:
 if DRYRUN == 0 or PREPARE == 1:
     eject_result = x.eject_cds(poolmaster)
     if eject_result == False:
-        print "Warning: Ejecting CDs failed. Continuing anyway."
+        message = "Ejecting CDs failed. Continuing anyway."
+        c.print_message(message=message, message_type="Warning", to_slack=to_slack)
 
 # Print overview
 checkBonds = True
 c.printHypervisors(clusterID, poolmaster.name, checkBonds)
 
 if halt_hypervisor:
-    print "Warning: Instead of reboot, we will halt the hypervisor. You need to start it yourself for the script to" \
+    message = "Instead of reboot, we will halt the hypervisor. You need to start it yourself for the script to" \
           " continue moving to the next hypervisor."
+    c.print_message(message=message, message_type="Warning", to_slack=False)
 
 if DRYRUN == 1:
     print
@@ -245,53 +261,64 @@ if DRYRUN == 1:
     sys.exit(1)
 
 # Start time
-print "Note: Starting @ " + time.strftime("%Y-%m-%d %H:%M")
+message = "Starting @ " + time.strftime("%Y-%m-%d %H:%M")
+c.print_message(message=message, message_type="Note", to_slack=False)
 
 # Check HA of Cluster
 pool_ha = x.pool_ha_check(poolmaster)
 if pool_ha == "Error":
-    print "Error: Unable to get the current HA state of cluster " + clustername
+    message = "Error: Unable to get the current HA state of cluster " + clustername
+    c.print_message(message=message, message_type="Error", to_slack=to_slack)
     disconnect_all()
     sys.ext(1)
-print "Note: The state of HA on cluster " + clustername + " is " + str(pool_ha)
+message = "The state of HA on cluster " + clustername + " is " + str(pool_ha)
+c.print_message(message=message, message_type="Note", to_slack=to_slack)
 
 # Disable HA
 if pool_ha:
     pool_ha_result = x.pool_ha_disable(poolmaster)
     if pool_ha_result == "Error":
-        print "Error: Unable to set the HA state to Disabled for cluster " + clustername
+        message = "Unable to set the HA state to Disabled for cluster " + clustername
+        c.print_message(message=message, message_type="Error", to_slack=to_slack)
         disconnect_all()
         sys.exit(1)
     pool_ha = x.pool_ha_check(poolmaster)
-    print "Note: The state of HA on cluster " + clustername + " is " + str(pool_ha)
+    message = "The state of HA on cluster " + clustername + " is " + str(pool_ha)
+    c.print_message(message=message, message_type="Note", to_slack=to_slack)
 
 # Do the poolmaster first
 if poolmaster.name not in ignoreHosts:
 
     # BEFORE: Set to Unmanage
-    print "Note: Setting cluster " + clustername + " to Unmanaged"
+    message = "Setting cluster " + clustername + " to Unmanaged"
+    c.print_message(message=message, message_type="Note", to_slack=to_slack)
     clusterUpdateReturn = c.updateCluster(
         {'clusterid': clusterID, 'managedstate': 'Unmanaged'})
 
     if clusterUpdateReturn == 1 or clusterUpdateReturn is None:
-        print "Error: Unmanaging cluster " + clustername + " failed. Halting."
+        message = "Unmanaging cluster " + clustername + " failed. Halting."
+        c.print_message(message=message, message_type="Error", to_slack=to_slack)
         disconnect_all()
         sys.exit(1)
 
     # Download all XenServer patches
     if not preserve_downloads:
-        print "Note: Deleting previously downloaded patches"
+        message = "Deleting previously downloaded patches"
+        c.print_message(message=message, message_type="Note", to_slack=False)
         files = glob.glob('xenserver_patches/*.zip')
         for f in files:
-            print "Note: Removing previously downloaded patch " + f
+            message = "Removing previously downloaded patch " + f
+            c.print_message(message=message, message_type="Note", to_slack=False)
             os.remove(f)
 
-    print "Note: Reading patches list '%s'" % patch_list_file
+    message = "Reading patches list '%s'" % patch_list_file
+    c.print_message(message=message, message_type="Note", to_slack=False)
     with open(patch_list_file) as file_pointer:
         patches = file_pointer.read().splitlines()
 
     for patch_url in patches:
-        print "Note: Processing patch '%s'" % patch_url
+        message = "Processing patch '%s'" % patch_url
+        c.print_message(message=message, message_type="Note", to_slack=False)
         x.download_patch(patch_url)
 
     # Upload the patches to poolmaster, then to XenServer
@@ -301,66 +328,82 @@ if poolmaster.name not in ignoreHosts:
     # Migrate all VMs off of pool master
     vm_count = x.host_get_vms(poolmaster)
     if vm_count:
-        print "Note: " + poolmaster.name + " (poolmaster) has " + vm_count + " VMs running."
+        message = poolmaster.name + " (poolmaster) has " + vm_count + " VMs running. Live migrating VMs to make it empty, then reboot it."
+        c.print_message(message=message, message_type="Note", to_slack=to_slack)
         reboot_result = x.host_reboot(poolmaster, halt_hypervisor)
         if reboot_result is False:
-            print "Error: Stopping sequence, as a reboot failed. Please investigate."
+            message = "Stopping sequence, as a reboot failed. Please investigate."
+            c.print_message(message=message, message_type="Error", to_slack=to_slack)
             x.roll_back(poolmaster)
             disconnect_all()
             sys.exit(1)
     else:
-        print "Error: Unable to contact the poolmaster " + poolmaster.name
+        message = "Unable to contact the poolmaster " + poolmaster.name
+        c.print_message(message=message, message_type="Error", to_slack=to_slack)
         disconnect_all()
         sys.exit(1)
 
     # AFTER: Set to Manage
-    print "Note: Setting cluster " + clustername + " back to Managed"
+    message = "Setting cluster " + clustername + " back to Managed"
+    c.print_message(message=message, message_type="Note", to_slack=to_slack)
     clusterUpdateReturn = c.updateCluster(
         {'clusterid': clusterID, 'managedstate': 'Managed'})
 
     if clusterUpdateReturn == 1 or clusterUpdateReturn is None:
-        print "Error: Managing cluster " + clustername + " failed. Please check manually."
+        message = "Managing cluster " + clustername + " failed. Please check manually."
+        c.print_message(message=message, message_type="Error", to_slack=to_slack)
         disconnect_all()
         sys.exit(1)
 
-    print "Note: Waiting 60s to allow all hosts connect.."
+    message = "Waiting 60s to allow all hosts connect.."
+    c.print_message(message=message, message_type="Note", to_slack=False)
     time.sleep(60)
 
 else:
-        print "Warning: Skipping " + poolmaster.name + " due to --ignore-hosts setting"
+        message = "Skipping " + poolmaster.name + " due to --ignore-hosts setting"
+        c.print_message(message=message, message_type="Warning", to_slack=to_slack)
 
 # Print overview
 checkBonds = True
 c.printHypervisors(clusterID, poolmaster.name, checkBonds)
 
 # Print cluster info
-print "Note: Some info about cluster '" + clustername + "':"
+message = "Some info about cluster '" + clustername + "':"
+c.print_message(message=message, message_type="Note", to_slack=False)
 c.printCluster(clusterID)
 
 # Then the other hypervisors, one-by-one
 for h in cluster_hosts:
+    c.slack_custom_value = h.name
+
     if h.name in ignoreHosts:
-        print "Warning: Skipping " + h.name + " due to --ignore-hosts setting"
+        message = "Skipping " + h.name + " due to --ignore-hosts setting"
+        c.print_message(message=message, message_type="Note", to_slack=to_slack)
         continue
 
     if h.name == poolmaster.name:
-        print "Note: Skipping poolmaster"
+        message = "Skipping poolmaster"
+        c.print_message(message=message, message_type="Note", to_slack=False)
         continue
     vm_count = x.host_get_vms(h)
     if vm_count:
-        print "Note: " + h.name + " has " + vm_count + " VMs running."
+        message = h.name + " has " + vm_count + " VMs running. Live migrating VMs to make it empty, then reboot it."
+        c.print_message(message=message, message_type="Note", to_slack=to_slack)
         reboot_result = x.host_reboot(h, halt_hypervisor)
         if reboot_result is False:
-            print "Error: Stopping sequence, as a reboot failed. Please investigate."
+            message = "Stopping sequence, as a reboot failed. Please investigate."
+            c.print_message(message=message, message_type="Error", to_slack=to_slack)
             x.roll_back(h)
             disconnect_all()
             sys.exit(1)
     else:
-        print "Error: Unable to get vm_count from host " + h.name
+        message = "Unable to get vm_count from host " + h.name
+        c.print_message(message=message, message_type="Error", to_slack=to_slack)
         x.roll_back(h)
         disconnect_all()
         sys.exit(1)
-    print "Note: We completed host " + h.name + " successfully."
+    message = "We completed host " + h.name + " successfully."
+    c.print_message(message=message, message_type="Note", to_slack=to_slack)
 
     # Print overview
     checkBonds = True
@@ -369,25 +412,32 @@ for h in cluster_hosts:
 # Enable HA
 pool_ha_result = x.pool_ha_enable(poolmaster)
 if pool_ha_result is False:
-    print "Warning: Unable to set the HA state to Enable for cluster " + clustername
+    message = "Unable to set the HA state to Enable for cluster " + clustername
+    c.print_message(message=message, message_type="Warning", to_slack=to_slack)
 
 # Check HA
 pool_ha = x.pool_ha_check(poolmaster)
 if pool_ha == "Error":
-    print "Error: Unable to get the current HA state of cluster " + clustername
+    message = "Unable to get the current HA state of cluster " + clustername
+    c.print_message(message=message, message_type="Error", to_slack=to_slack)
     disconnect_all()
     sys.ext(1)
-print "Note: The state of HA on cluster " + clustername + " is " + str(pool_ha)
+message = "The state of HA on cluster " + clustername + " is " + str(pool_ha)
+c.print_message(message=message, message_type="Note", to_slack=to_slack)
 
 # Print cluster info
-print "Note: Some info about cluster '" + clustername + "':"
+message = "Some info about cluster '" + clustername + "':"
+c.print_message(message=message, message_type="Note", to_slack=False)
 c.printCluster(clusterID)
 
 # Disconnect
 disconnect_all()
 
 # Done
-print "Note: We're done with cluster " + clustername
+message = "We're done with cluster " + clustername
+c.print_message(message=message, message_type="Note", to_slack=to_slack)
 
 # End time
-print "Note: Finished @ " + time.strftime("%Y-%m-%d %H:%M")
+message = "Finished @ " + time.strftime("%Y-%m-%d %H:%M")
+c.print_message(message=message, message_type="Note", to_slack=False)
+
