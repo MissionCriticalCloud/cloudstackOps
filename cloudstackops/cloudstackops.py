@@ -57,6 +57,7 @@ class CloudStackOps(CloudStackOpsBase):
 
     # Init function
     def __init__(self, debug=0, dryrun=0, force=0):
+        # type: (object, object, object) -> object
         self.apikey = ''
         self.secretkey = ''
         self.api = ''
@@ -671,6 +672,24 @@ class CloudStackOps(CloudStackOpsBase):
     def destroyRouter(self, vmid):
         apicall = destroyRouter.destroyRouterCmd()
         apicall.id = str(vmid)
+
+        # Call CloudStack API
+        return self._callAPI(apicall)
+
+    # Restart isolated network
+    def restartNetwork(self, vmid, cleanup='true'):
+        apicall = restartNetwork.restartNetworkCmd()
+        apicall.id = str(vmid)
+        apicall.cleanup = str(cleanup)
+
+        # Call CloudStack API
+        return self._callAPI(apicall)
+
+    # Restart VPC network
+    def restartVPC(self, vmid, cleanup='true'):
+        apicall = restartVPC.restartVPCCmd()
+        apicall.id = str(vmid)
+        apicall.cleanup = str(cleanup)
 
         # Call CloudStack API
         return self._callAPI(apicall)

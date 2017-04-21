@@ -47,6 +47,8 @@ def handleArguments(argv):
     isProjectVm = 0
     global onlyRequired
     onlyRequired = 0
+    global CLEANUP
+    CLEANUP = 0
 
     # Usage message
     help = "Usage: ./" + os.path.basename(__file__) + ' [options] ' + \
@@ -54,13 +56,14 @@ def handleArguments(argv):
         '\n  --routerinstance-name -r <name>\tWork with this router (r-12345-VM)' + \
         '\n  --is-projectrouter\t\t\tThe specified router belongs to a project' + \
         '\n  --only-when-required\t\t\tOnly reboot when the RequiresUpgrade flag is set' + \
+        '\n  --cleanup\t\t\t\tRestart router with cleanup' + \
         '\n  --debug\t\t\t\tEnable debug mode' + \
         '\n  --exec\t\t\t\tExecute for real'
 
     try:
         opts, args = getopt.getopt(
             argv, "hc:r:p", [
-                "config-profile=", "routerinstance-name=", "debug", "exec", "is-projectrouter", "only-when-required"])
+                "config-profile=", "routerinstance-name=", "debug", "exec", "cleanup", "is-projectrouter", "only-when-required"])
     except getopt.GetoptError:
         print help
         sys.exit(2)
@@ -72,6 +75,8 @@ def handleArguments(argv):
             configProfileName = arg
         elif opt in ("-r", "--routerinstance-name"):
             vmname = arg
+        elif opt in ("--cleanup"):
+            CLEANUP = 1
         elif opt in ("--debug"):
             DEBUG = 1
         elif opt in ("--exec"):
@@ -94,8 +99,9 @@ def handleArguments(argv):
 if __name__ == "__main__":
     handleArguments(sys.argv[1:])
 
-# Init our class
+# Init CloudStack class
 c = cloudstackops.CloudStackOps(DEBUG, DRYRUN)
+c.instance_name = "N/A"
 
 if DEBUG == 1:
     print "Warning: Debug mode is enabled!"
@@ -139,6 +145,14 @@ if DEBUG == 1:
 print "Note: Found router " + router.name + " that belongs to account " + str(router.account) + " with router ID " + router.id
 print "Note: This router has " + str(len(router.nic)) + " nics."
 
+# Pretty Slack messages
+c.instance_name = router.name
+c.slack_custom_title = "Domain"
+c.slack_custom_value = router.domain
+hostData = c.getHostData({'hostid': router.hostid})[0]
+clusterData = c.listClusters({'id': hostData.clusterid})
+c.cluster = clusterData[0].name
+
 # Does this router need an upgrade?
 if onlyRequired == 1 and router.requiresupgrade == 0:
     print "Note: This router does not need to be upgraded. Won't reboot because of --only-when-required flag. When you remove the flag and run the script again it will reboot anyway."
@@ -174,25 +188,74 @@ else:
     if DEBUG == 1:
         print emailbody
 
-# Reboot router
 if DRYRUN == 1:
     print "Note: Would have rebooted router " + router.name + " (" + router.id + ")"
 else:
-    print "Executing: reboot router " + router.name + " (" + router.id + ")"
-    result = c.rebootRouter(router.id)
-    if result == 1:
-        print "Rebooting failed, will try again!"
+    # Restart network with clean up
+    if CLEANUP == 1:
+        # If the network is a VPC
+        if router.vpcid:
+            c.task = "Restart VPC with clean up"
+            message = "Restarting router " + router.name + " with clean up (" + router.id + ") from VPC " + router.vpcname
+            c.print_message(message=message, message_type="Note", to_slack=True)
+            result = c.restartVPC(router.vpcid)
+            if result == 1:
+                print "Restarting failed, will try again!"
+                result = c.restartVPC(router.vpcid)
+                if result == 1:
+                    message = "Restarting (" + router.id + ") with clean up failed.\nError: investigate manually!"
+                    c.print_message(message=message, message_type="Error", to_slack=True)
+                    # Notify admin
+                    msgSubject = 'Warning: problem with maintenance for domain ' + \
+                        router.domain
+                    emailbody = "Could not restart router " + router.name + " with clean up."
+                    c.sendMail(c.mail_from, c.errors_to, msgSubject, emailbody)
+                    sys.exit(1)
+            else:
+                message = "Successfully restarted " + router.name + " (" + router.id + ") from VPC " + router.vpcname
+                c.print_message(message=message, message_type="Note", to_slack=True)
+        # If the network is a Isolated network
+        else:
+            c.task = "Restart isolated network with clean up"
+            message = "Restarting isolated network router " + router.name + " with clean up (" + router.id + ") from network " + router.guestnetworkname
+            c.print_message(message=message, message_type="Note", to_slack=True)
+            result = c.restartNetwork(router.guestnetworkid)
+            if result == 1:
+                print "Restarting failed, will try again!"
+                result = c.restartNetwork(router.guestnetworkid)
+                if result == 1:
+                    message = "Restarting (" + router.id + ") with clean up failed.\nError: investigate manually!"
+                    c.print_message(message=message, message_type="Error", to_slack=True)
+                    # Notify admin
+                    msgSubject = 'Warning: problem with maintenance for domain ' + \
+                        router.domain
+                    emailbody = "Could not restart router " + router.name + "with clean up."
+                    c.sendMail(c.mail_from, c.errors_to, msgSubject, emailbody)
+                    sys.exit(1)
+            else:
+                message = "Successfully restarted " + router.name + " (" + router.id + ") from network " + router.guestnetworkname
+                c.print_message(message=message, message_type="Note", to_slack=True)
+    else:
+        # Reboot router
+        c.task = "Reboot virtual router"
+        message = "Rebooting router " + router.name + " (" + router.id + ")"
+        c.print_message(message=message, message_type="Note", to_slack=True)
         result = c.rebootRouter(router.id)
         if result == 1:
-            print "Rebooting failed again -- exiting."
-            print "Error: investegate manually!"
-
-            # Notify admin
-            msgSubject = 'Warning: problem with maintenance for domain ' + \
-                router.domain
-            emailbody = "Could not reboot router " + router.name
-            c.sendMail(c.mail_from, c.errors_to, msgSubject, emailbody)
-            sys.exit(1)
+            print "Rebooting failed, will try again!"
+            result = c.rebootRouter(router.id)
+            if result == 1:
+                message = "Rebooting (" + router.id + ") failed.\nError: Investigate manually!"
+                c.print_message(message=message, message_type="Error", to_slack=True)
+                # Notify admin
+                msgSubject = 'Warning: problem with maintenance for domain ' + \
+                    router.domain
+                emailbody = "Could not reboot router " + router.name
+                c.sendMail(c.mail_from, c.errors_to, msgSubject, emailbody)
+                sys.exit(1)
+        else:
+            message = "Successfully rebooted " + router.name + " (" + router.id + ")"
+            c.print_message(message=message, message_type="Note", to_slack=True)
 
 # Get user data to e-mail
 if DRYRUN == 1:
