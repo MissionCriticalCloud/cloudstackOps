@@ -27,7 +27,7 @@ import getopt
 from cloudstackops import cloudstackops
 import os.path
 from prettytable import PrettyTable
-
+from distutils.version import LooseVersion
 
 # Function to handle our arguments
 def handleArguments(argv):
@@ -73,6 +73,11 @@ def handleArguments(argv):
     ignoreDomainList = ''
     global ignoreDomains
     ignoreDomains = ''
+    global routerMaxVersion
+    routerMaxVersion = '999'
+    global  routerMinVersion
+    routerMinVersion = '0'
+
 
     # Usage message
     help = "Usage: ./" + os.path.basename(__file__) + ' [options]' + \
@@ -96,6 +101,10 @@ def handleArguments(argv):
         'have at least --router-nic-count nics' + \
         '\n  --nic-count-is-maximum\t\tLimit search to router VMs that ' + \
         'have no more than --router-nic-count nics' + \
+        '\n  --router-max-version \t\t\tQuery for router VMs older than ' + \
+        'specificed version' + \
+        '\n  --router-min-version \t\t\tQuery for router VMs newer than ' + \
+        'specified version' + \
         '\n  --projectname -p \t\t\tLimit search to VMs in this project' + \
         '\n  --is-projectvm\t\t\tLimit search to VMs that belong to a ' + \
         'project' + \
@@ -120,7 +129,8 @@ def handleArguments(argv):
                 "no-routers", "only-routers",
                 "only-routers-to-be-upgraded",
                 "nic-count-is-minimum",
-                "nic-count-is-maximum", "ignore-domains="
+                "nic-count-is-maximum", "ignore-domains=",
+                "router-max-version=", "router-min-version="
             ]
         )
     except getopt.GetoptError as e:
@@ -177,6 +187,10 @@ def handleArguments(argv):
             routerNicCountIsMinimum = 1
         elif opt in ("--nic-count-is-maximum"):
             routerNicCountIsMaximum = 1
+        elif opt in ("--router-min-version"):
+            routerMinVersion = str(arg)
+        elif opt in ("--router-max-version"):
+            routerMaxVersion = str(arg)
 
     # Default to cloudmonkey default config file
     if len(configProfileName) == 0:
@@ -247,6 +261,7 @@ def printVirtualmachine(args):
                         vmstoragesize,
                         vmtemplatedisplaytext,
                         '-',
+                        '-',
                         vmmemory,
                         vm.cpunumber,
                         vm.instancename,
@@ -260,6 +275,7 @@ def printVirtualmachine(args):
                         vmname,
                         vmstoragesize,
                         vmtemplatedisplaytext,
+                        '-',
                         '-',
                         vmmemory,
                         vm.cpunumber,
@@ -358,6 +374,7 @@ if nonAdminCredentials == 1:
         "VM",
         "Storage",
         "Router nic count",
+        "Router version",
         "Memory",
         "Cores",
         "Instance",
@@ -429,6 +446,7 @@ for clusterid, clustername in clusters.items():
         "Storage",
         "Template",
         "Router nic count",
+        "Router version",
         "Memory",
         "Cores",
         "Instance",
@@ -505,7 +523,17 @@ for clusterid, clustername in clusters.items():
             if vm.domain in ignoreDomains:
                 continue
 
-            # Nic
+            # Router VM version
+            vmversion = str(vm.version)
+
+            # Filter router VM based on their version
+            if LooseVersion(vmversion) < LooseVersion(routerMinVersion):
+                continue
+
+            if LooseVersion(vmversion) > LooseVersion(routerMaxVersion):
+                continue
+
+            # Amount of NICs
             niccount = len(vm.nic)
 
             if routerNicCountIsMinimum == 1:
@@ -590,6 +618,7 @@ for clusterid, clustername in clusters.items():
                             '-',
                             '-',
                             vmniccount,
+                            vmversion,
                             memoryDisplay,
                             serviceOfferingData[0].cpunumber,
                             vm.name,
@@ -604,6 +633,7 @@ for clusterid, clustername in clusters.items():
                             '-',
                             '-',
                             vmniccount,
+                            vmversion,
                             memoryDisplay,
                             'Unknown',
                             vm.name,
@@ -619,6 +649,7 @@ for clusterid, clustername in clusters.items():
                             '-',
                             '-',
                             vmniccount,
+                            vmversion,
                             memoryDisplay,
                             serviceOfferingData[0].cpunumber,
                             vm.name,
@@ -633,6 +664,7 @@ for clusterid, clustername in clusters.items():
                             '-',
                             '-',
                             vmniccount,
+                            vmversion,
                             memoryDisplay,
                             'Unknown',
                             vm.name,
