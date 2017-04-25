@@ -220,7 +220,7 @@ else:
         # If the network is a Isolated network
         else:
             c.task = "Restart isolated network with clean up"
-            message = "Restarting isolated network router " + router.name + " with clean up (" + router.id + ") from network " + router.guestnetworkname
+            message = "Restarting isolated network router " + router.name + " with clean up (" + router.id + ")"
             c.print_message(message=message, message_type="Note", to_slack=True)
             result = c.restartNetwork(router.guestnetworkid)
             if result == 1:
@@ -239,7 +239,7 @@ else:
                     message = "Successfully restarted " + router.name + " (" + router.id + ")"
                     c.print_message(message=message, message_type="Note", to_slack=True)
             else:
-                message = "Successfully restarted " + router.name + " (" + router.id + ") from network " + router.guestnetworkname
+                message = "Successfully restarted " + router.name + " (" + router.id + ")"
                 c.print_message(message=message, message_type="Note", to_slack=True)
     else:
         # Reboot router
