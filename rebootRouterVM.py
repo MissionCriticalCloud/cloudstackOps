@@ -196,7 +196,7 @@ else:
         # If the network is a VPC
         if router.vpcid:
             c.task = "Restart VPC with clean up"
-            message = "Restarting router " + router.name + " with clean up (" + router.id + ") from VPC " + router.vpcname
+            message = "Restarting router " + router.name + " with clean up (" + router.id + ")"
             c.print_message(message=message, message_type="Note", to_slack=True)
             result = c.restartVPC(router.vpcid)
             if result == 1:
@@ -211,8 +211,11 @@ else:
                     emailbody = "Could not restart router " + router.name + " with clean up."
                     c.sendMail(c.mail_from, c.errors_to, msgSubject, emailbody)
                     sys.exit(1)
+                else:
+                    message = "Successfully restarted " + router.name + " (" + router.id + ")"
+                    c.print_message(message=message, message_type="Note", to_slack=True)
             else:
-                message = "Successfully restarted " + router.name + " (" + router.id + ") from VPC " + router.vpcname
+                message = "Successfully restarted " + router.name + " (" + router.id + ")"
                 c.print_message(message=message, message_type="Note", to_slack=True)
         # If the network is a Isolated network
         else:
@@ -232,6 +235,9 @@ else:
                     emailbody = "Could not restart router " + router.name + "with clean up."
                     c.sendMail(c.mail_from, c.errors_to, msgSubject, emailbody)
                     sys.exit(1)
+                else:
+                    message = "Successfully restarted " + router.name + " (" + router.id + ")"
+                    c.print_message(message=message, message_type="Note", to_slack=True)
             else:
                 message = "Successfully restarted " + router.name + " (" + router.id + ") from network " + router.guestnetworkname
                 c.print_message(message=message, message_type="Note", to_slack=True)
