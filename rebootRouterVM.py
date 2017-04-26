@@ -166,8 +166,11 @@ if DRYRUN == 1:
     print "Note: Not sending notification e-mails due to DRYRUN setting. Would have e-mailed " + adminData.email
 else:
 
-    if not adminData.email:
-        print "Warning: Skipping mailing due to missing e-mail address."
+    if hasattr(adminData, 'email'):
+        if not adminData.email:
+            print "Warning: Skipping mailing due to missing e-mail address."
+    else:
+        print "Warning: No e-mail address found, does this account have any users?"
 
     templatefile = open("email_template/rebootRouterVM.txt", "r")
     emailbody = templatefile.read()
