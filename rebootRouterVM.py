@@ -22,12 +22,10 @@
 # Script to upgrade a router VM to the new template
 # Remi Bergsma - rbergsma@schubergphilis.com
 
-import time
 import sys
 import getopt
 from cloudstackops import cloudstackops
 import os.path
-from random import choice
 
 # Function to handle our arguments
 
@@ -162,27 +160,27 @@ print "Note: Let's reboot the router VM.."
 
 # Get user data to e-mail
 adminData = c.getDomainAdminUserData(router.domainid)
-if DRYRUN == 1:
-    print "Note: Not sending notification e-mails due to DRYRUN setting. Would have e-mailed " + adminData.email
-else:
 
-    if hasattr(adminData, 'email'):
-        if not adminData.email:
-            print "Warning: Skipping mailing due to missing e-mail address."
-    else:
-        print "Warning: No e-mail address found, does this account have any users?"
+if adminData is not 1:
 
+    if DRYRUN == 1:
+        print "Note: Not sending notification e-mails due to DRYRUN setting. Would have e-mailed " + adminData.email
+
+    # Sends e-mail to account/user:"
     templatefile = open("email_template/rebootRouterVM.txt", "r")
     emailbody = templatefile.read()
+
     emailbody = emailbody.replace("FIRSTNAME", adminData.firstname)
     emailbody = emailbody.replace("LASTNAME", adminData.lastname)
     emailbody = emailbody.replace("ROUTERDOMAIN", router.domain)
     emailbody = emailbody.replace("ROUTERNAME", router.name)
     emailbody = emailbody.replace("ORGANIZATION", c.organization)
+
     templatefile.close()
 
     # Notify user
     msgSubject = 'Starting maintenance for domain ' + router.domain
+
     c.sendMail(c.mail_from, adminData.email, msgSubject, emailbody)
 
     # Notify admin
@@ -190,6 +188,9 @@ else:
 
     if DEBUG == 1:
         print emailbody
+
+else:
+    print "Warning: No admin user found this domain (" + router.domain + ")"
 
 if DRYRUN == 1:
     print "Note: Would have rebooted router " + router.name + " (" + router.id + ")"
@@ -267,31 +268,37 @@ else:
             c.print_message(message=message, message_type="Note", to_slack=True)
 
 # Get user data to e-mail
-if DRYRUN == 1:
-    print "Note: Not sending notification e-mails due to DRYRUN setting. Would have e-mailed " + adminData.email
+if adminData is not 1:
+
+    if DRYRUN == 1:
+            print "Note: Not sending notification e-mails due to DRYRUN setting. Would have e-mailed " + adminData.email
+    else:
+
+        if not adminData.email:
+            print "Warning: Skipping mailing due to missing e-mail address."
+
+        templatefile = open("email_template/rebootRouterVM_done.txt", "r")
+        emailbody = templatefile.read()
+
+        emailbody = emailbody.replace("FIRSTNAME", adminData.firstname)
+        emailbody = emailbody.replace("LASTNAME", adminData.lastname)
+        emailbody = emailbody.replace("ROUTERDOMAIN", router.domain)
+        emailbody = emailbody.replace("ROUTERNAME", router.name)
+        emailbody = emailbody.replace("ORGANIZATION", c.organization)
+        templatefile.close()
+
+        # Notify user
+        msgSubject = 'Completed maintenance for domain ' + router.domain
+
+        c.sendMail(c.mail_from, adminData.email, msgSubject, emailbody)
+
+        # Notify admin
+        c.sendMail(c.mail_from, c.errors_to, msgSubject, emailbody)
+
+        if DEBUG == 1:
+            print "DEBUG: email body:"
+            print emailbody
 else:
-
-    if not adminData.email:
-        print "Warning: Skipping mailing due to missing e-mail address."
-
-    templatefile = open("email_template/rebootRouterVM_done.txt", "r")
-    emailbody = templatefile.read()
-    emailbody = emailbody.replace("FIRSTNAME", adminData.firstname)
-    emailbody = emailbody.replace("LASTNAME", adminData.lastname)
-    emailbody = emailbody.replace("ROUTERDOMAIN", router.domain)
-    emailbody = emailbody.replace("ROUTERNAME", router.name)
-    emailbody = emailbody.replace("ORGANIZATION", c.organization)
-    templatefile.close()
-
-    # Notify user
-    msgSubject = 'Completed maintenance for domain ' + router.domain
-    c.sendMail(c.mail_from, adminData.email, msgSubject, emailbody)
-
-    # Notify admin
-    c.sendMail(c.mail_from, c.errors_to, msgSubject, emailbody)
-
-    if DEBUG == 1:
-        print "DEBUG: email body:"
-        print emailbody
+    print "Warning: No admin user found this domain (" + router.domain + ")"
 
 print "Note: We're done!"
