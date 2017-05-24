@@ -766,12 +766,13 @@ class CloudStackOps(CloudStackOpsBase):
             return False
         if not 'projectParam' in args:
             args['projectParam'] = "false"
-        systemvm = self.getRouterData({'id': args['vmid'], 'isProjectVm': args['projectParam']})[0]
-        if self.DEBUG:
-            print "Received systemvm:"
-            print systemvm
 
         if not 'hostid' in args:
+            systemvm = self.getRouterData({'id': args['vmid'], 'isProjectVm': args['projectParam']})[0]
+            if self.DEBUG:
+               print "Received systemvm:"
+               print systemvm
+
             requested_memory = self.get_needed_memory(systemvm)
             host_data = self.getHostData({'hostid': systemvm.hostid})[0]
             if self.DEBUG:
