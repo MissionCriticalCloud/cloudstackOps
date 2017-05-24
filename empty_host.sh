@@ -1,17 +1,18 @@
 #!/bin/bash
 
 CLOUD=$1
-FROM_HOST=$2
-TO_HOST=$3
-
-`cloudmonkey set display default`
-`cloudmonkey sync`
+FROM_HOST_NAME=$2
+TO_HOST_NAME=$3
 
 SUCCESS_RETURN='0'
 FAILURE=0
 
-FROM_HOST_NAME=`cloudmonkey -p ${CLOUD} list hosts hypervisor=KVM filter=name,id id=${FROM_HOST} | grep name | awk '{print $3}'`
-TO_HOST_NAME=`cloudmonkey -p ${CLOUD} list hosts hypervisor=KVM filter=name,id id=${TO_HOST} | grep name | awk '{print $3}'`
+cloudmonkey set display default
+cloudmonkey sync
+
+FROM_HOST=`cloudmonkey -p ${CLOUD} list hosts hypervisor=KVM filter=id name=${FROM_HOST_NAME} | grep id | awk '{print $3}'`
+TO_HOST=`cloudmonkey -p ${CLOUD} list hosts hypervisor=KVM filter=id name=${TO_HOST_NAME} | grep id | awk '{print $3}'`
+
 
 USER_VMS_NAMES=`cloudmonkey -p ${CLOUD} list virtualmachines listall=true filter=id,name hostid=${FROM_HOST} | grep 'id\|name' | awk '{print $3}' | paste - -`
 SYSTEM_VMS_NAMES=`cloudmonkey -p ${CLOUD} list systemvms listall=true filter=id,name hostid=${FROM_HOST} | grep 'id\|name' | awk '{print $3}' | paste - -`
