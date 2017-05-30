@@ -24,7 +24,7 @@
 from cloudstackopsbase import *
 # Import our dependencies
 import mysql.connector
-from mysql.connector.errors import Error
+from mysql.connector import errorcode
 
 
 class CloudStackSQL(CloudStackOpsBase):
