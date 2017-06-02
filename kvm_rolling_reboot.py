@@ -204,8 +204,7 @@ if clusterID == 1:
     sys.exit(1)
 
 # Get cluster hosts
-cluster_hosts = c.getAllHostsFromCluster(clusterID)
-first_host = cluster_hosts[0]
+cluster_hosts = sorted(c.getAllHostsFromCluster(clusterID), key=lambda h: h.name)
 
 # Print cluster info
 print "Note: Gathering some info about cluster '" + clustername + "':"

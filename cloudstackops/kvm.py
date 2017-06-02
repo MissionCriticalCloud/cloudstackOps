@@ -367,14 +367,14 @@ class Kvm(hypervisor.hypervisor):
     # Get current patchlevel
     def get_patch_level(self, hosts):
         return_string = ""
-        for host in hosts:
+        for host in sorted(hosts, key=lambda h: h.name):
             try:
                 with settings(host_string=self.ssh_user + "@" + host.ipaddress, use_sudo=True):
-                    patch_level = fab.run("yum check-update -q | wc -l") + " updates to install"
+                    patch_level = fab.run("yum check-update -q | wc -l") + " updates"
                     if len(return_string) == 0:
-                        hostname = host.name
+                        hostname = host.name.split('.')[0]
                     else:
-                        hostname = "\n" + host.name
+                        hostname = "\n" + host.name.split('.')[0]
                     return_string = return_string + hostname + ": " + patch_level + " "
             except:
                 return False

@@ -1535,7 +1535,7 @@ class CloudStackOps(CloudStackOpsBase):
                          "# VMs",
                          "Bond Status"])
 
-        for clusterhost in clusterHostsData:
+        for clusterhost in sorted(clusterHostsData,key=lambda h: h.name):
 
             # Some progress indication
             sys.stdout.write(clusterhost.name + ", ")
@@ -1585,7 +1585,7 @@ class CloudStackOps(CloudStackOpsBase):
                 vmcount = "UNKNOWN"
 
             # Table
-            t.add_row([clusterhost.name,
+            t.add_row([clusterhost.name.split('.')[0],
                        pm,
                        clusterhost.resourcestate,
                        clusterhost.state,
