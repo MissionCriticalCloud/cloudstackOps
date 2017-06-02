@@ -1769,6 +1769,9 @@ class CloudStackOps(CloudStackOpsBase):
                                 })
                                 instance = vm.name
                             else:
+                                if vm.isoid is not None:
+                                    self.detach_iso(vm.id)
+
                                 vmresult = self.migrateVirtualMachine(
                                     vm.id,
                                     migrationHost.id)
