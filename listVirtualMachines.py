@@ -732,6 +732,7 @@ if len(clusters) > 1 and display == "onlySummary":
         print " Total allocated RAM: " + str(grandMemoryTotal) + " / " + \
             str(grandHostMemoryTotal) + " GB (" + \
             str(grandMemoryUtilisation) + " %)"
+        print " Total allocated cores: " + str(grandCoresTotal)
         print " Total allocated storage: " + str(grandStorageSizeTotal) + " GB"
     else:
         print " Total allocated RAM: " + str(grandMemoryTotal) + " GB"
