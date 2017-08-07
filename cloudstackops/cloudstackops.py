@@ -1762,7 +1762,7 @@ class CloudStackOps(CloudStackOpsBase):
                                 print "Debug: Migrating vm to host '" + migrationHost.name + "'.."
 
                             # Systemvm or instance
-                            if bool(re.search('[rvs]-([\d])*-VM', vm.name)):
+                            if bool(re.search('[rvs]-([\d])*-', vm.name)):
                                 vmresult = self.migrateSystemVm({
                                     'vmid': vm.id,
                                     'hostid': migrationHost.id
@@ -1863,7 +1863,7 @@ class CloudStackOps(CloudStackOpsBase):
     def get_needed_memory(self, system_vm):
         if system_vm.memory is None:
             # Try to get the memory of systemvms from their offering
-            if bool(re.search('[rvs]-([\d])*-VM', system_vm.name)) and system_vm.serviceofferingid is not None:
+            if bool(re.search('[rvs]-([\d])*-', system_vm.name)) and system_vm.serviceofferingid is not None:
                 serviceOfferingData = self.listServiceOfferings(
                     {'serviceofferingid': system_vm.serviceofferingid, 'issystem': 'true'})
                 system_vm.memory = serviceOfferingData[0].memory
