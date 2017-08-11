@@ -759,6 +759,15 @@ class CloudStackOps(CloudStackOpsBase):
         # Call CloudStack API
         return self._callAPI(apicall)
 
+    # migrateVirtualMachine with Volumes
+    def migrateVirtualMachineWithVolume(self, vmid, hostid):
+        apicall = migrateVirtualMachineWithVolume.migrateVirtualMachineWithVolumeCmd()
+        apicall.virtualmachineid = str(vmid)
+        apicall.hostid = str(hostid)
+
+        # Call CloudStack API
+        return self._callAPI(apicall)
+
     # migrateSystemVm
     def migrateSystemVm(self, args):
         args = self.remove_empty_values(args)
@@ -974,32 +983,6 @@ class CloudStackOps(CloudStackOpsBase):
         # Call CloudStack API
         return self._callAPI(apicall)
 
-    # list snapshotPolicies
-    def listSnapshotPolicies(self, volid):
-        apicall = listSnapshotPolicies.listSnapshotPoliciesCmd()
-        apicall.volumeid = volid
-
-        # Call CloudStack API
-        return self._callAPI(apicall)
-
-    # create snapshot policy
-    def createSnapshotPolicy(self, args):
-        args = self.remove_empty_values(args)
-
-        apicall = createSnapshotPolicy.createSnapshotPolicyCmd()
-        apicall.volumeid = (str(args['volid'])) if 'volid' in args else None
-        apicall.intervaltype = (
-            str(args['intervaltype'])) if 'intervaltype' in args else None
-        apicall.maxsnaps = (
-            str(args['maxsnaps'])) if 'maxsnaps' in args else None
-        apicall.schedule = (
-            str(args['schedule'])) if 'schedule' in args else None
-        apicall.timezone = (
-            str(args['timezone'])) if 'timezone' in args else 'Europe/Amsterdam'
-
-        # Call CloudStack API
-        return self._callAPI(apicall)
-
     # list networks
     def listNetworks(self, networkid):
         apicall = listNetworks.listNetworksCmd()
@@ -1018,14 +1001,14 @@ class CloudStackOps(CloudStackOpsBase):
         # Call CloudStack API
         return self._callAPI(apicall)
 
-    # Translate id to name, because of CLOUDSTACK-6542
-    def translateIntervalType(self, intervaltype):
-        return {
-            0: 'HOURLY',
-            1: 'DAILY',
-            2: 'WEEKLY',
-            3: 'MONTHLY'
-        }.get(intervaltype, 0)
+    # list listVMSnapshot
+    def listVMSnapshot(self, vmid):
+        apicall = listVMSnapshot.listVMSnapshotCmd()
+        apicall.virtualmachineid = vmid
+        apicall.listAll = "true"
+
+        # Call CloudStack API
+        return self._callAPI(apicall)
 
     # list service offerings
     def listServiceOfferings(self, args):
