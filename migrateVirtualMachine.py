@@ -327,6 +327,8 @@ if volcount > 0:
                 # Add the snapshot policy again
                 if snapshotData is None:
                     print "Note: No snapshot policies to restore."
+                elif snapshotData == 1:
+                    print "Note: No snapshot policies to restore."
                 else:
                     for snapshot in snapshotData:
                         # Translate intervaltype
