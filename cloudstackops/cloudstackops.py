@@ -1663,7 +1663,7 @@ class CloudStackOps(CloudStackOpsBase):
         migrationHost = False
 
         if clusterHosts != 1 and clusterHosts is not None:
-            [ currentHost ] = [h for h in self.getAllHostsFromCluster(clusterID) if h.name == currentHostname]
+            [ currentHost ] = [h for h in self.getAllHostsFromCluster(clusterID) if h.name == currentHostname] or [""]
 
             for h in clusterHosts:
                 # Skip the current hostname
@@ -1672,11 +1672,12 @@ class CloudStackOps(CloudStackOpsBase):
                 # Only hosts have enough resources
                 if h.suitableformigration == False:
                     continue
-		# Handle dedicated hosts
-                if currentHost.dedicated != h.dedicated:
-                    continue
-                if currentHost.dedicated == True and currentHost.domainid != h.domainid:
-                    continue
+                # Handle dedicated hosts
+                if 'dedicated' in currentHost:
+                    if currentHost.dedicated != h.dedicated:
+                        continue
+                    if currentHost.dedicated == True and currentHost.domainid != h.domainid:
+                        continue
                 # And are not in Maintenance, Error or Disabled
                 if h.resourcestate == "Disabled" or h.resourcestate == "Maintenance" or h.resourcestate == "Error":
                     continue
