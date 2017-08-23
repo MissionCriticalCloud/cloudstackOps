@@ -293,18 +293,6 @@ if volcount > 0:
                     sys.exit(1)
             print "Warning: Snapshots will be lost after migration due to bug CLOUDSTACK-6538."
 
-        # Check for snapshot policies
-        snapshotData = c.listSnapshotPolicies(volid)
-        if snapshotData == 1:
-            print "Error: Could not list snapshot policies"
-        elif snapshotData is None:
-            print "Note: No snapshot schedules found for this volume."
-        else:
-            for snapshot in snapshotData:
-                intervaltype = c.translateIntervalType(snapshot.intervaltype)
-                print "Note: Found snapshot policy: interval=" + str(intervaltype) + " schedule=" + snapshot.schedule + " maxsnaps=" + str(snapshot.maxsnaps) + " timezone=" + snapshot.timezone + " volumeid=" + snapshot.volumeid
-            print "Warning: Snapshot schedules will be lost after migration due to bug CLOUDSTACK-6538. We'll try to recreate them, though."
-
         if DRYRUN == 1:
             print "Note: Would have migrated volume " + volid + " to storage " + targetStorageID
         else:
@@ -323,29 +311,6 @@ if volcount > 0:
 
             if result.volume.state == "Ready":
                 print "Note: " + result.volume.name + " is migrated successfully "
-
-                # Add the snapshot policy again
-                if snapshotData is None:
-                    print "Note: No snapshot policies to restore."
-                elif snapshotData == 1:
-                    print "Note: No snapshot policies to restore."
-                else:
-                    for snapshot in snapshotData:
-                        # Translate intervaltype
-                        intervaltype = c.translateIntervalType(
-                            snapshot.intervaltype)
-                        snapshotresult = c.createSnapshotPolicy(
-                            {
-                                'volid': result.volume.id,
-                                'intervaltype': intervaltype,
-                                'maxsnaps': snapshot.maxsnaps,
-                                'schedule': snapshot.schedule,
-                                'timezone': snapshot.timezone})
-                        if snapshotresult == 1:
-                            print "Error: failed to recreate snapshot schedule."
-                        else:
-                            print "Note: recreated snapshot schedule with id " + snapshotresult.snapshotpolicy.id
-
             else:
                 warningMsg = "Warning: " + result.volume.name + " is in state " + \
                     result.volume.state + " instead of Ready. Please investigate before starting VM again!"
