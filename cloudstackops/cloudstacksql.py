@@ -301,8 +301,28 @@ class CloudStackSQL(CloudStackOpsBase):
         cursor.execute("SELECT volumes.name, volumes.path, volumes.uuid, vm_instance.state as vmstate, "
                        "volumes.volume_type as voltype" +
                        " FROM vm_instance, volumes" +
-                       " WHERE volumes.instance_id = vm_instance.id" +
+                       " WHERE volumes.instance_id = vm_instance.id AND volumes.removed IS NULL AND volumes.state = 'Ready'" +
                        " AND instance_name='" + instancename + "';")
+        result = cursor.fetchall()
+        if self.DEBUG == 1:
+            print "DEBUG: Executed SQL: " + cursor.statement
+
+        cursor.close()
+
+        return result
+
+    # Return volumes that belong to a given instance ID
+    def get_volume(self, volumename):
+        if not self.conn:
+            return 1
+        if not volumename:
+            return 1
+
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT volumes.name, volumes.path, volumes.uuid, volumes.volume_type as voltype" +
+                       " FROM volumes" +
+                       " WHERE volumes.removed IS NULL AND volumes.state = 'Ready'" +
+                       " AND name='" + volumename + "';")
         result = cursor.fetchall()
         if self.DEBUG == 1:
             print "DEBUG: Executed SQL: " + cursor.statement
@@ -483,6 +503,41 @@ class CloudStackSQL(CloudStackOpsBase):
         cursor.close()
         return True
 
+    # Update db volumes table
+    def update_volume_from_xenserver_cluster_to_kvm_cluster(self, volume_uuid, to_storage_pool_name):
+        if not self.conn:
+            return 1
+        if not volume_uuid or not to_storage_pool_name:
+            return 1
+
+        to_storage_pool_id = self.get_storage_pool_id_from_name(to_storage_pool_name)
+
+        cursor = self.conn.cursor()
+
+        try:
+            cursor.execute ("""
+               UPDATE volumes
+               SET template_id=NULL, last_pool_id=NULL, format='QCOW2', pool_id=%s
+               WHERE uuid=%s
+            """, (to_storage_pool_id, volume_uuid))
+
+            if self.DRYRUN == 0:
+                self.conn.commit()
+            else:
+                print "Note: Would have executed: %s" % cursor.statement
+
+            if self.DEBUG == 1:
+                print "DEBUG: Executed SQL: " + cursor.statement
+
+        except mysql.connector.Error as err:
+            print("Error: MySQL: {}".format(err))
+            print cursor.statement
+            cursor.close()
+            return False
+
+        cursor.close()
+        return True
+
     # Generate revert queries
     def get_current_config(self, instancename):
 
@@ -496,7 +551,35 @@ class CloudStackSQL(CloudStackOpsBase):
                        "vm_instance.guest_os_id AS guest_os_id, volumes.pool_id AS pool_id " +
                        "FROM vm_instance, volumes " +
                        "WHERE vm_instance.id = volumes.instance_id " +
-                       "AND vm_instance.instance_name='" + instancename + "' LIMIT 1;")
+                       "AND vm_instance.instance_name='" + instancename + "' " +
+                       "AND volumes.removed is NULL "
+                       "AND vm_instance.removed is NULL LIMIT 1;")
+
+        if self.DEBUG == 1:
+            print "DEBUG: Executed SQL: " + cursor.statement
+
+        result = cursor.fetchall()
+        cursor.close()
+
+        try:
+            return result[0]
+        except:
+            return False
+
+    # Generate revert queries
+    def get_current_volume_config(self, volumeUUID):
+
+        if not self.conn:
+            return False
+        if not volumeUUID:
+            return False
+
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT id, pool_id "
+                       "FROM volumes " +
+                       "WHERE uuid='" + volumeUUID + "' " +
+                       "AND removed is NULL "
+                       "LIMIT 1;")
 
         if self.DEBUG == 1:
             print "DEBUG: Executed SQL: " + cursor.statement
@@ -520,6 +603,17 @@ class CloudStackSQL(CloudStackOpsBase):
         revert_sql_volume = "UPDATE volumes SET template_id=NULL, last_pool_id=NULL, format='VHD', " \
                             "pool_id=" + str(pool_id) + " WHERE instance_id='" + str(instance_id) + "';"
 
-        print "Note: Should you want to revert, you simply stop the VM on KVM and then run this SQL:"
-        print "\t\t\t" +  revert_sql_instance
-        print "\t\t\t" + revert_sql_volume
+        revert_sql = revert_sql_instance
+        revert_sql += "\n" + revert_sql_volume
+        print revert_sql
+        return revert_sql
+
+    # Generate revert query
+    def generate_revert_query_volume(self, volumeUUID):
+        volume_id, pool_id = self.get_current_volume_config(volumeUUID)
+
+        revert_sql_volume = "UPDATE volumes SET template_id=NULL, last_pool_id=NULL, format='VHD', " \
+                            "pool_id=" + str(pool_id) + " WHERE id='" + str(volume_id) + "';"
+
+        print revert_sql_volume
+        return revert_sql_volume

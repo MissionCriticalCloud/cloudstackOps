@@ -117,7 +117,8 @@ class CloudStackOpsBase(object):
             self.slack = slackweb.Slack(url=slack_url)
 
     def print_message(self, message, message_type="Note", to_slack=False):
-        print "%s: %s" % (message_type.title(), message)
+        if message_type != "Plain":
+            print "%s: %s" % (message_type.title(), message)
 
         if to_slack and self.slack is not None:
             color = "good"
@@ -130,7 +131,8 @@ class CloudStackOpsBase(object):
     def send_slack_message(self, message, color="good"):
 
         attachments = []
-        attachment = {"text": message, "color": color, "fields": [
+        attachment = {"text": message, "color": color, "mrkdwn_in": ["text", "pretext", "fields"], "mrkdwn": "true",
+                      "fields": [
             {
                 "title": str(self.slack_custom_title),
                 "value": str(self.slack_custom_value),
@@ -149,6 +151,16 @@ class CloudStackOpsBase(object):
             {
                 "title": "Instance ID",
                 "value": self.instance_name,
+                "short": "true"
+            },
+            {
+                "title": "VM name",
+                "value": self.vm_name,
+                "short": "true"
+            },
+            {
+                "title": "Zone",
+                "value": self.zone_name,
                 "short": "true"
             }
         ]}

@@ -36,6 +36,7 @@ import re
 
 # Marvin
 try:
+    import requests
     from marvin.cloudstackConnection import cloudConnection
     from marvin.cloudstackException import cloudstackAPIException
     from marvin.cloudstackAPI import *
@@ -343,6 +344,8 @@ class CloudStackOps(CloudStackOpsBase):
         elif csApiCall == "listTemplates":
             apicall = listTemplates.listTemplatesCmd()
             apicall.templatefilter = "all"
+        elif csApiCall == "listVolumes":
+            apicall = listVolumes.listVolumesCmd()
         else:
             print "No API command to call"
             sys.exit(1)
@@ -350,10 +353,12 @@ class CloudStackOps(CloudStackOpsBase):
         if isProjectVm == 'true':
             apicall.projectid = "-1"
 
-        if csname.startswith('i-'):
-            apicall.keyword = str(csname)
-
-        else:
+        try:
+            if csname.startswith('i-'):
+                apicall.keyword = str(csname)
+            else:
+                apicall.name = str(csname)
+        except:
             apicall.name = str(csname)
 
         if listAll == 'true':
@@ -432,9 +437,38 @@ class CloudStackOps(CloudStackOpsBase):
 
         # Call CloudStack API
         data = self._callAPI(apicall)
-        # Select a random storage pool that belongs to this cluster
 
         return data
+
+    # Find storagePool for Cluster with most free space
+    def getStoragePoolWithMostFreeSpace(self, clusterID):
+        apicall = listStoragePools.listStoragePoolsCmd()
+        apicall.clusterid = str(clusterID)
+        apicall.listAll = "true"
+
+        # Call CloudStack API
+        pools = self._callAPI(apicall)
+
+        lowest_pool_utilisation = 100
+        data = None
+
+        for pool_data in pools:
+            try:
+                pool_utilisation = float(pool_data.disksizeused) / float(pool_data.disksizetotal)
+                pool_utilisation_display = pool_utilisation * 100
+            except:
+                pool_utilisation = 100
+
+        if pool_utilisation < lowest_pool_utilisation:
+            lowest_pool_utilisation = pool_utilisation
+            if self.DEBUG ==1:
+                print "Debug: Pool %s has utilisation of %s %%, currently lowest. Checking others" % (pool_data.name, str(pool_utilisation_display))
+            data = pool_data
+
+        if data is not None:
+            return data
+        else:
+            return False
 
     # Get storagePool data
     def getStoragePoolData(self, storagepoolID):
@@ -466,24 +500,10 @@ class CloudStackOps(CloudStackOpsBase):
         return self._callAPI(apicall)
 
     # Get host data
-    def getFirstHostFromCluster(self, clusterID):
+    def getRandomHostFromCluster(self, clusterID):
 
         hosts_list = self.getHostsFromCluster(clusterID)
-        cluster_data = self.listClusters({'clusterid': clusterID})
-
-        if cluster_data[0].name.endswith("cs01"):
-            host_to_find = "hv01"
-        elif cluster_data[0].name.endswith("cs02"):
-            host_to_find = "hv07"
-        elif cluster_data[0].name.endswith("cs03"):
-            host_to_find = "hv07"
-        else:
-            return hosts_list[0]
-
-        for h in hosts_list:
-            if host_to_find in h.name:
-                return h
-        return hosts_list[0]
+        return choice(hosts_list)
 
     # Find enabled hosts in a given cluster excluding it's hosts which have been marked dedicated
     def getSharedHostsFromCluster(self, clusterID):
@@ -530,6 +550,15 @@ class CloudStackOps(CloudStackOpsBase):
             str(args['domainid'])) if 'domainid' in args else None
         apicall.keyword = (
             args['filterKeyword']) if 'filterKeyword' in args else None
+
+        # Call CloudStack API
+        return self._callAPI(apicall)
+
+    # Find volume
+    def getVolumeData(self, volumeid):
+        apicall = listVolumes.listVolumesCmd()
+        apicall.id = str(volumeid)
+        apicall.listAll = "true"
 
         # Call CloudStack API
         return self._callAPI(apicall)
@@ -775,13 +804,12 @@ class CloudStackOps(CloudStackOpsBase):
             return False
         if not 'projectParam' in args:
             args['projectParam'] = "false"
+        systemvm = self.getRouterData({'id': args['vmid'], 'isProjectVm': args['projectParam']})[0]
+        if self.DEBUG:
+            print "Received systemvm:"
+            print systemvm
 
         if not 'hostid' in args:
-            systemvm = self.getRouterData({'id': args['vmid'], 'isProjectVm': args['projectParam']})[0]
-            if self.DEBUG:
-               print "Received systemvm:"
-               print systemvm
-
             requested_memory = self.get_needed_memory(systemvm)
             host_data = self.getHostData({'hostid': systemvm.hostid})[0]
             if self.DEBUG:
@@ -1518,7 +1546,7 @@ class CloudStackOps(CloudStackOpsBase):
                          "# VMs",
                          "Bond Status"])
 
-        for clusterhost in sorted(clusterHostsData,key=lambda h: h.name):
+        for clusterhost in clusterHostsData:
 
             # Some progress indication
             sys.stdout.write(clusterhost.name + ", ")
@@ -1568,7 +1596,7 @@ class CloudStackOps(CloudStackOpsBase):
                 vmcount = "UNKNOWN"
 
             # Table
-            t.add_row([clusterhost.name.split('.')[0],
+            t.add_row([clusterhost.name,
                        pm,
                        clusterhost.resourcestate,
                        clusterhost.state,
@@ -1627,22 +1655,27 @@ class CloudStackOps(CloudStackOpsBase):
     # Check vm's still running on this host
     def getVirtualMachinesRunningOnHost(self, hostID):
         all_vmdata = ()
-        vms = self.listVirtualmachines({'hostid': hostID, 'listAll': 'true'}) or []
-        pvms = tuple([self.listVirtualmachines({'hostid': hostID, 'listAll': 'true', 'isProjectVm': 'true'})] or [])
-        routers = tuple([self.getRouterData({'hostid': hostID, 'listAll': 'true'})] or [])
-        prouters = tuple([self.getRouterData({'hostid': hostID, 'listAll': 'true', 'isProjectVm': 'true'})] or [])
-        svms = tuple([[svm for svm in self.getSystemVmData({'hostid': hostID}) or []]])
+        vms = self.listVirtualmachines({'hostid': hostID, 'listAll': 'true'}),
+        pvms = self.listVirtualmachines({'hostid': hostID, 'listAll': 'true', 'isProjectVm': 'true'}),
+        routers = self.getRouterData({'hostid': hostID, 'listAll': 'true'}),
+        prouters = self.getRouterData({'hostid': hostID, 'listAll': 'true', 'isProjectVm': 'true'}),
+        svms = self.getSystemVmData({'hostid': hostID})
+
+        if not None in vms:
+            all_vmdata += vms
+        if not None in pvms:
+            all_vmdata += pvms
+        if not None in routers:
+            all_vmdata += routers
+        if not None in prouters:
+            all_vmdata += prouters
+        if svms is not None:
+            for vm in svms:
+                all_vmdata[0].append(vm)
 
         # Sort VM list on memory
-        if len(vms) > 0:
-          vms.sort(key=operator.attrgetter('memory'), reverse=True)
-
-        all_vmdata += tuple([vms])
-        all_vmdata += pvms
-        all_vmdata += routers
-        all_vmdata += prouters
-        all_vmdata += svms
-
+        if len(all_vmdata) > 0 :
+            all_vmdata[0].sort(key=operator.attrgetter('memory'), reverse=True)
 
         if self.DEBUG:
             print all_vmdata
@@ -1761,9 +1794,6 @@ class CloudStackOps(CloudStackOpsBase):
                                 })
                                 instance = vm.name
                             else:
-                                if vm.isoid is not None:
-                                    self.detach_iso(vm.id)
-
                                 vmresult = self.migrateVirtualMachine(
                                     vm.id,
                                     migrationHost.id)
@@ -1865,3 +1895,4 @@ class CloudStackOps(CloudStackOpsBase):
             else:
                 system_vm.memory = 1024
         return int(system_vm.memory) * 1024 * 1024
+
