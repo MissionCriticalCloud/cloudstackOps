@@ -40,6 +40,7 @@ env.forward_agent = True
 env.disable_known_hosts = True
 env.parallel = False
 env.pool_size = 1
+env.keepalive = 1
 
 # Supress Fabric output by default, we will enable when needed
 output['debug'] = False
@@ -441,7 +442,7 @@ class xenserver(hypervisor.hypervisor):
             return self.mountpoint
         try:
             with settings(host_string=self.ssh_user + "@" + host.ipaddress):
-                command = "mount | grep storage | awk {'print $3'}"
+                command = "mount | grep sr-mount | grep \"type nfs\" | awk {'print $3'}"
                 self.mountpoint = fab.run(command)
                 print "Note: Found " + str(self.mountpoint)
                 return self.mountpoint
@@ -460,9 +461,9 @@ class xenserver(hypervisor.hypervisor):
             print "Error: Extracting the volume went wrong"
             return False
         uuid_folder = self.get_migration_path().split("/migration/")[-1]
-        download_url = "http://%s:5001/%s%s" % (host.ipaddress, uuid_folder, path)
-        print "Note: Download url is %s" % download_url
-        return download_url
+        file_location = uuid_folder + path
+        print "Note: File location is %s" % file_location
+        return file_location
 
     def extract_volume(self, host, path):
         print "Note: We're exporting disk with name (on disk) '%s' and make it available for HTTP download" % path

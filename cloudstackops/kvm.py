@@ -65,11 +65,11 @@ class Kvm(hypervisor.hypervisor):
         self.DRYRUN = True
         self.PREPARE = False
 
-    def prepare_kvm(self, kvmhost):
+    def prepare_kvm(self, kvmhost, storage_pool_uuid):
         if self.DRYRUN:
-            print "Note: Would have created migration folder on %s" % kvmhost.name
+            print "Note: Would have created migration folder on /mnt/%s on random host" % storage_pool_uuid
             return True
-        result = self.create_migration_nfs_dir(kvmhost)
+        result = self.create_migration_nfs_dir(kvmhost, storage_pool_uuid)
         if self.DEBUG == 1:
             print "DEBUG: received this result:" + str(result)
         if result is False:
@@ -77,33 +77,17 @@ class Kvm(hypervisor.hypervisor):
             return False
         return True
 
-    def find_nfs_mountpoint(self, host):
-        print "Note: Looking for NFS mount on KVM host %s" % host.name
-        if self.mountpoint is not None:
-            print "Note: Found " + str(self.mountpoint)
-            return self.mountpoint
-        try:
-            with settings(host_string=self.ssh_user + "@" + host.ipaddress):
-                command = "sudo mount | grep storage | awk {'print $3'}"
-                self.mountpoint = fab.run(command)
-                print "Note: Found " + str(self.mountpoint)
-                return self.mountpoint
-        except:
-            return False
-
     def get_migration_path(self):
         if self.migration_path is None:
             self.migration_path = self.mountpoint + "/migration/" + str(uuid.uuid4()) + "/"
         return self.migration_path
 
-    def create_migration_nfs_dir(self, host):
-        mountpoint = self.find_nfs_mountpoint(host)
-        if mountpoint is False:
-            return False
-        if len(mountpoint) == 0:
+    def create_migration_nfs_dir(self, host, storage_pool_uuid):
+        if len(storage_pool_uuid) == 0:
             print "Error: mountpoint cannot be empty"
             return False
-        print "Note: Creating migration folder %s" % self.get_migration_path()
+        self.mountpoint = "/mnt/" + storage_pool_uuid
+        print "Note: Creating migration folder %s on %s" % (self.get_migration_path(), host.name)
         try:
             with settings(host_string=self.ssh_user + "@" + host.ipaddress):
                 command = "sudo mkdir -p " + self.get_migration_path()
@@ -111,12 +95,12 @@ class Kvm(hypervisor.hypervisor):
         except:
             return False
 
-    def download_volume(self, kvmhost, url, path):
-        print "Note: Downloading disk from %s to host %s" % (url, kvmhost.name)
+    def download_volume(self, kvmhost, file_location, path):
+        print "Note: Downloading disk from %s to host %s" % (file_location, kvmhost.name)
         try:
             with settings(host_string=self.ssh_user + "@" + kvmhost.ipaddress):
-                command = "nice -n 19 sudo aria2c --file-allocation=none -c -m 5 -d %s -o %s.vhd %s" % \
-                          (self.get_migration_path(), path, url)
+                command = "sudo rsync -av -P %s %s%s.vhd" % (file_location, self.get_migration_path(), path)
+
                 return fab.run(command)
         except:
             return False

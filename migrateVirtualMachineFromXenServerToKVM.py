@@ -32,6 +32,8 @@ from cloudstackops import kvm
 import os.path
 from random import choice
 import getpass
+from datetime import datetime
+
 
 # Function to handle our arguments
 
@@ -133,16 +135,41 @@ def handleArguments(argv):
 
 def exit_script(message):
     print "Fatal Error: %s" % message
-
-    # Notify admin
-    msgSubject = 'Error: problem with maintenance for VM %s / %s' % (vm.name, vm.instancename)
-    emailbody = 'Error: %s' % message
-    c.sendMail(c.mail_from, c.errors_to, msgSubject, emailbody)
     sys.exit(1)
+
+
+def start_vm(hypervisor_name):
+    global message, result, autoStartVM
+    if DRYRUN == 1:
+        message = "Would have started vm %s with id %s" % (vm.name, vm.id)
+        c.print_message(message=message, message_type="Note", to_slack=False)
+    elif autoStartVM:
+        message = "Starting virtualmachine %s with id %s" % (vm.name, vm.id)
+        c.print_message(message=message, message_type="Note", to_slack=True)
+        result = c.startVirtualMachine(vm.id)
+        if result == 1:
+            message = "Start vm failed -- exiting."
+            c.print_message(message=message, message_type="Error", to_slack=True)
+            message = "investegate manually!"
+            c.print_message(message=message, message_type="Note", to_slack=False)
+            sys.exit(1)
+
+        if result.virtualmachine.state == "Running":
+            message = "%s is started successfully on %s" % (result.virtualmachine.name, hypervisor_name)
+            c.print_message(message=message, message_type="Note", to_slack=True)
+        else:
+            warningMsg = "Warning: " + result.virtualmachine.name + " is in state " + \
+                         result.virtualmachine.state + \
+                         " instead of Running. Please investigate (could just take some time)."
+            print warningMsg
 
 # Parse arguments
 if __name__ == "__main__":
     handleArguments(sys.argv[1:])
+
+# Start time
+print "Note: Starting @ %s" % time.strftime("%Y-%m-%d %H:%M")
+start_time = datetime.now()
 
 if DEBUG == 1:
     print "Warning: Debug mode is enabled!"
@@ -226,27 +253,47 @@ if vmdata is None:
 
 vm = vmdata[0]
 c.instance_name = vm.instancename
+c.vm_name = vm.name
+c.zone_name = vm.zonename
 c.slack_custom_title = "Migration details for %s" % vm.domain
 
 # Convert template
 template_dict = {
-    'Win2012R2': 'Win2012R2-DC-SBP_CIS-KVM-2016-10',
-    'Windows2012R2': 'Win2012R2-DC-SBP_CIS-KVM-2016-10',
-    'Windows 2012 DC R2': 'Win2012R2-DC-SBP_CIS-KVM-2016-10',
-    'win2008r2ee': 'Win2012R2-DC-SBP_CIS-KVM-2016-10',
+    'Win2012R2': 'Win2012R2-DC-SBP_CIS-KVM-2017-05',
+    'Windows2012R2': 'Win2012R2-DC-SBP_CIS-KVM-2017-05',
+    'Windows 2012 DC R2': 'Win2012R2-DC-SBP_CIS-KVM-2017-05',
+    'win2008r2ee': 'win2008r2ee-m2015-02-V3B19-KVM',
+    'Windows 2008R2': 'win2008r2ee-m2015-02-V3B19-KVM',
     'Win81': 'Win81x64_for_kvmvdi_v1.5',
     'Centos7': 'Centos7-x86_64-Sbp_cis-KVM-latest',
+    'Centos 7': 'Centos7-x86_64-Sbp_cis-KVM-latest',
     'Rhel7': 'Rhel7-x86_64-Sbp_cis-KVM-latest',
-    'Rhel6': 'Rhel7-x86_64-Sbp_cis-KVM-latest',
+    'Rhel6': 'Rhel6-x86_64-Sbp_cis-KVM-latest',
+    'Rhel 7': 'Rhel7-x86_64-Sbp_cis-KVM-latest',
+    'Rhel 6': 'Rhel6-x86_64-Sbp_cis-KVM-latest',
     'Centos6': 'Centos6-x86_64-Sbp_cis-KVM-latest',
+    'Centos 6': 'Centos6-x86_64-Sbp_cis-KVM-latest',
     'NSVPX-XEN': 'Netscaler 11.1.47.14f',
     'Netscaler': 'Netscaler 11.1.47.14f',
     'Ubuntu12': 'Ubuntu1204-x86_64-Sbp_cis-KVM-latest',
-    'Ubuntu14': 'Ubuntu1404-x86_64-Sbp_cis-KVM-latest'
+    'Ubuntu14': 'Ubuntu1404-x86_64-Sbp_cis-KVM-latest',
+    'Ubuntu16': 'ubuntu-16.04',
+    'Ubuntu-12': 'Ubuntu1204-x86_64-Sbp_cis-KVM-latest',
+    'Ubuntu-14': 'Ubuntu1404-x86_64-Sbp_cis-KVM-latest',
+    'Ubuntu-16': 'ubuntu-16.04',
+    'Ubuntu 12': 'Ubuntu1204-x86_64-Sbp_cis-KVM-latest',
+    'Ubuntu Server 12': 'Ubuntu1204-x86_64-Sbp_cis-KVM-latest',
+    'Ubuntu 14': 'Ubuntu1404-x86_64-Sbp_cis-KVM-latest',
+    'Ubuntu 16': 'ubuntu-16.04',
+    'Ubuntu Desktop 12': 'Ubuntu1204-x86_64-Sbp_cis-KVM-latest',
+    'ubuntu-13': 'Ubuntu1404-x86_64-Sbp_cis-KVM-latest',
+    'ubuntu 13': 'Ubuntu1404-x86_64-Sbp_cis-KVM-latest',
+    'Ubuntu 10': 'Ubuntu1404-x86_64-Sbp_cis-KVM-latest',
+    'Ubuntu-10': 'Ubuntu1404-x86_64-Sbp_cis-KVM-latest'
 }
 
 for key, value in template_dict.iteritems():
-    if key in vm.templatedisplaytext:
+    if key.lower() in vm.templatedisplaytext.lower():
         if len(newBaseTemplate) > 0 and newBaseTemplate != value:
             print "Warning: Would have guessed to use template '%s' but now using overridden value '%s'" \
                   % (value, newBaseTemplate)
@@ -254,9 +301,9 @@ for key, value in template_dict.iteritems():
         newBaseTemplate = value
 
 if len(newBaseTemplate) == 0:
-    print "Error: Was unable to detect a KVM template for this vm. Please specify one using the --new-base-template " \
-          "flag and try again."
-    sys.exit(1)
+    print "Warning: Was unable to detect a KVM template for vm %s. Please specify one using the --new-base-template " \
+          "flag and try again. Using 'Linux - Unknown template converted from XenServer'" % (vm.name)
+    newBaseTemplate = 'Linux - Unknown template converted from XenServer'
 
 if 'Netscaler' in newBaseTemplate or 'NSVPX' in newBaseTemplate:
     print "Warning: Setting doVirtvtov = False due to Netscaler detected"
@@ -281,13 +328,14 @@ else:
     print "Note: No ISOs connected to detach"
 
 # Get cluster hosts
-kvm_host = c.getFirstHostFromCluster(toClusterID)
+kvm_host = c.getRandomHostFromCluster(toClusterID)
 
 # Select storage pool
-targetStorageID = c.getRandomStoragePool(toClusterID)
-targetStoragePoolData = c.getStoragePoolData(targetStorageID)
-storagepooltags = targetStoragePoolData[0].tags
-storagepoolname = targetStoragePoolData[0].name
+targetStorage = c.getStoragePoolWithMostFreeSpace(toClusterID)
+targetStorageID = targetStorage.id
+targetStoragePoolData = c.getStoragePoolData(targetStorageID)[0]
+storagepooltags = targetStoragePoolData.tags
+storagepoolname = targetStoragePoolData.name
 
 # Get hosts that belong to toCluster
 toClusterHostsData = c.getHostsFromCluster(toClusterID)
@@ -326,41 +374,6 @@ voldata = c.getVirtualmachineVolumes(vmID, projectParam)
 saved_storage_id = None
 currentStorageID = None
 
-# Get user data to e-mail
-adminData = c.getDomainAdminUserData(vm.domainid)
-if DRYRUN == 1:
-    message = "Not sending notification e-mails due to DRYRUN setting. Would have e-mailed %s " % adminData.email
-    c.print_message(message=message, message_type="Warning", to_slack=False)
-else:
-    if not adminData.email:
-        message = "Skipping mailing due to missing e-mail address."
-        c.print_message(message=message, message_type="Warning", to_slack=False)
-
-    templatefile = open(
-        "email_template/migrateVirtualMachine_start.txt",
-        "r")
-    emailbody = templatefile.read()
-    emailbody = emailbody.replace("FIRSTNAME", adminData.firstname)
-    emailbody = emailbody.replace("LASTNAME", adminData.lastname)
-    emailbody = emailbody.replace("DOMAIN", vm.domain)
-    emailbody = emailbody.replace("VMNAME", vm.name)
-    emailbody = emailbody.replace("STATE", vm.state)
-    emailbody = emailbody.replace("INSTANCENAME", vm.instancename)
-    emailbody = emailbody.replace("TOCLUSTER", toCluster)
-    emailbody = emailbody.replace("ORGANIZATION", c.organization)
-    templatefile.close()
-
-    # Notify user
-    msgSubject = 'Starting maintenance for VM ' + \
-                 vm.name + ' / ' + vm.instancename
-    c.sendMail(c.mail_from, adminData.email, msgSubject, emailbody)
-
-    # Notify admin
-    c.sendMail(c.mail_from, c.errors_to, msgSubject, emailbody)
-
-    if DEBUG == 1:
-        print emailbody
-
 # Migrate its volumes
 for vol in voldata:
     # Check if volume is already on correct storage
@@ -369,12 +382,6 @@ for vol in voldata:
 
     if saved_storage_id is None:
         saved_storage_id = currentStorageID
-
-    if saved_storage_id != currentStorageID:
-        message = "All attached volumes need to be on the same pool! (%s versus %s)" \
-              % (saved_storage_id, currentStorageID)
-        c.print_message(message=message, message_type="Error", to_slack=False)
-        sys.exit(1)
 
     if currentStorageID == targetStorageID:
         message = "No need to migrate volume %s -- already on the desired storage pool. Skipping." % vol.name
@@ -387,7 +394,8 @@ if currentStorageID is None:
 
 # Get hosts that belong to toCluster vm is currently running on
 currentStorageData = c.getStoragePoolData(currentStorageID)[0]
-xenserver_host = c.getFirstHostFromCluster(currentStorageData.clusterid)
+xenserver_host = c.getRandomHostFromCluster(currentStorageData.clusterid)
+currentClusterData = c.listClusters({'clusterid': currentStorageData.clusterid})[0]
 
 c.slack_custom_value = "From %s to %s" % (xenserver_host.name, kvm_host.name.split(".")[0])
 
@@ -397,22 +405,25 @@ if sodata is not None:
     hosttags = (sodata[0].hosttags) if sodata[0].hosttags is not None else ''
     storagetags = (sodata[0].tags) if sodata[0].tags is not None else ''
 
-    if storagetags == '':
-        message = "Service offering has empty storage tags."
+    message = "Service offering: " + str(sodata[0].name)
+    c.print_message(message=message, message_type="Note", to_slack=False)
+
+    if hosttags == '':
+        message = "Service offering has empty hosttags."
         c.print_message(message=message, message_type="Note", to_slack=False)
 
-    if storagetags != '' and storagepooltags != storagetags and c.FORCE == 0:
+    if hosttags != '' and kvm_host.hosttags != hosttags and c.FORCE == 0:
         if DEBUG == 1:
-            print "Error: cannot do this: storage tags from provided storage pool '" + storagepooltags + \
-                  "' do not match your vm's service offering '" + storagetags + "'"
+            print "Error: hosttags of new KVM hypervisor '" + kvm_host + \
+                  "' do not match your vm's service offering '" + storagetags
             sys.exit(1)
-    elif storagetags != '' and storagepooltags != storagetags and c.FORCE == 1:
+    elif hosttags != '' and kvm_host.hosttags != hosttags and c.FORCE == 1:
         if DEBUG == 1:
-            print "Warning: storage tags from provided storage pool '" + storagepooltags + \
+            print "Warning: hosttags of new KVM hypervisor '" + kvm_host + \
                   "' do not match your vm's service offering '" + storagetags + "'. Since you used --FORCE you " \
                   "probably know what you manually need to edit in the database."
     elif DEBUG == 1:
-        print "Note: Storage tags look OK."
+        print "Note: hosttags look OK."
 
 # Stop this vm if it was running
 if needToStop:
@@ -424,16 +435,10 @@ if needToStop:
         c.print_message(message=message, message_type="Note", to_slack=True)
         result = c.stopVirtualMachine(vm.id)
         if result == 1:
-            message = "Stop vm failed -- exiting."
+            message = "Stop vm %s failed -- exiting." % vm.name
             c.print_message(message=message, message_type="Error", to_slack=True)
             message = "investigate manually!"
             c.print_message(message=message, message_type="Note", to_slack=False)
-
-            # Notify admin
-            msgSubject = 'Warning: problem with maintenance for vm ' + \
-                         vm.name + ' / ' + vm.instancename
-            emailbody = "Could not stop vm " + vm.name
-            c.sendMail(c.mail_from, c.errors_to, msgSubject, emailbody)
             sys.exit(1)
 
         if result.virtualmachine.state == "Stopped":
@@ -445,19 +450,13 @@ if needToStop:
                       "Re-run script to try again -- exit." % (result.virtualmachine.name, result.virtualmachine.state)
             c.print_message(message=message, message_type="Error", to_slack=True)
 
-            # Notify admin
-            msgSubject = 'Warning: problem with maintenance for VM ' + \
-                         vm.name + ' / ' + vm.instancename
-            emailbody = 'Could not stop VM ' + vm.name
-            c.sendMail(c.mail_from, c.errors_to, msgSubject, emailbody)
-            sys.exit(1)
 
 # Here we have a stopped VM to work with
 
 # Prepare the folders
 if x.prepare_xenserver(xenserver_host) is False:
     sys.exit(1)
-if k.prepare_kvm(kvm_host) is False:
+if k.prepare_kvm(kvm_host, targetStoragePoolData.id) is False:
     sys.exit(1)
 if k.put_scripts(kvm_host) is False:
     sys.exit(1)
@@ -479,26 +478,29 @@ for (name, path, uuid, vmstate, voltype) in volumes_result:
             c.print_message(message=message, message_type="Error", to_slack=True)
             message = "Nothing has changed, you can either retry or start the VM on XenServer"
             c.print_message(message=message, message_type="Note", to_slack=False)
+            start_vm("XenServer")
             sys.exit(1)
 
         # Transfer volume from XenServer to KVM
         message = "Note: Extracting volume %s" % name
         c.print_message(message=message, message_type="Note", to_slack=False)
 
-        url_to_download = x.extract_volume_wrapper(path, xenserver_host)
-        if url_to_download is None:
+        file_to_download = "/mnt/NL1-NETAPPS/" + currentClusterData.name + "/" + str(x.extract_volume_wrapper(path, xenserver_host))
+        if file_to_download is None:
             message = "Transferring volume failed: did not get download url from API"
             c.print_message(message=message, message_type="Error", to_slack=True)
             message = "Check volume_store_ref table, field url. It should contain a valid URL or NULL"
             c.print_message(message=message, message_type="Note", to_slack=False)
             message = "Nothing has changed, you can either retry or start the VM on XenServer"
             c.print_message(message=message, message_type="Note", to_slack=False)
+            start_vm("XenServer")
             sys.exit(1)
-        if k.download_volume(kvm_host, url_to_download, path) is False:
+        if k.download_volume(kvm_host, file_to_download, path) is False:
             message = "Downloading volume %s failed" % path
             c.print_message(message=message, message_type="Error", to_slack=True)
             message = "Nothing has changed, you can either retry or start the VM on XenServer"
             c.print_message(message=message, message_type="Note", to_slack=False)
+            start_vm("XenServer")
             sys.exit(1)
         message = "Downloading volume %s (name on disk %s) to KVM was successful" % (name, path)
         c.print_message(message=message, message_type="Note", to_slack=False)
@@ -512,9 +514,14 @@ for (name, path, uuid, vmstate, voltype) in volumes_result:
             message = "%s is a disk of type %s" % (name, voltype)
             c.print_message(message=message, message_type="Note", to_slack=False)
             kvmresult = k.make_kvm_compatible(kvm_host, path, doVirtvtov, True)
+            message = "For troubleshooting purposes, use this command to edit /etc/fstab (on any hypervisor) " \
+                      "of cluster %s: ```virt-edit -a %s /etc/fstab```" % (toCluster, path)
+            c.print_message(message=message, message_type="Note", to_slack=to_slack)
+
         else:
             message = "Found volume %s with unknown type %s. Halting." % (name, voltype)
             c.print_message(message=message, message_type="Error", to_slack=True)
+            start_vm("XenServer")
             sys.exit(1)
 
         if kvmresult is False:
@@ -524,6 +531,7 @@ for (name, path, uuid, vmstate, voltype) in volumes_result:
             c.print_message(message=message, message_type="Note", to_slack=False)
             message = "Nothing has changed, you can either retry or start the VM on XenServer"
             c.print_message(message=message, message_type="Note", to_slack=False)
+            start_vm("XenServer")
             sys.exit(1)
         message = "Converting volume %s to KVM was successful" % path
         c.print_message(message=message, message_type="Note", to_slack=True)
@@ -534,14 +542,14 @@ for (name, path, uuid, vmstate, voltype) in volumes_result:
 result = s.connectMySQL(mysqlHost, mysqlPasswd)
 if result > 0:
     message = "MySQL connection failed"
-    c.print_message(message=message, message_type="Error", to_slack=True)
+    c.print_message(message=message, message_type="Error", to_slack=to_slack)
     sys.exit(1)
 elif DEBUG == 1:
     print "DEBUG: MySQL connection successful"
     print s.conn
 
 # Revery Query
-s.generate_revert_query(vm.instancename)
+revert_sql = s.generate_revert_query(vm.instancename)
 
 message = "Updating the database to activate the VM on KVM"
 c.print_message(message=message, message_type="Note", to_slack=False)
@@ -551,94 +559,16 @@ if not s.update_instance_to_kvm(vm.instancename, newBaseTemplate, storagepoolnam
     c.print_message(message=message, message_type="Error", to_slack=True)
     message = "Nothing has changed, you can either retry or start the VM on XenServer"
     c.print_message(message=message, message_type="Note", to_slack=False)
+    start_vm("XenServer")
     sys.exit(1)
+else:
+    message =  "Note: Should you want to revert, you simply stop the VM on KVM and then run this SQL:"
+    c.print_message(message=message, message_type="Note", to_slack=False)
+    c.print_message(message="Revert SQL: ```" + revert_sql + "```", message_type="Plain", to_slack=to_slack)
 
 # Start the VM again
 if autoStartVM:
-    if DRYRUN == 1:
-        message = "Would have started vm %s with id %s" % (vm.name, vm.id)
-        c.print_message(message=message, message_type="Note", to_slack=False)
-    else:
-        message = "Starting virtualmachine %s with id %s" % (vm.name, vm.id)
-        c.print_message(message=message, message_type="Note", to_slack=True)
-        result = c.startVirtualMachine(vm.id)
-        if result == 1:
-            message = "Start vm failed -- exiting."
-            c.print_message(message=message, message_type="Error", to_slack=True)
-            message = "investegate manually!"
-            c.print_message(message=message, message_type="Note", to_slack=False)
-
-            # Notify admin
-            msgSubject = 'Warning: problem with maintenance for vm ' + \
-                         vm.name + ' / ' + vm.instancename
-            emailbody = "Could not start vm " + vm.name
-            c.sendMail(c.mail_from, c.errors_to, msgSubject, emailbody)
-            sys.exit(1)
-
-        if result.virtualmachine.state == "Running":
-            message = "%s is started successfully on KVM" % result.virtualmachine.name
-            c.print_message(message=message, message_type="Note", to_slack=True)
-            # Get user data to e-mail
-            adminData = c.getDomainAdminUserData(vm.domainid)
-            if DRYRUN == 1:
-                print "Note: Not sending notification e-mails due to DRYRUN setting. " \
-                      "Note: Would have e-mailed " + adminData.email
-            else:
-
-                if not adminData.email:
-                    message = "Skipping mailing due to missing e-mail address."
-                    c.print_message(message=message, message_type="Warning", to_slack=False)
-
-                templatefile = open(
-                    "email_template/migrateVirtualMachine_done.txt",
-                    "r")
-                emailbody = templatefile.read()
-                emailbody = emailbody.replace(
-                    "FIRSTNAME",
-                    adminData.firstname)
-                emailbody = emailbody.replace(
-                    "LASTNAME",
-                    adminData.lastname)
-                emailbody = emailbody.replace("DOMAIN", vm.domain)
-                emailbody = emailbody.replace("VMNAME", vm.name)
-                emailbody = emailbody.replace("STATE", vm.state)
-                emailbody = emailbody.replace(
-                    "INSTANCENAME",
-                    vm.instancename)
-                emailbody = emailbody.replace("TOCLUSTER", toCluster)
-                emailbody = emailbody.replace(
-                    "ORGANIZATION",
-                    c.organization)
-                templatefile.close()
-
-                # Notify user
-                msgSubject = 'Finished maintenance for VM ' + \
-                             vm.name + ' / ' + vm.instancename
-                c.sendMail(
-                    c.mail_from,
-                    adminData.email,
-                    msgSubject,
-                    emailbody)
-
-                # Notify admin
-                c.sendMail(c.mail_from, c.errors_to, msgSubject, emailbody)
-
-                if DEBUG == 1:
-                    print emailbody
-
-        else:
-            warningMsg = "Warning: " + result.virtualmachine.name + " is in state " + \
-                         result.virtualmachine.state + \
-                         " instead of Started. Please investigate (could just take some time)."
-            print warningMsg
-            autoStartVM = "false"
-
-            # Notify admin
-            msgSubject = 'Warning: problem with maintenance for VM ' + \
-                         vm.name + ' / ' + vm.instancename
-            emailbody = warningMsg
-            c.sendMail(c.mail_from, c.errors_to, msgSubject, emailbody)
-
+    start_vm("KVM")
 else:
     message = "Not starting %s automatically because when migration started it was also in Stopped state!" % vm.name
     to_slack = True
@@ -646,45 +576,16 @@ else:
         to_slack = False
     c.print_message(message=message, message_type="Warning", to_slack=to_slack)
 
-    # Get user data to e-mail
-    adminData = c.getDomainAdminUserData(vm.domainid)
-    if DRYRUN == 1:
-        message = "Not sending notification e-mails due to DRYRUN setting. Would have e-mailed %s" % adminData.email
-        c.print_message(message=message, message_type="Warning", to_slack=False)
-    else:
-
-        if not adminData.email:
-            message = "Skipping mailing due to missing e-mail address."
-            c.print_message(message=message, message_type="Warning", to_slack=False)
-
-        # Tell the user how to start the VM manually
-        cloudmonkeyCmd = "cloudmonkey start virtualmachine id=" + vm.id
-
-        templatefile = open(
-            "email_template/migrateVirtualMachine_done_nostart.txt",
-            "r")
-        emailbody = templatefile.read()
-        emailbody = emailbody.replace("FIRSTNAME", adminData.firstname)
-        emailbody = emailbody.replace("LASTNAME", adminData.lastname)
-        emailbody = emailbody.replace("DOMAIN", vm.domain)
-        emailbody = emailbody.replace("VMNAME", vm.name)
-        emailbody = emailbody.replace("STATE", vm.state)
-        emailbody = emailbody.replace("INSTANCENAME", vm.instancename)
-        emailbody = emailbody.replace("CLOUDMONKEYCMD", cloudmonkeyCmd)
-        emailbody = emailbody.replace("TOCLUSTER", toCluster)
-        emailbody = emailbody.replace("ORGANIZATION", c.organization)
-        templatefile.close()
-
-        # Notify user
-        msgSubject = 'Finished maintenance for VM ' + \
-                     vm.name + ' / ' + vm.instancename
-        c.sendMail(c.mail_from, adminData.email, msgSubject, emailbody)
-
-        # Notify mon-cloud
-        c.sendMail(c.mail_from, c.errors_to, msgSubject, emailbody)
-
-        if DEBUG == 1:
-            print emailbody
-
 # Disconnect MySQL
 s.disconnectMySQL()
+
+# End time
+message = "Finished @ " + time.strftime("%Y-%m-%d %H:%M")
+c.print_message(message=message, message_type="Note", to_slack=False)
+elapsed_time = datetime.now() - start_time
+
+m, s = divmod(elapsed_time.total_seconds(), 60)
+h, m = divmod(m, 60)
+
+message = "VM %s is successfully migrated to KVM on cluster %s in %02d:%02d:%02d" % (vm.name, toCluster, h, m, s)
+c.print_message(message=message, message_type="Note", to_slack=to_slack)
