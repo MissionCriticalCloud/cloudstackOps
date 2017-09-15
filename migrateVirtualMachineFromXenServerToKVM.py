@@ -133,6 +133,10 @@ def handleArguments(argv):
         print help
         sys.exit()
 
+    if not os.path.isdir(helperScriptsPath):
+        print "Error: Directory %s as specified with --helper-scripts-path does not exist!" % helperScriptsPath
+        sys.exit(1)
+
 def exit_script(message):
     print "Fatal Error: %s" % message
     sys.exit(1)
@@ -415,12 +419,12 @@ if sodata is not None:
     if hosttags != '' and kvm_host.hosttags != hosttags and c.FORCE == 0:
         if DEBUG == 1:
             print "Error: hosttags of new KVM hypervisor '" + kvm_host + \
-                  "' do not match your vm's service offering '" + storagetags
+                  "' do not match your vm's service offering '" + hosttags
             sys.exit(1)
     elif hosttags != '' and kvm_host.hosttags != hosttags and c.FORCE == 1:
         if DEBUG == 1:
             print "Warning: hosttags of new KVM hypervisor '" + kvm_host + \
-                  "' do not match your vm's service offering '" + storagetags + "'. Since you used --FORCE you " \
+                  "' do not match your vm's service offering '" + hosttags + "'. Since you used --FORCE you " \
                   "probably know what you manually need to edit in the database."
     elif DEBUG == 1:
         print "Note: hosttags look OK."
