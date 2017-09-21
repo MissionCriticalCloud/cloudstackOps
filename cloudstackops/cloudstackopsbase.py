@@ -92,6 +92,8 @@ class CloudStackOpsBase(object):
         self.cluster = "Undefined"
         self.instance_name = "Undefined"
         self.task = "Undefined"
+        self.vm_name = "Undefined"
+        self.zone_name = "Undefined"
 
         self.printWelcome()
         self.configure_slack()
