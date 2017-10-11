@@ -1549,7 +1549,7 @@ class CloudStackOps(CloudStackOpsBase):
                          "# VMs",
                          "Bond Status"])
 
-        for clusterhost in clusterHostsData:
+        for clusterhost in sorted(clusterHostsData,key=lambda h: h.name):
 
             # Some progress indication
             sys.stdout.write(clusterhost.name + ", ")
@@ -1599,7 +1599,7 @@ class CloudStackOps(CloudStackOpsBase):
                 vmcount = "UNKNOWN"
 
             # Table
-            t.add_row([clusterhost.name,
+            t.add_row([clusterhost.name.split('.')[0],
                        pm,
                        clusterhost.resourcestate,
                        clusterhost.state,
@@ -1658,17 +1658,17 @@ class CloudStackOps(CloudStackOpsBase):
     # Check vm's still running on this host
     def getVirtualMachinesRunningOnHost(self, hostID):
         all_vmdata = ()
-        vms = self.listVirtualmachines({'hostid': hostID, 'listAll': 'true'}) or tuple([])
-        pvms = self.listVirtualmachines({'hostid': hostID, 'listAll': 'true', 'isProjectVm': 'true'}) or tuple([])
-        routers = self.getRouterData({'hostid': hostID, 'listAll': 'true'}) or tuple([])
-        prouters = self.getRouterData({'hostid': hostID, 'listAll': 'true', 'isProjectVm': 'true'}) or tuple([])
+        vms = self.listVirtualmachines({'hostid': hostID, 'listAll': 'true'}) or []
+        pvms = tuple([self.listVirtualmachines({'hostid': hostID, 'listAll': 'true', 'isProjectVm': 'true'})] or [])
+        routers = tuple([self.getRouterData({'hostid': hostID, 'listAll': 'true'})] or [])
+        prouters = tuple([self.getRouterData({'hostid': hostID, 'listAll': 'true', 'isProjectVm': 'true'})] or [])
         svms = tuple([[svm for svm in self.getSystemVmData({'hostid': hostID}) or []]])
 
         # Sort VM list on memory
         if len(vms) > 0:
             vms.sort(key=operator.attrgetter('memory'), reverse=True)
 
-        all_vmdata += vms
+        all_vmdata += tuple([vms])
         all_vmdata += pvms
         all_vmdata += routers
         all_vmdata += prouters
@@ -1792,6 +1792,8 @@ class CloudStackOps(CloudStackOpsBase):
                                 })
                                 instance = vm.name
                             else:
+                                if vm.isoid is not None:
+                                    self.detach_iso(vm.id)
                                 vmresult = self.migrateVirtualMachine(
                                     vm.id,
                                     migrationHost.id)
