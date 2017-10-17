@@ -806,12 +806,13 @@ class CloudStackOps(CloudStackOpsBase):
             return False
         if not 'projectParam' in args:
             args['projectParam'] = "false"
-        systemvm = self.getRouterData({'id': args['vmid'], 'isProjectVm': args['projectParam']})[0]
-        if self.DEBUG:
-            print "Received systemvm:"
-            print systemvm
 
         if not 'hostid' in args:
+            systemvm = self.getRouterData({'id': args['vmid'], 'isProjectVm': args['projectParam']})[0]
+            if self.DEBUG:
+                print "Received systemvm:"
+                print systemvm
+
             requested_memory = self.get_needed_memory(systemvm)
             host_data = self.getHostData({'hostid': systemvm.hostid})[0]
             if self.DEBUG:
@@ -1548,7 +1549,7 @@ class CloudStackOps(CloudStackOpsBase):
                          "# VMs",
                          "Bond Status"])
 
-        for clusterhost in clusterHostsData:
+        for clusterhost in sorted(clusterHostsData,key=lambda h: h.name):
 
             # Some progress indication
             sys.stdout.write(clusterhost.name + ", ")
@@ -1598,7 +1599,7 @@ class CloudStackOps(CloudStackOpsBase):
                 vmcount = "UNKNOWN"
 
             # Table
-            t.add_row([clusterhost.name,
+            t.add_row([clusterhost.name.split('.')[0],
                        pm,
                        clusterhost.resourcestate,
                        clusterhost.state,
@@ -1657,27 +1658,22 @@ class CloudStackOps(CloudStackOpsBase):
     # Check vm's still running on this host
     def getVirtualMachinesRunningOnHost(self, hostID):
         all_vmdata = ()
-        vms = self.listVirtualmachines({'hostid': hostID, 'listAll': 'true'}),
-        pvms = self.listVirtualmachines({'hostid': hostID, 'listAll': 'true', 'isProjectVm': 'true'}),
-        routers = self.getRouterData({'hostid': hostID, 'listAll': 'true'}),
-        prouters = self.getRouterData({'hostid': hostID, 'listAll': 'true', 'isProjectVm': 'true'}),
-        svms = self.getSystemVmData({'hostid': hostID})
-
-        if not None in vms:
-            all_vmdata += vms
-        if not None in pvms:
-            all_vmdata += pvms
-        if not None in routers:
-            all_vmdata += routers
-        if not None in prouters:
-            all_vmdata += prouters
-        if svms is not None:
-            for vm in svms:
-                all_vmdata[0].append(vm)
+        vms = self.listVirtualmachines({'hostid': hostID, 'listAll': 'true'}) or []
+        pvms = tuple([self.listVirtualmachines({'hostid': hostID, 'listAll': 'true', 'isProjectVm': 'true'})] or [])
+        routers = tuple([self.getRouterData({'hostid': hostID, 'listAll': 'true'})] or [])
+        prouters = tuple([self.getRouterData({'hostid': hostID, 'listAll': 'true', 'isProjectVm': 'true'})] or [])
+        svms = tuple([[svm for svm in self.getSystemVmData({'hostid': hostID}) or []]])
 
         # Sort VM list on memory
-        if len(all_vmdata) > 0 :
-            all_vmdata[0].sort(key=operator.attrgetter('memory'), reverse=True)
+        if len(vms) > 0:
+            vms.sort(key=operator.attrgetter('memory'), reverse=True)
+
+        all_vmdata += tuple([vms])
+        all_vmdata += pvms
+        all_vmdata += routers
+        all_vmdata += prouters
+        all_vmdata += svms
+
 
         if self.DEBUG:
             print all_vmdata
@@ -1796,6 +1792,8 @@ class CloudStackOps(CloudStackOpsBase):
                                 })
                                 instance = vm.name
                             else:
+                                if vm.isoid is not None:
+                                    self.detach_iso(vm.id)
                                 vmresult = self.migrateVirtualMachine(
                                     vm.id,
                                     migrationHost.id)
