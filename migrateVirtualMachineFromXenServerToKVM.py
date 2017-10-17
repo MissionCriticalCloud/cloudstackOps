@@ -468,8 +468,9 @@ if k.put_scripts(kvm_host) is False:
 
 # Get all volumes
 volumes_result = s.get_volumes_for_instance(vm.instancename)
-for (name, path, uuid, vmstate, voltype) in volumes_result:
-    message = "Processing volume '%s', filename '%s', uuid '%s'" % (name, path, uuid)
+for (name, path, uuid, size, vmstate, voltype) in volumes_result:
+    size_gb = size / 1024 / 1024 / 1024
+    message = "Processing volume '%s', filename '%s', uuid '%s', size '%sGB'" % (name, path, uuid, size_gb)
     to_slack = True
     if DRYRUN == 1:
         to_slack = False
