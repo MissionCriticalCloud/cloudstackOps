@@ -19,16 +19,21 @@
 #      specific language governing permissions and limitations
 #      under the License.
 
-# We depend on these
-import uuid
+import socket
 import sys
 import time
-import socket
+# We depend on these
+import uuid
 
-# Fabric
-from fabric.api import *
 from fabric import api as fab
-from fabric import *
+# Fabric
+from fabric.api import (
+    env,
+    output,
+    put,
+    settings
+)
+
 import hypervisor
 
 # Set user/passwd for fabric ssh
@@ -163,9 +168,32 @@ class Kvm(hypervisor.hypervisor):
     def inject_drivers(self, kvmhost, volume_uuid):
         print "Note: Inject drivers into disk %s on host %s" % (volume_uuid, kvmhost.name)
         try:
-            with settings(host_string=self.ssh_user + "@" + kvmhost.ipaddress):
+            with settings(host_string=self.ssh_user + "@" + kvmhost.ipaddress, warn_only=True):
                 command = "cd %s; sudo virt-v2v -i disk %s -o local -os ./" % (self.get_migration_path(), volume_uuid)
-                return fab.run(command)
+                output = fab.run(command)
+
+                if output.failed and "The NTFS partition is in an unsafe state." in output:
+                    print "Note: NTFS is in an unsafe state, trying to fix for disk %s on host %s" % (volume_uuid, kvmhost.name)
+                    if self.ntfsfix(kvmhost, volume_uuid, output):
+                        print "Note: Retrying to inject drivers into disk %s on host %s" % (volume_uuid, kvmhost.name)
+                        output = fab.run(command).succeeded
+
+                return output
+        except:
+            return False
+
+    def ntfsfix(self, kvmhost, volume_uuid, output):
+        print "Note: Trying to fix NTFS on disk %s on host %s" % (volume_uuid, kvmhost.name)
+        try:
+            with settings(host_string=self.ssh_user + "@" + kvmhost.ipaddress, warn_only=True):
+                for line in output.split('\n'):
+                    if "Original error message: mount:" in line:
+                        device = line.split(" ")[4]
+
+                        print "Note: Fixing NTFS partition %s disk %s on host %s" % (device, volume_uuid, kvmhost.name)
+                        command = "cd %s; sudo guestfish add %s : run : ntfsfix %s" % \
+                                  (self.get_migration_path(), volume_uuid, device)
+                        return fab.run(command).succeeded
         except:
             return False
 

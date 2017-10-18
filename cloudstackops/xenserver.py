@@ -466,7 +466,7 @@ class xenserver(hypervisor.hypervisor):
         return file_location
 
     def extract_volume(self, host, path):
-        print "Note: We're exporting disk with name (on disk) '%s' and make it available for HTTP download" % path
+        print "Note: We're exporting disk with name (on disk) '%s' and make it available for rsync download" % path
         try:
             with settings(show('output'), host_string=self.ssh_user + "@" + host.ipaddress):
                 return fab.run("DISKPATH=" + path + "; DISKUUID=$(xe vdi-list location=${DISKPATH} "
