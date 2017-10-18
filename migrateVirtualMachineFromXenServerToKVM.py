@@ -278,6 +278,7 @@ template_dict = {
     'Rhel 6': 'Rhel6-x86_64-Sbp_cis-KVM-latest',
     'Centos6': 'Centos6-x86_64-Sbp_cis-KVM-latest',
     'Centos 6': 'Centos6-x86_64-Sbp_cis-KVM-latest',
+    'CentOS 6': 'Centos6-x86_64-Sbp_cis-KVM-latest',
     'NSVPX-XEN': 'Netscaler 11.1.47.14f',
     'Netscaler': 'Netscaler 11.1.47.14f',
     'Ubuntu12': 'Ubuntu1204-x86_64-Sbp_cis-KVM-latest',
