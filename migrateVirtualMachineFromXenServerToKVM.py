@@ -265,6 +265,7 @@ c.slack_custom_title = "Migration details for %s" % vm.domain
 template_dict = {
     'Win2012R2': 'Win2012R2-DC-SBP_CIS-KVM-2017-05',
     'Windows2012R2': 'Win2012R2-DC-SBP_CIS-KVM-2017-05',
+    'Windows 2012 R2': 'Win2012R2-DC-SBP_CIS-KVM-2017-05',
     'Windows 2012 DC R2': 'Win2012R2-DC-SBP_CIS-KVM-2017-05',
     'win2008r2ee': 'win2008r2ee-m2015-02-V3B19-KVM',
     'Windows 2008R2': 'win2008r2ee-m2015-02-V3B19-KVM',
@@ -277,6 +278,7 @@ template_dict = {
     'Rhel 6': 'Rhel6-x86_64-Sbp_cis-KVM-latest',
     'Centos6': 'Centos6-x86_64-Sbp_cis-KVM-latest',
     'Centos 6': 'Centos6-x86_64-Sbp_cis-KVM-latest',
+    'CentOS 6': 'Centos6-x86_64-Sbp_cis-KVM-latest',
     'NSVPX-XEN': 'Netscaler 11.1.47.14f',
     'Netscaler': 'Netscaler 11.1.47.14f',
     'Ubuntu12': 'Ubuntu1204-x86_64-Sbp_cis-KVM-latest',
@@ -467,8 +469,9 @@ if k.put_scripts(kvm_host) is False:
 
 # Get all volumes
 volumes_result = s.get_volumes_for_instance(vm.instancename)
-for (name, path, uuid, vmstate, voltype) in volumes_result:
-    message = "Processing volume '%s', filename '%s', uuid '%s'" % (name, path, uuid)
+for (name, path, uuid, size, vmstate, voltype) in volumes_result:
+    size_gb = size / 1024 / 1024 / 1024
+    message = "Processing volume '%s', filename '%s', uuid '%s', size '%sGB'" % (name, path, uuid, size_gb)
     to_slack = True
     if DRYRUN == 1:
         to_slack = False
