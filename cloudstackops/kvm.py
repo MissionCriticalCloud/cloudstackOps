@@ -298,7 +298,7 @@ class Kvm(hypervisor.hypervisor):
             return fab.run("virsh list | grep running | wc -l")
 
     # Reboot host and execute scripts
-    def host_reboot(self, host, halt_hypervisor=False, force_reset_hypervisor=False):
+    def host_reboot(self, host, halt_hypervisor=False, force_reset_hypervisor=False, skip_reboot_hypervisor=False):
 
         # Count VMs to be sure
         if self.host_get_vms(host) != "0":
@@ -320,6 +320,8 @@ class Kvm(hypervisor.hypervisor):
                 elif force_reset_hypervisor:
                     print "Note: Immediately force-resetting host %s" % host.name
                     fab.run("sudo sync; sudo echo b > /proc/sysrq-trigger")
+                elif skip_reboot_hypervisor:
+                    print "Note: Skipping reboot on host %s" % host.name
                 else:
                     print "Note: Rebooting host %s in 60s. Undo with 'sudo shutdown -c' " % host.name
                     fab.run("sudo shutdown -r 1")
@@ -328,7 +330,8 @@ class Kvm(hypervisor.hypervisor):
                   "shutting itself down, so ignoring it."
 
         # Check the host is really offline
-        self.check_offline(host)
+        if not skip_reboot_hypervisor:
+	    self.check_offline(host)
 
         # Wait until the host is back
         self.check_connect(host)

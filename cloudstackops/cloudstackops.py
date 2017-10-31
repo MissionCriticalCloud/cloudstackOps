@@ -1704,11 +1704,11 @@ class CloudStackOps(CloudStackOpsBase):
                 if h.suitableformigration == False:
                     continue
                 # Handle dedicated hosts
-                if 'dedicated' in currentHost:
-                    if currentHost.dedicated != h.dedicated:
-                        continue
-                    if currentHost.dedicated == True and currentHost.domainid != h.domainid:
-                        continue
+                #if 'dedicated' in currentHost:
+                #    if currentHost.dedicated != h.dedicated:
+                #        continue
+                #    if currentHost.dedicated == True and currentHost.domainid != h.domainid:
+                #        continue
                 # And are not in Maintenance, Error or Disabled
                 if h.resourcestate == "Disabled" or h.resourcestate == "Maintenance" or h.resourcestate == "Error":
                     continue

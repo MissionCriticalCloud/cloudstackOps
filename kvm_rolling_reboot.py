@@ -63,6 +63,8 @@ def handleArguments(argv):
     halt_hypervisor = False
     global force_reset_hypervisor
     force_reset_hypervisor = False
+    global skip_reboot_hypervisor
+    skip_reboot_hypervisor = False
     global pre_empty_script
     pre_empty_script = 'kvm_pre_empty_script.sh'
     global post_empty_script
@@ -86,6 +88,8 @@ def handleArguments(argv):
         'upgrades) ' + \
         '\n  --force-reset-hypervisor\t\t\tInstead of the default reboot, force-reset the hypervisor (useful in ' \
         'situations where a normal reboot would hang. It will sync filesystems first.) ' + \
+        '\n  --skip-reboot-hypervisor\t\t\tInstead of the default reboot, skip the hypervisor reboot (useful in ' \
+        'situations where you would only want to live migrate virtual machines in the cluster.) ' + \
         '\n  --pre-empty-script\t\t\t\tBash script to run on hypervisor before starting the live migrations to empty ' \
         'hypervisor (expected in same folder as this script)' + \
         '\n  --post-empty-script\t\t\t\tBash script to run on hypervisor after a hypervisor has no more VMs running' \
@@ -99,7 +103,7 @@ def handleArguments(argv):
         opts, args = getopt.getopt(
             argv, "hc:n:t:p", [
                 "credentials-file=", "clustername=", "ignore-hosts=", "only-hosts=", "threads=", "pre-empty-script=",
-                "post-empty-script=", "force-reset-hypervisor", "no-bond-check", "halt", "debug", "exec",
+                "post-empty-script=", "force-reset-hypervisor", "skip-reboot-hypervisor", "no-bond-check", "halt", "debug", "exec",
                 "post-reboot-script=", "prepare"])
     except getopt.GetoptError as e:
         print "Error: " + str(e)
@@ -124,6 +128,8 @@ def handleArguments(argv):
             halt_hypervisor = True
         elif opt in ("--force-reset-hypervisor"):
             force_reset_hypervisor = True
+        elif opt in ("--skip-reboot-hypervisor"):
+            skip_reboot_hypervisor = True
         elif opt in ("--pre-empty-script"):
             pre_empty_script = arg
         elif opt in ("--post-empty-script"):
@@ -231,6 +237,10 @@ if force_reset_hypervisor:
     message = "Instead of reboot, we will force-reset the hypervisors!"
     c.print_message(message=message, message_type="Warning", to_slack=to_slack)
 
+if skip_reboot_hypervisor:
+    message = "Skipping the reboot of the hypervisors!"
+    c.print_message(message=message, message_type="Warning", to_slack=to_slack)
+
 if DRYRUN == 1:
     print
     print "Warning: We are running in DRYRUN mode."
@@ -242,7 +252,7 @@ if DRYRUN == 1:
     print "      - live migrate all VMs off of it"
     print "      - execute the --post-empty-script script '" + post_empty_script + "' on the hypervisor"
     print "      - when empty, it will reboot the hypervisor"
-    print "        (halting is " + str(halt_hypervisor) + ") and (force_reset is " + str(force_reset_hypervisor) + ")"
+    print "        (halting is " + str(halt_hypervisor) + ") and (force_reset is " + str(force_reset_hypervisor) + ")  and (skip_reboot is " + str(skip_reboot_hypervisor) + ")"
     print "      - will wait for it to come back online (checks SSH connection)"
     print "      - execute the --post-reboot-script script '" + post_reboot_script + "' on the hypervisor"
     print "      - enable the host in Cosmic"
@@ -335,14 +345,16 @@ for host in cluster_hosts:
         message = "About to halt hypervisor %s. Be sure to start it manually for the procedure to continue!" % host.name
     if force_reset_hypervisor:
         message = "About to force-reset hypervisor %s" % host.name
+    if skip_reboot_hypervisor:
+        message = "About to skip reboot of hypervisor %s" % host.name
     c.print_message(message=message, message_type="Note", to_slack=True)
 
-    if not k.host_reboot(host, halt_hypervisor=halt_hypervisor, force_reset_hypervisor=force_reset_hypervisor):
+    if not k.host_reboot(host, halt_hypervisor=halt_hypervisor, force_reset_hypervisor=force_reset_hypervisor, skip_reboot_hypervisor=skip_reboot_hypervisor):
         message = "Reboot/Halt/Force-reset failed for %s. Please investigate.." % host.name
         c.print_message(message=message, message_type="Error", to_slack=True)
         sys.exit(1)
 
-    message = "Reboot/Halt/Force-reset was successful for %s." % host.name
+    message = "Reboot/Halt/Force-reset/Skip-reboot was successful for %s." % host.name
     c.print_message(message=message, message_type="Note", to_slack=True)
 
     # Enable host
