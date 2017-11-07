@@ -3,7 +3,14 @@
 ZONE=$1
 VMNAME=$2
 
-HOSTNAME=$(cloudmonkey -p $ZONE list virtualmachines name=$VMNAME listall=true filter=hostname | grep -i mccp | awk '{ print $2 }')
+HOSTNAME=$(cloudmonkey -p $ZONE list virtualmachines hypervisor=XenServer name=$VMNAME listall=true filter=hostname | grep -i mccp | awk '{ print $2 }')
+
+if [ -z "$HOSTNAME" ]
+then
+      # Couldn't find VM / host
+      exit 1
+fi
+
 PODNAME=$(cloudmonkey -p $ZONE list hosts name=$HOSTNAME filter=podname | grep -i mccp | awk '{ print $2 }')
 
 if [ "$ZONE" == "admin-nl1" ]; then
