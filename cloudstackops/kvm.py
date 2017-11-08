@@ -54,7 +54,6 @@ output['warnings'] = False
 
 
 class Kvm(hypervisor.hypervisor):
-
     def __init__(self, ssh_user='root', threads=5, pre_empty_script='', post_empty_script='', post_reboot_script='',
                  helper_scripts_path=None):
         hypervisor.__init__(ssh_user, threads)
@@ -151,7 +150,7 @@ class Kvm(hypervisor.hypervisor):
         try:
             with settings(host_string=self.ssh_user + "@" + kvmhost.ipaddress):
                 command = "cd %s; nice -n 19 sudo qemu-img convert %s.vhd -O qcow2 %s" % (self.get_migration_path(),
-                                                                             volume_uuid, volume_uuid)
+                                                                                          volume_uuid, volume_uuid)
                 return fab.run(command)
         except:
             return False
@@ -173,10 +172,15 @@ class Kvm(hypervisor.hypervisor):
                 output = fab.run(command)
 
                 if output.failed and "The NTFS partition is in an unsafe state." in output:
-                    print "Note: NTFS is in an unsafe state, trying to fix for disk %s on host %s" % (volume_uuid, kvmhost.name)
+                    print "Note: NTFS is in an unsafe state, trying to fix for disk %s on host %s" % (
+                        volume_uuid, kvmhost.name
+                    )
                     if self.ntfsfix(kvmhost, volume_uuid, output):
                         print "Note: Retrying to inject drivers into disk %s on host %s" % (volume_uuid, kvmhost.name)
                         output = fab.run(command).succeeded
+                elif output.failed:
+                    print output
+                    return False
 
                 return output
         except:
@@ -331,7 +335,7 @@ class Kvm(hypervisor.hypervisor):
 
         # Check the host is really offline
         if not skip_reboot_hypervisor:
-	    self.check_offline(host)
+            self.check_offline(host)
 
         # Wait until the host is back
         self.check_connect(host)
