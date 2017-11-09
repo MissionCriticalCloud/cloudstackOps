@@ -522,7 +522,7 @@ for (name, path, uuid, size, vmstate, voltype) in volumes_result:
             c.print_message(message=message, message_type="Note", to_slack=False)
             kvmresult = k.make_kvm_compatible(kvm_host, path, doVirtvtov, True)
             message = "For troubleshooting purposes, use this command to edit /etc/fstab (on any hypervisor) " \
-                      "of cluster %s: ```virt-edit -a %s /etc/fstab```" % (toCluster, path)
+                      "of cluster %s: ```virt-edit -a /mnt/%s/%s /etc/fstab```" % (toCluster, targetStoragePoolData.id, path)
             c.print_message(message=message, message_type="Note", to_slack=to_slack)
 
         else:
