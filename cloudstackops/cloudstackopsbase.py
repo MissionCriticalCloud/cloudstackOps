@@ -20,41 +20,32 @@
 # CloudStackOps Base Class
 # Remi Bergsma - rbergsma@schubergphilis.com
 
-import os
-import sys
-import signal
-import getopt
 import ConfigParser
-from os.path import expanduser
-from random import choice
-import logging
-import urllib2
-import time
-import string
-import random
-import commands
-from urlparse import urlparse
-from prettytable import PrettyTable
+import os
 import pprint
+import signal
+import sys
+
 # Slackweb
 try:
     import slackweb
-except:
-    print "Error: Please install slackweb library to support Slack messaging:"
+except Exception as e:
+    print "Error: Please install slackweb library to support Slack messaging: %s" % e
     print "       pip install slackweb"
     sys.exit(1)
 
 # Colored terminals
 try:
     from clint.textui import colored
-except:
-    print "Error: Please install clint library to support color in the terminal:"
+except Exception as e:
+    print "Error: Please install clint library to support color in the terminal: %s" % e
     print "       pip install clint"
     sys.exit(1)
 
 
 class Timeout:
     """Timeout class using ALARM signal."""
+
     class Timeout(Exception):
         pass
 
@@ -66,14 +57,13 @@ class Timeout:
         signal.alarm(self.sec)
 
     def __exit__(self, *args):
-        signal.alarm(0)    # disable alarm
+        signal.alarm(0)  # disable alarm
 
     def raise_timeout(self, *args):
         raise Timeout.Timeout()
 
 
 class CloudStackOpsBase(object):
-
     # Init function
     def __init__(self, debug=0, dryrun=0, force=0):
         self.DEBUG = debug
@@ -135,37 +125,37 @@ class CloudStackOpsBase(object):
         attachments = []
         attachment = {"text": message, "color": color, "mrkdwn_in": ["text", "pretext", "fields"], "mrkdwn": "true",
                       "fields": [
-            {
-                "title": str(self.slack_custom_title),
-                "value": str(self.slack_custom_value),
-                "short": "true"
-            },
-            {
-                "title": "Task",
-                "value": self.task,
-                "short": "true"
-            },
-            {
-                "title": "Cluster",
-                "value": self.cluster,
-                "short": "true"
-            },
-            {
-                "title": "Instance ID",
-                "value": self.instance_name,
-                "short": "true"
-            },
-            {
-                "title": "VM name",
-                "value": self.vm_name,
-                "short": "true"
-            },
-            {
-                "title": "Zone",
-                "value": self.zone_name,
-                "short": "true"
-            }
-        ]}
+                          {
+                              "title": str(self.slack_custom_title),
+                              "value": str(self.slack_custom_value),
+                              "short": "true"
+                          },
+                          {
+                              "title": "Task",
+                              "value": self.task,
+                              "short": "true"
+                          },
+                          {
+                              "title": "Cluster",
+                              "value": self.cluster,
+                              "short": "true"
+                          },
+                          {
+                              "title": "Instance ID",
+                              "value": self.instance_name,
+                              "short": "true"
+                          },
+                          {
+                              "title": "VM name",
+                              "value": self.vm_name,
+                              "short": "true"
+                          },
+                          {
+                              "title": "Zone",
+                              "value": self.zone_name,
+                              "short": "true"
+                          }
+                      ]}
 
         attachments.append(attachment)
         self.slack.notify(attachments=attachments, icon_emoji=":robot_face:", username="cloudstackOps")
