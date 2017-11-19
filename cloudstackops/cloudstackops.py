@@ -285,8 +285,6 @@ class CloudStackOps(CloudStackOpsBase):
                     passwd=self.password,
                     asyncTimeout=14400,
                     logging=log,
-                    port=int(
-                        self.apiport),
                     scheme=self.apiprotocol)
             if self.DEBUG == 1:
                 print self.cloudstack
@@ -375,6 +373,8 @@ class CloudStackOps(CloudStackOpsBase):
             apicall.templatefilter = "all"
         elif csApiCall == "listVolumes":
             apicall = listVolumes.listVolumesCmd()
+        elif csApiCall == "listNetworks":
+            apicall = listNetworks.listNetworksCmd()
         else:
             print "No API command to call"
             sys.exit(1)
