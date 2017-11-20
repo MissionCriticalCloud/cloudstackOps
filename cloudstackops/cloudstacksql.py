@@ -1077,3 +1077,28 @@ WHERE
             print "DEBUG: Executed SQL: " + cursor.statement
 
         cursor.close()
+
+    def check_if_network_is_vpc_tier(self, network_id):
+        query = """
+SELECT `vpc_id`
+FROM `networks`
+WHERE
+(
+  `id` = %(network_id)s
+);
+""" % dict(network_id=network_id)
+
+        cursor = self.conn.cursor()
+        cursor.execute(query)
+
+        if self.DEBUG == 1:
+            print "DEBUG: Executed SQL: " + cursor.statement
+
+        result = cursor.fetchone()
+
+        cursor.close()
+
+        if result[0]:
+            return True
+        else:
+            return False

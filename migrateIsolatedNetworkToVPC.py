@@ -149,6 +149,13 @@ if DEBUG == 1:
 # Get Isolated network details
 isolated_network_db_id = s.get_network_db_id(network_uuid)
 
+# Pre-flight checks
+# 1. Check if network is actually already an VPC tier
+if s.check_if_network_is_vpc_tier(isolated_network_db_id):
+    print "This network is already a VPC tier"
+    exit(1)
+
+# Migration
 # 1. Create the new VPC
 vpc_db_id = s.create_vpc(isolated_network_db_id, vpc_offering_db_id)
 # vpc_db_id = 1
