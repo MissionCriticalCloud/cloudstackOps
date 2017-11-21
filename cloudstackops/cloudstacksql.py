@@ -1108,3 +1108,57 @@ WHERE
             return True
         else:
             return False
+
+    def get_vpc_offering_id(self, vpc_offering_name):
+        query = """
+SELECT `id`
+FROM `vpc_offerings`
+WHERE
+(
+  `name` = '%(vpc_offering_name)s'
+);
+""" % dict(vpc_offering_name=vpc_offering_name)
+
+        cursor = self.conn.cursor()
+        cursor.execute(query)
+
+        if self.DEBUG == 1:
+            print "DEBUG: Executed SQL: " + cursor.statement
+
+        result = cursor.fetchall()
+
+        if len(result) is not 1:
+            print "Couldn't find vpc offering!"
+            print result
+            exit(1)
+
+        cursor.close()
+
+        return result[0][0]
+
+    def get_network_offering_id(self, network_offering_name):
+        query = """
+SELECT `id`
+FROM `network_offerings`
+WHERE
+(
+  `name` = '%(network_offering_name)s'
+);
+""" % dict(network_offering_name=network_offering_name)
+
+        cursor = self.conn.cursor()
+        cursor.execute(query)
+
+        if self.DEBUG == 1:
+            print "DEBUG: Executed SQL: " + cursor.statement
+
+        result = cursor.fetchall()
+
+        if len(result) is not 1:
+            print "Couldn't find network offering!"
+            print result
+            exit(1)
+
+        cursor.close()
+
+        return result[0][0]

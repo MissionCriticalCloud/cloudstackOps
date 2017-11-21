@@ -22,6 +22,10 @@ def handleArguments(argv):
     networkname = ''
     global networkuuid
     networkuuid = ''
+    global vpcofferingname
+    vpcofferingname = ''
+    global networkofferingname
+    networkofferingname = ''
     global configProfileName
     configProfileName = ''
     global force
@@ -39,6 +43,8 @@ def handleArguments(argv):
            '(or specify in ./config file)' + \
            '\n  --network-name -n <network-name>\tMigrate Isolated network with this name.' \
            '\n  --uuid -u <uuid>\tThe UUID of the network. When provided, the network name will be ignored.' \
+           '\n  --vpc-offering -v <vpc-offering-name>\tThe name of the VPC offering.' \
+           '\n  --network-offering -o <network-offering-name>\tThe name of the VPC tier network offering.' \
            '\n  --mysqlserver -s <mysql hostname>\tSpecify MySQL server config section name' + \
            '\n  --mysqlpassword <passwd>\t\tSpecify password to cloud MySQL user' + \
            '\n  --debug\t\t\t\tEnable debug mode' + \
@@ -46,8 +52,9 @@ def handleArguments(argv):
 
     try:
         opts, args = getopt.getopt(
-            argv, "hc:n:u:t:p:s:b:", [
-                "config-profile=", "network-name=", "uuid=", "mysqlserver=", "mysqlpassword=", "debug", "exec", "force"
+            argv, "hc:n:u:v:o:t:p:s:b:", [
+                "config-profile=", "network-name=", "uuid=", "vpc-offering=", "network-offering=", "mysqlserver=",
+                "mysqlpassword=", "debug", "exec", "force"
             ])
     except getopt.GetoptError as e:
         print "Error: " + str(e)
@@ -63,6 +70,10 @@ def handleArguments(argv):
             networkname = arg
         elif opt in ("-u", "--uuid"):
             networkuuid = arg
+        elif opt in ("-v", "--vpc-offering"):
+            vpcofferingname = arg
+        elif opt in ("-o", "--network-offering"):
+            networkofferingname = arg
         elif opt in ("-s", "--mysqlserver"):
             mysqlHost = arg
         elif opt in ("-p", "--mysqlpassword"):
@@ -79,7 +90,14 @@ def handleArguments(argv):
         configProfileName = "config"
 
     # We need at least these vars
-    if (len(networkname) == 0 and len(networkuuid) == 0) or len(mysqlHost) == 0:
+    if (len(networkname) == 0 and len(networkuuid) == 0) or len(mysqlHost) == 0 or len(vpcofferingname) == 0 or \
+                    len(networkofferingname) == 0:
+        print "networkname: " + networkname
+        print "networkuuid: " + networkuuid
+        print "mysqlHost: " + mysqlHost
+        print "vpcofferingname: " + vpcofferingname
+        print "networkofferingname: " + networkofferingname
+        print "Required parameter not passed!"
         print help
         sys.exit()
 
@@ -127,12 +145,6 @@ c.configProfileName = configProfileName
 # Init the CloudStack API
 c.initCloudStackAPI()
 
-# TODO Make a dict out of this, match it with the existing network offerings
-# Default VPC offering
-vpc_offering_db_id = 1
-# DefaultIsolatedNetworkOfferingForVpcNetworks
-vpc_tier_offering_db_id = 14
-
 if not networkuuid:
     networkuuid = c.checkCloudStackName({
         'csname': networkname,
@@ -162,10 +174,13 @@ if s.check_if_network_is_vpc_tier(isolated_network_db_id):
     print "This network is already a VPC tier"
     exit(1)
 
+# 2 Gather VPC / network offering
+vpc_offering_db_id = s.get_vpc_offering_id(vpcofferingname)
+vpc_tier_offering_db_id = s.get_network_offering_id(networkofferingname)
+
 # Migration
 # 1. Create the new VPC
 vpc_db_id = s.create_vpc(isolated_network_db_id, vpc_offering_db_id)
-# vpc_db_id = 1
 
 # 2. Fill the vpc service map
 s.fill_vpc_service_map(vpc_db_id)
@@ -175,14 +190,14 @@ s.migrate_ntwk_service_map_from_isolated_network_to_vpc(isolated_network_db_id)
 
 # 4. Create network acl from isolated network egress for vpc
 egress_network_acl_db_id = s.create_network_acl_for_vpc(vpc_db_id, networkuuid + '-fwrules')
-# egress_network_acl_db_id = 6
 
 # TODO Think about default deny / default allow
 # 5. Fill egress network acl
 s.convert_isolated_network_egress_rules_to_network_acl(isolated_network_db_id, egress_network_acl_db_id)
 
 # 6. Update network to become a VPC tier
-s.update_isolated_network_to_be_a_vpc_tier(vpc_db_id, egress_network_acl_db_id, vpc_tier_offering_db_id, isolated_network_db_id)
+s.update_isolated_network_to_be_a_vpc_tier(vpc_db_id, egress_network_acl_db_id, vpc_tier_offering_db_id,
+                                           isolated_network_db_id)
 
 # 7. Migrate public ips to vpc
 ipadresses = s.get_all_ipaddresses_from_network(isolated_network_db_id)
@@ -198,7 +213,6 @@ for ipaddress in ipadresses:
 
 # HACK Update Egress cidrs to be allow all
 s.fix_egress_cidr_allow_all(egress_network_acl_db_id)
-
 
 # 8. Migrate routers
 s.migrate_routers_from_isolated_network_to_vpc(vpc_db_id, isolated_network_db_id)
