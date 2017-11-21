@@ -118,6 +118,7 @@ print "Note: Found VPC " + vpcname
 c.instance_name = vpcname
 c.slack_custom_title = "Domain"
 c.slack_custom_value = vpc.domain
+c.zone_name = vpc.zonename
 
 print "Note: Let's reboot the VPC.."
 
