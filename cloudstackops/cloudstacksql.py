@@ -71,11 +71,17 @@ class CloudStackSQL(CloudStackOpsBase):
                                                                             "mysqluser=user or specify password on the command line."
                 sys.exit(1)
 
+            try:
+                mysqlport = config.get(mysqlhost, 'mysqlport')
+            except:
+                mysqlport = 3306
+
         config = {
             'user': mysqluser,
             'password': mysqlpassword,
             'host': mysqlhostname,
             'database': 'cloud',
+            'port': mysqlport,
             'raise_on_warnings': True,
             'autocommit': True
         }
