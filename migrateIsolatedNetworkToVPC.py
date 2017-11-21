@@ -18,8 +18,10 @@ def handleArguments(argv):
     DEBUG = 0
     global DRYRUN
     DRYRUN = 1
-    global networkid
-    networkid = ''
+    global networkname
+    networkname = ''
+    global networkuuid
+    networkuuid = ''
     global configProfileName
     configProfileName = ''
     global force
@@ -35,8 +37,8 @@ def handleArguments(argv):
     help = "Usage: ./" + os.path.basename(__file__) + ' [options] ' + \
            '\n  --config-profile -c <profilename>\tSpecify the CloudMonkey profile name to get the credentials from ' \
            '(or specify in ./config file)' + \
-           '\n  --network-id -i <network-id>\tMigrate Isolated network with this UUID. Network name is also' \
-           'supported as long as it is unique.' \
+           '\n  --network-name -n <network-name>\tMigrate Isolated network with this name.' \
+           '\n  --uuid -u <uuid>\tThe UUID of the network. When provided, the network name will be ignored.' \
            '\n  --mysqlserver -s <mysql hostname>\tSpecify MySQL server config section name' + \
            '\n  --mysqlpassword <passwd>\t\tSpecify password to cloud MySQL user' + \
            '\n  --debug\t\t\t\tEnable debug mode' + \
@@ -44,9 +46,9 @@ def handleArguments(argv):
 
     try:
         opts, args = getopt.getopt(
-            argv, "hc:i:t:p:s:b:", [
-                "config-profile=", "network-id=", "mysqlserver=", "mysqlpassword=",
-                "debug", "exec", "force"])
+            argv, "hc:n:u:t:p:s:b:", [
+                "config-profile=", "network-name=", "uuid=", "mysqlserver=", "mysqlpassword=", "debug", "exec", "force"
+            ])
     except getopt.GetoptError as e:
         print "Error: " + str(e)
         print help
@@ -57,8 +59,10 @@ def handleArguments(argv):
             sys.exit()
         elif opt in ("-c", "--config-profile"):
             configProfileName = arg
-        elif opt in ("-i", "--network-id"):
-            networkid = arg
+        elif opt in ("-n", "--network-name"):
+            networkname = arg
+        elif opt in ("-u", "--uuid"):
+            networkuuid = arg
         elif opt in ("-s", "--mysqlserver"):
             mysqlHost = arg
         elif opt in ("-p", "--mysqlpassword"):
@@ -75,7 +79,7 @@ def handleArguments(argv):
         configProfileName = "config"
 
     # We need at least these vars
-    if len(networkid) == 0 or len(mysqlHost) == 0:
+    if (len(networkname) == 0 and len(networkuuid) == 0) or len(mysqlHost) == 0:
         print help
         sys.exit()
 
@@ -129,10 +133,13 @@ vpc_offering_db_id = 1
 # DefaultIsolatedNetworkOfferingForVpcNetworks
 vpc_tier_offering_db_id = 14
 
-network_uuid = c.checkCloudStackName({'csname': networkid,
-                                      'csApiCall': 'listNetworks',
-                                      'listAll': 'true',
-                                      'isProjectVm': False})
+if not networkuuid:
+    networkuuid = c.checkCloudStackName({
+        'csname': networkname,
+        'csApiCall': 'listNetworks',
+        'listAll': 'true',
+        'isProjectVm': False
+    })
 
 if DEBUG == 1:
     print "API address: " + c.apiurl
@@ -144,10 +151,10 @@ if DEBUG == 1:
 # Check cloudstack IDs
 if DEBUG == 1:
     print "Debug: Checking CloudStack IDs of provided input.."
-    print "Network UUID: %s" % network_uuid
+    print "Network UUID: %s" % networkuuid
 
 # Get Isolated network details
-isolated_network_db_id = s.get_network_db_id(network_uuid)
+isolated_network_db_id = s.get_network_db_id(networkuuid)
 
 # Pre-flight checks
 # 1. Check if network is actually already an VPC tier
@@ -167,7 +174,7 @@ s.fill_vpc_service_map(vpc_db_id)
 s.migrate_ntwk_service_map_from_isolated_network_to_vpc(isolated_network_db_id)
 
 # 4. Create network acl from isolated network egress for vpc
-egress_network_acl_db_id = s.create_network_acl_for_vpc(vpc_db_id, networkid + '-fwrules')
+egress_network_acl_db_id = s.create_network_acl_for_vpc(vpc_db_id, networkuuid + '-fwrules')
 # egress_network_acl_db_id = 6
 
 # TODO Think about default deny / default allow
