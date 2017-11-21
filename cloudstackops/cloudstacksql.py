@@ -1116,6 +1116,8 @@ FROM `vpc_offerings`
 WHERE
 (
   `name` = '%(vpc_offering_name)s'
+  AND
+  `removed` IS NULL
 );
 """ % dict(vpc_offering_name=vpc_offering_name)
 
@@ -1143,6 +1145,8 @@ FROM `network_offerings`
 WHERE
 (
   `name` = '%(network_offering_name)s'
+    AND
+  `removed` IS NULL
 );
 """ % dict(network_offering_name=network_offering_name)
 
