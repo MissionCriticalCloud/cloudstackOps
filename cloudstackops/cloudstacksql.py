@@ -968,6 +968,39 @@ WHERE
 
     def migrate_public_ip_from_isolated_network_to_vpc(self, vpc_id, ip_acl_id, public_ip_id):
         query = """
+SELECT `id`
+FROM `firewall_rules`
+WHERE
+(
+  `ip_address_id` = %(public_ip_id)s
+  AND
+  `purpose` IN ('PortForwarding', 'LoadBalancing')
+);
+""" % dict(public_ip_id=public_ip_id)
+
+        cursor = self.conn.cursor()
+        cursor.execute(query)
+
+        if self.DEBUG == 1:
+            print "DEBUG: Executed SQL: " + cursor.statement
+
+        result = cursor.fetchall()
+        cursor.close()
+
+        if len(result) is 0:
+            query = """
+UPDATE `user_ip_address`
+SET
+  `vpc_id` = %(vpc_id)s,
+  `ip_acl_id` = %(ip_acl_id)s,
+  `network_id` = NULL
+WHERE
+(
+  `id` = %(public_ip_id)s
+);
+""" % dict(vpc_id=vpc_id, ip_acl_id=ip_acl_id, public_ip_id=public_ip_id)
+        else:
+            query = """
 UPDATE `user_ip_address`
 SET
   `vpc_id` = %(vpc_id)s,
