@@ -375,6 +375,8 @@ class CloudStackOps(CloudStackOpsBase):
             apicall = listVolumes.listVolumesCmd()
         elif csApiCall == "listNetworks":
             apicall = listNetworks.listNetworksCmd()
+        elif csApiCall == "listVPCs":
+            apicall = listVPCs.listVPCsCmd()
         else:
             print "No API command to call"
             sys.exit(1)
