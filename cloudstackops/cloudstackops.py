@@ -19,20 +19,24 @@
 
 # Class to support tools used to operate CloudStack
 # Remi Bergsma - rbergsma@schubergphilis.com
-
-# Import the class we depend on
-from cloudstackopsbase import *
+import logging
+import operator
+import re
 # Import our dependencies
 import smtplib
-import operator
-from email.mime.text import MIMEText
-from email.mime.image import MIMEImage
+import string
+import urllib2
 from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+# Import the class we depend on
+from os.path import expanduser
+from random import choice
+from urlparse import urlparse
+
+import time
 from prettytable import PrettyTable
-import subprocess
-from subprocess import Popen, PIPE
-import pprint
-import re
+
+from cloudstackopsbase import *
 
 # Marvin
 try:
@@ -55,12 +59,13 @@ except:
 
 
 class CloudStackOps(CloudStackOpsBase):
-
     # Init function
     def __init__(self, debug=0, dryrun=0, force=0):
         # type: (object, object, object) -> object
         self.apikey = ''
         self.secretkey = ''
+        self.username = ''
+        self.password = ''
         self.api = ''
         self.cloudstack = ''
         self.DEBUG = debug
@@ -137,7 +142,8 @@ class CloudStackOps(CloudStackOpsBase):
             return True
         if self.check_screen_term():
             return True
-        print colored.red("Warning: You are NOT running inside screen/tmux. Please start a screen/tmux session to keep commands running in case you get disconnected!")
+        print colored.red(
+            "Warning: You are NOT running inside screen/tmux. Please start a screen/tmux session to keep commands running in case you get disconnected!")
 
     # Handle unwanted CTRL+C presses
     def catch_ctrl_C(self, sig, frame):
@@ -155,11 +161,12 @@ class CloudStackOps(CloudStackOpsBase):
             print "Note: Trying to use API credentials from CloudMonkey profile '" + self.configProfileName + "'"
             self.parseConfig(self.configProfileNameFullPath)
         except:
-            print colored.yellow("Warning: Cannot read or parse CloudMonkey profile '" + self.configProfileName + "'. Trying local config file..")
+            print colored.yellow(
+                "Warning: Cannot read or parse CloudMonkey profile '" + self.configProfileName + "'. Trying local config file..")
             tryLocal = True
 
         if self.configProfileName == "config":
-           tryLocal = True
+            tryLocal = True
 
         if tryLocal:
             # Read config for CloudStack API credentials
@@ -167,11 +174,14 @@ class CloudStackOps(CloudStackOpsBase):
                 print "Note: Trying to use API credentials from local config profile '" + self.configProfileName + "'"
                 self.parseConfig(self.configfile)
             except:
-                print colored.yellow("Warning: Cannot read or parse profile '" + self.configProfileName + "' from local config file either")
+                print colored.yellow(
+                    "Warning: Cannot read or parse profile '" + self.configProfileName + "' from local config file either")
 
         # Do we have all required settings?
-        if self.apiurl == '' or self.apikey == '' or self.secretkey == '':
-            print colored.red("Error: Could not load CloudStack API settings from local config file, nor from CloudMonkey config file. Halting.")
+        if self.apiurl == '' or (self.apikey == '' or self.secretkey == '') and (
+                self.username == '' or self.password == ''):
+            print colored.red(
+                "Error: Could not load CloudStack API settings from local config file, nor from CloudMonkey config file. Halting.")
             print "Hint: Specify a CloudMonkey profile or setup the local config file 'config'. See documentation."
             sys.exit(2)
 
@@ -208,6 +218,8 @@ class CloudStackOps(CloudStackOpsBase):
                     print "Debug: profile " + profile
                 self.apikey = config.get(profile, 'apikey')
                 self.secretkey = config.get(profile, 'secretkey')
+                self.username = config.get(profile, 'username')
+                self.password = config.get(profile, 'password')
                 self.apiurl = config.get(profile, 'url')
             elif self.configProfileName != 'config':
                 # cloudmonkey > 5.2.x config with the commandline profile
@@ -215,9 +227,9 @@ class CloudStackOps(CloudStackOpsBase):
                 if self.DEBUG == 1:
                     print "Cloudmonkey > 5.2.x configfile found, profile option given"
                 self.apikey = config.get(self.configProfileName, 'apikey')
-                self.secretkey = config.get(
-                    self.configProfileName,
-                    'secretkey')
+                self.secretkey = config.get(self.configProfileName, 'secretkey')
+                self.username = config.get(self.configProfileName, 'username')
+                self.password = config.get(self.configProfileName, 'password')
                 self.apiurl = config.get(self.configProfileName, 'url')
             # Split it, because we use an older Marvin and a newer CloudMonkey
             urlParts = urlparse(self.apiurl)
@@ -237,11 +249,13 @@ class CloudStackOps(CloudStackOpsBase):
                 print "Cloudmonkey < 5.2.x configfile found"
             self.apikey = config.get('user', 'apikey')
             self.secretkey = config.get('user', 'secretkey')
+            self.username = config.get('user', 'username')
+            self.password = config.get('user', 'password')
             self.apiport = config.get('server', 'port')
             self.apiprotocol = config.get('server', 'protocol')
             self.apiserver = config.get('server', 'host')
             self.apiurl = self.apiprotocol + '://' + self.apiserver + \
-                ':' + self.apiport + config.get('server', 'path')
+                          ':' + self.apiport + config.get('server', 'path')
         if self.DEBUG == 1:
             print "URL: " + self.apiurl
 
@@ -250,17 +264,28 @@ class CloudStackOps(CloudStackOpsBase):
         self.readConfigFile()
         log = logging.getLogger()
         if self.DEBUG == 1:
-            print "Debug: apiserver=" + self.apiserver + " apiKey=" + self.apikey + " securityKey=" + self.secretkey + " port=" + str(self.apiport) + " scheme=" + self.apiprotocol
+            print "Debug: apiserver=" + self.apiserver + " apiKey=" + self.apikey + " securityKey=" + self.secretkey + " username=" + self.username + " password=" + self.password + " port=" + str(
+                self.apiport) + " scheme=" + self.apiprotocol
         try:
-            self.cloudstack = cloudConnection(
-                self.apiserver,
-                apiKey=self.apikey,
-                securityKey=self.secretkey,
-                asyncTimeout=14400,
-                logging=log,
-                port=int(
-                    self.apiport),
-                scheme=self.apiprotocol)
+            if self.apikey:
+                self.cloudstack = cloudConnection(
+                    self.apiserver,
+                    apiKey=self.apikey,
+                    securityKey=self.secretkey,
+                    asyncTimeout=14400,
+                    logging=log,
+                    port=int(
+                        self.apiport),
+                    scheme=self.apiprotocol)
+            elif self.password:
+                print "Using username + password for connection!"
+                self.cloudstack = cloudConnection(
+                    self.apiserver,
+                    user=self.username,
+                    passwd=self.password,
+                    asyncTimeout=14400,
+                    logging=log,
+                    scheme=self.apiprotocol)
             if self.DEBUG == 1:
                 print self.cloudstack
         except:
@@ -307,7 +332,7 @@ class CloudStackOps(CloudStackOpsBase):
             return dict(
                 (k,
                  self.remove_empty_values(v)) for k,
-                v in d.iteritems() if v and self.remove_empty_values(v))
+                                                  v in d.iteritems() if v and self.remove_empty_values(v))
         else:
             return d
 
@@ -348,6 +373,10 @@ class CloudStackOps(CloudStackOpsBase):
             apicall.templatefilter = "all"
         elif csApiCall == "listVolumes":
             apicall = listVolumes.listVolumesCmd()
+        elif csApiCall == "listNetworks":
+            apicall = listNetworks.listNetworksCmd()
+        elif csApiCall == "listVPCs":
+            apicall = listVPCs.listVPCsCmd()
         else:
             print "No API command to call"
             sys.exit(1)
@@ -390,15 +419,18 @@ class CloudStackOps(CloudStackOpsBase):
                         print "Not found in loop " + str(d.name) + " counter = " + str(found_counter)
 
                 if len(csnameID) < 1:
-                    print "Warning: '%s' could not be located in CloudStack database using '%s' -- Exit." % (csname, csApiCall)
+                    print "Warning: '%s' could not be located in CloudStack database using '%s' -- Exit." % (
+                    csname, csApiCall)
                     sys.exit(1)
 
-                if found_counter >1:
-                    print "Error: '%s' could not be located in CloudStack database using '%s' because it is not unique -- Exit." % (csname, csApiCall)
+                if found_counter > 1:
+                    print "Error: '%s' could not be located in CloudStack database using '%s' because it is not unique -- Exit." % (
+                    csname, csApiCall)
                     sys.exit(1)
 
             else:
-                print "Error: '%s' could not be located in CloudStack database using '%s' -- exit!" % (csname, csApiCall)
+                print "Error: '%s' could not be located in CloudStack database using '%s' -- exit!" % (
+                csname, csApiCall)
                 # Exit if not found
                 sys.exit(1)
 
@@ -463,8 +495,9 @@ class CloudStackOps(CloudStackOpsBase):
 
         if pool_utilisation < lowest_pool_utilisation:
             lowest_pool_utilisation = pool_utilisation
-            if self.DEBUG ==1:
-                print "Debug: Pool %s has utilisation of %s %%, currently lowest. Checking others" % (pool_data.name, str(pool_utilisation_display))
+            if self.DEBUG == 1:
+                print "Debug: Pool %s has utilisation of %s %%, currently lowest. Checking others" % (
+                pool_data.name, str(pool_utilisation_display))
             data = pool_data
 
         if data is not None:
@@ -515,7 +548,7 @@ class CloudStackOps(CloudStackOpsBase):
         apicall.listAll = "true"
 
         # Call CloudStack API
-        clusterhostdetails  =  self._callAPI(apicall)
+        clusterhostdetails = self._callAPI(apicall)
 
         # Remove dedicated hosts from the results
         dedicatedhosts = self.getDedicatedHosts()
@@ -674,7 +707,8 @@ class CloudStackOps(CloudStackOpsBase):
                         peerHostData = self.getHostData(
                             {'hostname': routerPeerData.hostname})
                         if silent == 'True':
-                            print "Note: The redundant peer of router " + routername + " is " + routerPeerData.name + " running on " + routerPeerData.hostname + " (" + peerHostData[0].clustername + " / " + peerHostData[0].podname + ")."
+                            print "Note: The redundant peer of router " + routername + " is " + routerPeerData.name + " running on " + routerPeerData.hostname + " (" + \
+                                  peerHostData[0].clustername + " / " + peerHostData[0].podname + ")."
                         returnData = {
                             "guestnetworkid": router.guestnetworkid,
                             "router": router,
@@ -901,7 +935,7 @@ class CloudStackOps(CloudStackOpsBase):
 
     # Generate a random name
     def generateRandomName(self, prefix):
-        name = prefix + (''.join(random.choice(string.digits)
+        name = prefix + (''.join(choice(string.digits)
                                  for i in range(5)))
         return name
 
@@ -1063,10 +1097,10 @@ class CloudStackOps(CloudStackOpsBase):
         # The required tags
         if tagtype == "host":
             tags = (serviceOfferingData[0].hosttags) if serviceOfferingData[
-                0].hosttags is not None else ''
+                                                            0].hosttags is not None else ''
         elif tagtype == "storage":
             tags = (serviceOfferingData[0].tags) if serviceOfferingData[
-                0].tags is not None else ''
+                                                        0].tags is not None else ''
         else:
             return 1
         return tags
@@ -1197,7 +1231,7 @@ class CloudStackOps(CloudStackOpsBase):
 
     def getDetachedVolumes(self, storagepoolid):
 
-        volumes = self.listVolumes(storagepoolid,False)
+        volumes = self.listVolumes(storagepoolid, False)
 
         orphans = []
 
@@ -1210,7 +1244,7 @@ class CloudStackOps(CloudStackOpsBase):
                 if volume.vmname is None:
                     orphans.append(volume)
 
-        #return selected detached volumes
+        # return selected detached volumes
         return orphans
 
     # Check zone
@@ -1229,7 +1263,8 @@ class CloudStackOps(CloudStackOpsBase):
 
         # Check zone of current and destination clusters
         if targetStoragePoolData[0].zonename != routerClusterData[0].zonename:
-            print "Error: cannot do this: Router is currently in zone " + routerClusterData[0].zonename + " and you selected a cluster in zone " + targetStoragePoolData[0].zonename + "."
+            print "Error: cannot do this: Router is currently in zone " + routerClusterData[
+                0].zonename + " and you selected a cluster in zone " + targetStoragePoolData[0].zonename + "."
             return 1
 
         # All OK
@@ -1549,7 +1584,7 @@ class CloudStackOps(CloudStackOpsBase):
                          "# VMs",
                          "Bond Status"])
 
-        for clusterhost in sorted(clusterHostsData,key=lambda h: h.name):
+        for clusterhost in sorted(clusterHostsData, key=lambda h: h.name):
 
             # Some progress indication
             sys.stdout.write(clusterhost.name + ", ")
@@ -1642,7 +1677,7 @@ class CloudStackOps(CloudStackOpsBase):
                 patch_level = self.kvm.get_patch_level(clusterHostsData)
 
         except:
-                patch_level = "N/A"
+            patch_level = "N/A"
 
         for cluster in clusterData:
             t.add_row([cluster.name,
@@ -1674,12 +1709,10 @@ class CloudStackOps(CloudStackOpsBase):
         all_vmdata += prouters
         all_vmdata += svms
 
-
         if self.DEBUG:
             print all_vmdata
 
         return all_vmdata
-
 
     # Find suitable host
     def findBestMigrationHost(
@@ -1694,7 +1727,7 @@ class CloudStackOps(CloudStackOpsBase):
         migrationHost = False
 
         if clusterHosts != 1 and clusterHosts is not None:
-            [ currentHost ] = [h for h in self.getAllHostsFromCluster(clusterID) if h.name == currentHostname] or [""]
+            [currentHost] = [h for h in self.getAllHostsFromCluster(clusterID) if h.name == currentHostname] or [""]
 
             for h in clusterHosts:
                 # Skip the current hostname
@@ -1704,7 +1737,7 @@ class CloudStackOps(CloudStackOpsBase):
                 if h.suitableformigration == False:
                     continue
                 # Handle dedicated hosts
-                #if 'dedicated' in currentHost:
+                # if 'dedicated' in currentHost:
                 #    if currentHost.dedicated != h.dedicated:
                 #        continue
                 #    if currentHost.dedicated == True and currentHost.domainid != h.domainid:
@@ -1716,8 +1749,9 @@ class CloudStackOps(CloudStackOpsBase):
                 # Available memory in Bytes
                 memoryavailable = h.memorytotal - h.memoryallocated
                 if self.DEBUG == 1:
-                    print "Note: host " + h.name + " has free mem: " + str(memoryavailable/1024/1024) + "MB and we need " + \
-                          str(requestedMemory/1024/1024) + " MB"
+                    print "Note: host " + h.name + " has free mem: " + str(
+                        memoryavailable / 1024 / 1024) + "MB and we need " + \
+                          str(requestedMemory / 1024 / 1024) + " MB"
 
                 # vm.memory is in Mega Bytes
                 if requestedMemory is not None:
@@ -1729,16 +1763,19 @@ class CloudStackOps(CloudStackOpsBase):
                 # Find host with most memory free
                 if bestAvailableMemory == 0:
                     if self.DEBUG == 1:
-                        print "Note: Found possible migration host '" + h.name + "' with free memory: " + str(memoryavailable)
+                        print "Note: Found possible migration host '" + h.name + "' with free memory: " + str(
+                            memoryavailable)
                     migrationHost = h
                     bestAvailableMemory = memoryavailable
                 elif memoryavailable > bestAvailableMemory:
                     if self.DEBUG == 1:
-                        print "Note: Found better migration host '" + h.name + "' with free memory: " + str(memoryavailable)
+                        print "Note: Found better migration host '" + h.name + "' with free memory: " + str(
+                            memoryavailable)
                     migrationHost = h
                     bestAvailableMemory = memoryavailable
                 elif self.DEBUG == 1:
-                    print "Note: Found migration host '" + h.name + "' with free memory: " + str(memoryavailable) + " but there are already better (or equal) candidates so skipping this one"
+                    print "Note: Found migration host '" + h.name + "' with free memory: " + str(
+                        memoryavailable) + " but there are already better (or equal) candidates so skipping this one"
 
         return migrationHost
 
@@ -1830,28 +1867,29 @@ class CloudStackOps(CloudStackOpsBase):
         return True
 
     # list oscategories
-    def listOsCategories(self,args):
-      args = self.remove_empty_values(args)
+    def listOsCategories(self, args):
+        args = self.remove_empty_values(args)
 
-      apicall = listOsCategories.listOsCategoriesCmd()
-      apicall.id = (str(args['id'])) if 'id' in args and len(args['id']) >0 else None
-      apicall.name = (str(args['name'])) if 'name' in args and len(args['name']) >0 else None
-      apicall.keyword = (str(args['keyword'])) if 'keyword' in args and len(args['keyword']) >0 else None
+        apicall = listOsCategories.listOsCategoriesCmd()
+        apicall.id = (str(args['id'])) if 'id' in args and len(args['id']) > 0 else None
+        apicall.name = (str(args['name'])) if 'name' in args and len(args['name']) > 0 else None
+        apicall.keyword = (str(args['keyword'])) if 'keyword' in args and len(args['keyword']) > 0 else None
 
-      # Call CloudStack API
-      return self._callAPI(apicall)
+        # Call CloudStack API
+        return self._callAPI(apicall)
 
     # list ostypes
-    def listOsTypes(self,args):
-      args = self.remove_empty_values(args)
+    def listOsTypes(self, args):
+        args = self.remove_empty_values(args)
 
-      apicall = listOsTypes.listOsTypesCmd()
-      apicall.id = (str(args['id'])) if 'id' in args and len(args['id']) >0 else None
-      apicall.oscategoryid = (str(args['oscategoryid'])) if 'oscategoryid' in args and len(args['oscategoryid']) >0 else None
-      apicall.keyword = (str(args['keyword'])) if 'keyword' in args and len(args['keyword']) >0 else None
+        apicall = listOsTypes.listOsTypesCmd()
+        apicall.id = (str(args['id'])) if 'id' in args and len(args['id']) > 0 else None
+        apicall.oscategoryid = (str(args['oscategoryid'])) if 'oscategoryid' in args and len(
+            args['oscategoryid']) > 0 else None
+        apicall.keyword = (str(args['keyword'])) if 'keyword' in args and len(args['keyword']) > 0 else None
 
-      # Call CloudStack API
-      return self._callAPI(apicall)
+        # Call CloudStack API
+        return self._callAPI(apicall)
 
     def extract_volume(self, uuid, zoneid):
         # Export volume
@@ -1890,9 +1928,9 @@ class CloudStackOps(CloudStackOpsBase):
                     {'serviceofferingid': system_vm.serviceofferingid, 'issystem': 'true'})
                 system_vm.memory = serviceOfferingData[0].memory
                 if self.DEBUG == 1:
-                    print "DEBUG: Set memory to the value in the service offering: %s" % str(serviceOfferingData[0].memory)
-                # Else, fail back to a 1GB default
+                    print "DEBUG: Set memory to the value in the service offering: %s" % str(
+                        serviceOfferingData[0].memory)
+                    # Else, fail back to a 1GB default
             else:
                 system_vm.memory = 1024
         return int(system_vm.memory) * 1024 * 1024
-
