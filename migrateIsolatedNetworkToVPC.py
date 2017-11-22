@@ -166,17 +166,38 @@ if DEBUG == 1:
     print "Network UUID: %s" % networkuuid
 
 # Get Isolated network details
+isolated_network = c.listNetworks(networkuuid)[0]
 isolated_network_db_id = s.get_network_db_id(networkuuid)
+
+# Pretty Slack messages
+c.instance_name = isolated_network.name
+c.slack_custom_title = "Network"
+c.slack_custom_value = isolated_network.name
+c.zone_name = isolated_network.zonename
+c.task = "Converting legacy network to VPC tier"
+
+to_slack = True
+if DRYRUN == 1:
+    to_slack = False
 
 # Pre-flight checks
 # 1. Check if network is actually already an VPC tier
 if s.check_if_network_is_vpc_tier(isolated_network_db_id):
-    print "This network is already a VPC tier"
+    message = "Network '%s' is already part of a VPC. Nothing to do!" % isolated_network.name
+    c.print_message(message=message, message_type="Note", to_slack=to_slack)
     exit(1)
 
 # 2 Gather VPC / network offering
 vpc_offering_db_id = s.get_vpc_offering_id(vpcofferingname)
 vpc_tier_offering_db_id = s.get_network_offering_id(networkofferingname)
+
+if DRYRUN:
+    message = "Would have migrated classic network '%s' to a VPC!" % isolated_network.name
+    c.print_message(message=message, message_type="Note", to_slack=to_slack)
+    exit(0)
+
+message = "Starting migration of classic network '%s' to VPC" % isolated_network.name
+c.print_message(message=message, message_type="Note", to_slack=to_slack)
 
 # Migration
 # 1. Create the new VPC
@@ -216,3 +237,7 @@ s.fix_egress_cidr_allow_all(egress_network_acl_db_id)
 
 # 8. Migrate routers
 s.migrate_routers_from_isolated_network_to_vpc(vpc_db_id, isolated_network_db_id)
+
+message = "Migration of classic network '%s' to VPC succeeded! Restart+Cleanup needed to complete migration!"\
+          % isolated_network.name
+c.print_message(message=message, message_type="Note", to_slack=to_slack)
