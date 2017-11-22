@@ -42,7 +42,7 @@ def handleArguments(argv):
            '\n  --config-profile -c <profilename>\tSpecify the CloudMonkey profile name to get the credentials from ' \
            '(or specify in ./config file)' + \
            '\n  --network-name -n <network-name>\tMigrate Isolated network with this name.' \
-           '\n  --uuid -u <uuid>\tThe UUID of the network. When provided, the network name will be ignored.' \
+           '\n  --uuid -u <uuid>\t\t\tThe UUID of the network. When provided, the network name will be ignored.' \
            '\n  --vpc-offering -v <vpc-offering-name>\tThe name of the VPC offering.' \
            '\n  --network-offering -o <network-offering-name>\tThe name of the VPC tier network offering.' \
            '\n  --mysqlserver -s <mysql hostname>\tSpecify MySQL server config section name' + \
