@@ -121,7 +121,7 @@ if len(networkuuid) > 0:
 if not VPCUUID:
     VPCUUID = vpcuuid
 
-if VPCUUID == 1:
+if VPCUUID == 1 or VPCUUID == "":
     print "Error: VPC cannot be found!"
     exit(1)
 
