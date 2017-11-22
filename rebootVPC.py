@@ -16,6 +16,8 @@ def handleArguments(argv):
     vpcname = ''
     global vpcuuid
     vpcuuid = ''
+    global networkuuid
+    networkuuid = ''
     global toCluster
     toCluster = ''
     global configProfileName
@@ -26,16 +28,17 @@ def handleArguments(argv):
     # Usage message
     help = "Usage: ./" + os.path.basename(__file__) + ' [options] ' + \
         '\n  --config-profile -c <profilename>\tSpecify the CloudMonkey profile name to get the credentials from (or specify in ./config file)' + \
-        '\n  --vpc-name -v <name>\tWork with this VPC (r-12345-VM)' + \
-        '\n  --uuid -u <name>\tWork with this VPC (UUID)' + \
+        '\n  --vpc-name -v <name>\t\t\tWork with this VPC (r-12345-VM)' + \
+        '\n  --uuid -u <name>\t\t\tWork with this VPC (UUID)' + \
+        '\n  --network-uuid -t <name>\t\tWork with this VPC tier (UUID)' + \
         '\n  --is-projectrouter\t\t\tThe specified router belongs to a project' + \
         '\n  --debug\t\t\t\tEnable debug mode' + \
         '\n  --exec\t\t\t\tExecute for real'
 
     try:
         opts, args = getopt.getopt(
-            argv, "hc:v:u:p", [
-                "config-profile=", "vpc-name=", "uuid=", "debug", "exec", "is-projectrouter"])
+            argv, "hc:v:u:pt:", [
+                "config-profile=", "vpc-name=", "uuid=", "network-uuid=", "debug", "exec", "is-projectrouter"])
     except getopt.GetoptError:
         print help
         sys.exit(2)
@@ -49,6 +52,8 @@ def handleArguments(argv):
             vpcname = arg
         elif opt in ("-u", "--uuid"):
             vpcuuid = arg
+        elif opt in ("-t", "--network-uuid"):
+            networkuuid = arg
         elif opt in ("--debug"):
             DEBUG = 1
         elif opt in ("--exec"):
@@ -61,9 +66,10 @@ def handleArguments(argv):
         configProfileName = "config"
 
     # We need at least these vars
-    if len(vpcname) == 0 and len(vpcuuid) == 0:
+    if len(vpcname) == 0 and len(vpcuuid) == 0 and len(networkuuid) == 0:
         print vpcuuid
         print vpcname
+        print networkuuid
         print help
         sys.exit()
 
@@ -107,8 +113,17 @@ VPCUUID = c.checkCloudStackName({'csname': vpcname,
                                   'listAll': 'true',
                                   'isProjectVm': projectParam})
 
+if len(networkuuid) > 0:
+    print "Note: Getting VPC id from network uuid %s" % networkuuid
+    network = c.listNetworks(networkuuid)[0]
+    VPCUUID = network.vpcid
+
 if not VPCUUID:
     VPCUUID = vpcuuid
+
+if VPCUUID == 1:
+    print "Error: VPC cannot be found!"
+    exit(1)
 
 vpc = c.listVPCs(VPCUUID)[0]
 
