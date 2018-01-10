@@ -3,6 +3,8 @@
 ZONE=$1
 VMNAME=$2
 
+cloudmonkey set display table
+
 HOSTNAME=$(cloudmonkey -p $ZONE list virtualmachines hypervisor=XenServer name=$VMNAME listall=true filter=hostname | grep -i mccp | awk '{ print $2 }')
 
 if [ -z "$HOSTNAME" ]
