@@ -489,16 +489,18 @@ class CloudStackOps(CloudStackOpsBase):
         for pool_data in pools:
             try:
                 pool_utilisation = float(pool_data.disksizeused) / float(pool_data.disksizetotal)
-                pool_utilisation_display = pool_utilisation * 100
+                data = pool_data
             except:
                 pool_utilisation = 100
 
-        if pool_utilisation < lowest_pool_utilisation:
-            lowest_pool_utilisation = pool_utilisation
-            if self.DEBUG == 1:
-                print "Debug: Pool %s has utilisation of %s %%, currently lowest. Checking others" % (
-                pool_data.name, str(pool_utilisation_display))
-            data = pool_data
+            pool_utilisation_display = pool_utilisation * 100
+
+            if pool_utilisation < lowest_pool_utilisation:
+                lowest_pool_utilisation = pool_utilisation
+                if self.DEBUG == 1:
+                    print "Debug: Pool %s has utilisation of %s %%, currently lowest. Checking others" % (
+                    pool_data.name, str(pool_utilisation_display))
+                data = pool_data
 
         if data is not None:
             return data
