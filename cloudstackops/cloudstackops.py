@@ -1787,10 +1787,12 @@ class CloudStackOps(CloudStackOpsBase):
         hostData = self.getHostData({'hostid': hostID})
         foundHostData = hostData[0]
         hostname = foundHostData.name
+        to_slack = True
         if self.DEBUG == 1:
             print hostData
             print foundHostData
             print hostname
+            to_slack = False
 
         # Check vm's still running on this host
         all_vmdata = self.getVirtualMachinesRunningOnHost(hostID)
@@ -1820,8 +1822,8 @@ class CloudStackOps(CloudStackOpsBase):
                             print "\nError: No hosts with enough capacity to migrate vm's to. Please migrate manually to another cluster."
                             sys.exit(1)
                         try:
-                            if self.DEBUG == 1:
-                                print "Debug: Migrating vm to host '" + migrationHost.name + "'.."
+                            message = "Live migrating vm %s to host %s" % (vm.name, migrationHost.name)
+                            self.print_message(message=message, message_type="Note", to_slack=to_slack)
 
                             # Systemvm or instance
                             if bool(re.search('[rvs]-([\d])*-', vm.name)):
