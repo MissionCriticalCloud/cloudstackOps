@@ -157,8 +157,11 @@ class CloudStackOpsBase(object):
                           }
                       ]}
 
-        attachments.append(attachment)
-        self.slack.notify(attachments=attachments, icon_emoji=":robot_face:", username="cloudstackOps")
+        try:
+            attachments.append(attachment)
+            self.slack.notify(attachments=attachments, icon_emoji=":robot_face:", username="cloudstackOps")
+        except:
+            print "Warning: Slack said NO."
 
     # Handle unwanted CTRL+C presses
     def catch_ctrl_C(self, sig, frame):
