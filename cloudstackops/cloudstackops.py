@@ -489,9 +489,8 @@ class CloudStackOps(CloudStackOpsBase):
         for pool_data in pools:
             try:
                 pool_utilisation = float(pool_data.disksizeused) / float(pool_data.disksizetotal)
-                data = pool_data
             except:
-                pool_utilisation = 100
+                pool_utilisation = 1
 
             pool_utilisation_display = pool_utilisation * 100
 
@@ -503,6 +502,7 @@ class CloudStackOps(CloudStackOpsBase):
                 data = pool_data
 
         if data is not None:
+            print "Note: Selected Pool %s" % data.name
             return data
         else:
             return False
