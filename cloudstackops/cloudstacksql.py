@@ -425,6 +425,8 @@ class CloudStackSQL(CloudStackOpsBase):
     # Set instance to KVM in the db
     def update_instance_to_kvm(self, instance_name, vm_template_name, to_storage_pool_name,
                                guest_os_name="Other PV (64-bit)"):
+        if self.DRYRUN:
+            return True
         if not self.update_instance_from_xenserver_cluster_to_kvm_cluster(instance_name, vm_template_name,
                                                                           guest_os_name):
             print "Error: vm_instance query failed"
