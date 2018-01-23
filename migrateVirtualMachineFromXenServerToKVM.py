@@ -65,6 +65,8 @@ def handleArguments(argv):
     doVirtvtov = True
     global helperScriptsPath
     helperScriptsPath = None
+    global alwaysStart
+    alwaysStart = False
 
     # Usage message
     help = "Usage: ./" + os.path.basename(__file__) + ' [options] ' + \
@@ -81,6 +83,7 @@ def handleArguments(argv):
         '\n  --mysqlpassword <passwd>\t\tSpecify password to cloud ' + \
         'MySQL user' + \
         '\n  --skip-virt-v2v\t\t\tSkipping the virt-v2v step' + \
+        '\n  --always-start\t\t\tStart VM even when it was in Stopped state before migration' + \
         '\n  --helper-scripts-path\t\t\tFolder with scripts to be copied to hypervisor in migrate working folder' + \
         '\n  --debug\t\t\t\tEnable debug mode' + \
         '\n  --exec\t\t\t\tExecute for real'
@@ -89,8 +92,8 @@ def handleArguments(argv):
         opts, args = getopt.getopt(
             argv, "hc:i:t:p:s:b:", [
                 "config-profile=", "instance-name=", "tocluster=", "mysqlserver=", "mysqlpassword=",
-                "new-base-template=", "skip-virt-v2v", "helper-scripts-path=", "debug", "exec", "is-projectvm",
-                "force"])
+                "new-base-template=", "always-start", "skip-virt-v2v", "helper-scripts-path=", "debug",
+                "exec", "is-projectvm", "force"])
     except getopt.GetoptError as e:
         print "Error: " + str(e)
         print help
@@ -119,6 +122,8 @@ def handleArguments(argv):
             isProjectVm = 1
         elif opt in ("--force"):
             force = 1
+        elif opt in ("--always-start"):
+            alwaysStart = True
         elif opt in ("--skip-virt-v2v"):
             doVirtvtov = False
         elif opt in ("--helper-scripts-path"):
@@ -147,7 +152,7 @@ def start_vm(hypervisor_name):
     if DRYRUN == 1:
         message = "Would have started vm %s with id %s" % (vm.name, vm.id)
         c.print_message(message=message, message_type="Note", to_slack=False)
-    elif autoStartVM:
+    elif autoStartVM or alwaysStart:
         message = "Starting virtualmachine %s with id %s" % (vm.name, vm.id)
         c.print_message(message=message, message_type="Note", to_slack=True)
         result = c.startVirtualMachine(vm.id)
@@ -574,7 +579,7 @@ else:
     c.print_message(message="Revert SQL: ```" + revert_sql + "```", message_type="Plain", to_slack=to_slack)
 
 # Start the VM again
-if autoStartVM:
+if autoStartVM or alwaysStart:
     start_vm("KVM")
 else:
     message = "Not starting %s automatically because when migration started it was also in Stopped state!" % vm.name
