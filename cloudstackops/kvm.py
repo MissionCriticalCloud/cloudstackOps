@@ -142,7 +142,7 @@ class Kvm(hypervisor.hypervisor):
             if result is False:
                 print "Error: Could not move datavolume %s to the storage pool on host %s" % (path, kvmhost.name)
                 return False
-            print "Note: Skipping virt-v2v step due to --skipVirtvtov flag"
+            print "Note: Skipping virt-v2v step due to --skip-virt-v2v flag"
         return True
 
     def convert_volume_to_qcow(self, kvmhost, volume_uuid):
