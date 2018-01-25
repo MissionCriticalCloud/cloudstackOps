@@ -22,9 +22,11 @@ for line in $UUIDs; do
         continue
     fi
 
-    echo $NAME
-    echo $UUID
-    cloudmonkey list virtualmachines listall=true domainid=$UUID hypervisor=XenServer filter=domain,templatename,state,name,created,serviceofferingname > $OUTPUT_DIR/$NAME.csv
+    OUTPUT=$(cloudmonkey list virtualmachines listall=true domainid=$UUID hypervisor=XenServer filter=domain,templatename,state,name,created,serviceofferingname)
+
+    if [ ! -z "$OUTPUT" ]; then 
+        echo "$OUTPUT" > $OUTPUT_DIR/$NAME.csv
+    fi
 done
 
 cloudmonkey set display table
