@@ -19,7 +19,8 @@
 #      specific language governing permissions and limitations
 #      under the License.
 
-# Script to migrate offline volumes to a new storage
+# Script to migrate offline volumes to a new storage (to a new cluster)
+# i.e. from clusterX/randomStorageX to clusterY/RandomStorageY)
 # Remi Bergsma - rbergsma@schubergphilis.com
 
 import time
