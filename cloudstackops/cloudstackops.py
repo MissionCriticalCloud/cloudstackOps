@@ -87,6 +87,7 @@ class CloudStackOps(CloudStackOpsBase):
         self.ssh = None
         self.xenserver = None
         self.kvm = None
+        self.vmware = None
         self.slack = None
         self.slack_custom_title = "Undefined"
         self.slack_custom_value = "Undefined"

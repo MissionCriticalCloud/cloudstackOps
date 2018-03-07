@@ -227,6 +227,28 @@ class Kvm(hypervisor.hypervisor):
         except:
             return False
 
+    def vmware_virt_v2v(self, kvmhost, esxi_host, vmx_path):
+        print "Note: Virt-v2v from VMware host: %s vmx-path: %s on kvm host: %s" % (
+            esxi_host, vmx_path, kvmhost.name
+        )
+        try:
+            with settings(host_string=self.ssh_user + "@" + kvmhost.ipaddress, warn_only=True):
+
+                vmx_uri = "ssh://root@%s/%s" % (esxi_host, vmx_path)
+
+                command = "cd %s; LIBGUESTFS_BACKEND=direct sudo -E virt-v2v -i vmx -it ssh \"%s\" -o local -of qcow2 -os ./" % \
+                          (self.get_migration_path(), vmx_uri)
+
+                output = fab.run(command)
+
+                if output.failed:
+                    print output
+                    return False
+
+                return output
+        except:
+            return False
+
     def modify_os_files(self, kvmhost, volume_uuid):
         print "Note: Getting rid of XenServer legacy for disk %s on host %s" % (volume_uuid, kvmhost.name)
 
