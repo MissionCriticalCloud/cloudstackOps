@@ -164,6 +164,7 @@ def start_vm(hypervisor_name, start=startVM):
                          " instead of Running. Please investigate (could just take some time)."
             print warningMsg
 
+
 # Init CloudStackOps class
 c = cloudstackops.CloudStackOps(DEBUG, DRYRUN)
 c.task = "VMware -> KVM migration"
@@ -209,9 +210,6 @@ if DEBUG == 1:
 if DEBUG == 1:
     print "Debug: Checking CloudStack IDs of provided input.."
 
-vmID = c.checkCloudStackName({'csname': instancename,
-                              'csApiCall': 'listVirtualMachines',
-                              'listAll': 'true'})
 toClusterID = c.checkCloudStackName({'csname': toCluster, 'csApiCall': 'listClusters'})
 
 message = "Cluster ID found for %s is %s" % (toCluster, toClusterID)
