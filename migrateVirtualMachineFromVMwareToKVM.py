@@ -120,6 +120,20 @@ def handleArguments(argv):
         sys.exit(1)
 
 
+# Parse arguments
+if __name__ == "__main__":
+    handleArguments(sys.argv[1:])
+
+# Start time
+print "Note: Starting @ %s" % time.strftime("%Y-%m-%d %H:%M")
+start_time = datetime.now()
+
+if DEBUG == 1:
+    print "Warning: Debug mode is enabled!"
+
+if DRYRUN == 1:
+    print "Warning: dry-run mode is enabled, not running any commands!"
+
 def exit_script(message):
     print "Fatal Error: %s" % message
     sys.exit(1)
@@ -149,21 +163,6 @@ def start_vm(hypervisor_name, start=startVM):
                          result.virtualmachine.state + \
                          " instead of Running. Please investigate (could just take some time)."
             print warningMsg
-
-
-# Parse arguments
-if __name__ == "__main__":
-    handleArguments(sys.argv[1:])
-
-# Start time
-print "Note: Starting @ %s" % time.strftime("%Y-%m-%d %H:%M")
-start_time = datetime.now()
-
-if DEBUG == 1:
-    print "Warning: Debug mode is enabled!"
-
-if DRYRUN == 1:
-    print "Warning: dry-run mode is enabled, not running any commands!"
 
 # Init CloudStackOps class
 c = cloudstackops.CloudStackOps(DEBUG, DRYRUN)
@@ -265,5 +264,7 @@ if k.put_scripts(kvm_host) is False:
 
 # SSH to random host on tocluster -> do virt-v2v
 k.vmware_virt_v2v(kvm_host, esxiHost, vmxPath)
+
+
 
 exit(0)
