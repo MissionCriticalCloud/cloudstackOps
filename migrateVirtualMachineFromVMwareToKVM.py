@@ -61,7 +61,10 @@ def handleArguments(argv):
            '\n  --start-vm\t\t\t\tStart VM when migration is complete; default=true' + \
            '\n  --helper-scripts-path\t\t\tFolder with scripts to be copied to hypervisor in migrate working folder' + \
            '\n  --debug\t\t\t\tEnable debug mode' + \
-           '\n  --exec\t\t\t\tExecute for real'
+           '\n  --exec\t\t\t\tExecute for real' + \
+           '\n\n\n\n' + \
+           '\nMake sure the esxi host is in the known hosts file of every kvm host in the cluster ' \
+           'for h in 01 02 03 04 05 06 07 08 09 10 11 12 13 14; do ssh mccppod051-hv${h} "ssh -o StrictHostKeyChecking=no root@172.16.98.219 ls"; done'
 
     try:
         opts, args = getopt.getopt(
@@ -263,6 +266,14 @@ if k.put_scripts(kvm_host) is False:
 # SSH to random host on tocluster -> do virt-v2v
 k.vmware_virt_v2v(kvm_host, esxiHost, vmxPath)
 
+# Gather disk info from kvm host
 
+# Create virtualmachine
+# Add data disks
+# Start virtual machine
+# Stop virtual machine
+# Get disks locations from database
+# Move disks on kvm host to correct location
+# Start vm
 
 exit(0)

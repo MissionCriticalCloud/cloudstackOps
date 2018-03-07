@@ -34,8 +34,6 @@ from fabric.api import (
     settings
 )
 
-import hypervisor
-
 # Set user/passwd for fabric ssh
 env.user = 'root'
 env.password = 'password'
