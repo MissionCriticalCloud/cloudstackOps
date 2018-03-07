@@ -87,6 +87,7 @@ class CloudStackOps(CloudStackOpsBase):
         self.ssh = None
         self.xenserver = None
         self.kvm = None
+        self.vmware = None
         self.slack = None
         self.slack_custom_title = "Undefined"
         self.slack_custom_value = "Undefined"
@@ -346,6 +347,8 @@ class CloudStackOps(CloudStackOpsBase):
         isProjectVm = (
             args['isProjectVm']) if 'isProjectVm' in args else 'false'
 
+        domainId = (args['domainid']) if 'domainid' in args else ''
+
         # Find out which API call to make
         if csApiCall == "listVirtualMachines":
             apicall = listVirtualMachines.listVirtualMachinesCmd()
@@ -357,6 +360,8 @@ class CloudStackOps(CloudStackOpsBase):
             apicall = listRouters.listRoutersCmd()
         elif csApiCall == "listDomains":
             apicall = listDomains.listDomainsCmd()
+        elif csApiCall == "listAccounts":
+            apicall = listAccounts.listAccountsCmd()
         elif csApiCall == "listProjects":
             apicall = listProjects.listProjectsCmd()
             isProjectVm = 'false'
@@ -377,6 +382,10 @@ class CloudStackOps(CloudStackOpsBase):
             apicall = listNetworks.listNetworksCmd()
         elif csApiCall == "listVPCs":
             apicall = listVPCs.listVPCsCmd()
+        elif csApiCall == "listServiceOfferings":
+            apicall = listServiceOfferings.listServiceOfferingsCmd()
+        elif csApiCall == "listDiskOfferings":
+            apicall = listDiskOfferings.listDiskOfferingsCmd()
         else:
             print "No API command to call"
             sys.exit(1)
@@ -394,6 +403,9 @@ class CloudStackOps(CloudStackOpsBase):
 
         if listAll == 'true':
             apicall.listAll = "true"
+
+        if domainId is not '':
+            apicall.domainid = domainId
 
         found_counter = 0
         try:
@@ -420,17 +432,17 @@ class CloudStackOps(CloudStackOpsBase):
 
                 if len(csnameID) < 1:
                     print "Warning: '%s' could not be located in CloudStack database using '%s' -- Exit." % (
-                    csname, csApiCall)
+                        csname, csApiCall)
                     sys.exit(1)
 
                 if found_counter > 1:
                     print "Error: '%s' could not be located in CloudStack database using '%s' because it is not unique -- Exit." % (
-                    csname, csApiCall)
+                        csname, csApiCall)
                     sys.exit(1)
 
             else:
                 print "Error: '%s' could not be located in CloudStack database using '%s' -- exit!" % (
-                csname, csApiCall)
+                    csname, csApiCall)
                 # Exit if not found
                 sys.exit(1)
 
@@ -498,7 +510,7 @@ class CloudStackOps(CloudStackOpsBase):
                 lowest_pool_utilisation = pool_utilisation
                 if self.DEBUG == 1:
                     print "Debug: Pool %s has utilisation of %s %%, currently lowest. Checking others" % (
-                    pool_data.name, str(pool_utilisation_display))
+                        pool_data.name, str(pool_utilisation_display))
                 data = pool_data
 
         if data is not None:
@@ -788,12 +800,12 @@ class CloudStackOps(CloudStackOpsBase):
         s.quit()
 
     # Stop virtualvirtualmachine
-    def stopVirtualMachine(self, vmid, timeout=900):
+    def stopVirtualMachine(self, vmid, force="false", timeout=900):
         try:
             with Timeout(timeout):
                 apicall = stopVirtualMachine.stopVirtualMachineCmd()
                 apicall.id = str(vmid)
-                apicall.forced = "false"
+                apicall.forced = force
 
                 # Call CloudStack API
                 return self._callAPI(apicall)
@@ -920,17 +932,45 @@ class CloudStackOps(CloudStackOpsBase):
         args = self.remove_empty_values(args)
 
         apicall = deployVirtualMachine.deployVirtualMachineCmd()
-        apicall.domainid = (
-            str(args['domainid'])) if 'domainid' in args else None
-        apicall.networkids = (
-            str(args['networkids'])) if 'networkids' in args else None
-        apicall.templateid = (
-            str(args['templateid'])) if 'templateid' in args else None
-        apicall.serviceofferingid = (
-            str(args['serviceofferingid'])) if 'serviceofferingid' in args else None
+        apicall.domainid = (str(args['domainid'])) if 'domainid' in args else None
+        apicall.networkids = (str(args['networkids'])) if 'networkids' in args else None
+        apicall.templateid = (str(args['templateid'])) if 'templateid' in args else None
+        apicall.serviceofferingid = (str(args['serviceofferingid'])) if 'serviceofferingid' in args else None
         apicall.zoneid = (str(args['zoneid'])) if 'zoneid' in args else None
         apicall.account = (str(args['account'])) if 'account' in args else None
         apicall.name = (str(args['name'])) if 'name' in args else None
+        apicall.displayname = (str(args['displayname'])) if 'displayname' in args else None
+        apicall.ipaddress = (str(args['ipaddress'])) if 'ipaddress' in args else None
+        apicall.startvm = (str(args['startvm'])) if 'startvm' in args else None
+        apicall.rootdisksize = (str(args['rootdisksize'])) if 'rootdisksize' in args else None
+        apicall.iptonetworklist = args['iptonetworklist'] if 'iptonetworklist' in args else None
+
+        # Call CloudStack API
+        return self._callAPI(apicall)
+
+    # Create volume
+    def createVolume(self, args):
+        args = self.remove_empty_values(args)
+
+        apicall = createVolume.createVolumeCmd()
+        apicall.name = (str(args['name'])) if 'name' in args else None
+        apicall.domainid = (str(args['domainid'])) if 'domainid' in args else None
+        apicall.account = (str(args['account'])) if 'account' in args else None
+        apicall.diskofferingid = (str(args['diskofferingid'])) if 'diskofferingid' in args else None
+        apicall.size = (str(args['size'])) if 'size' in args else None
+        apicall.zoneid = (str(args['zoneid'])) if 'zoneid' in args else None
+
+        # Call CloudStack API
+        return self._callAPI(apicall)
+
+    # Attach volume
+    def attachVolume(self, args):
+        args = self.remove_empty_values(args)
+
+        apicall = attachVolume.attachVolumeCmd()
+        apicall.id = (str(args['id'])) if 'id' in args else None
+        apicall.virtualmachineid = (str(args['virtualmachineid'])) if 'virtualmachineid' in args else None
+        apicall.deviceid = (str(args['deviceid'])) if 'deviceid' in args else None
 
         # Call CloudStack API
         return self._callAPI(apicall)

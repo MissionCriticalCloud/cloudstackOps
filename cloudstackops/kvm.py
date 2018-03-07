@@ -20,11 +20,13 @@
 #      under the License.
 
 import socket
+import subprocess
 import sys
 import time
 # We depend on these
 import uuid
 
+import os
 from fabric import api as fab
 # Fabric
 from fabric.api import (
@@ -227,6 +229,35 @@ class Kvm(hypervisor.hypervisor):
         except:
             return False
 
+    def vmware_virt_v2v(self, kvmhost, esxi_host, vmx_path):
+        print "Note: Virt-v2v from VMware host: %s vmx-path: %s on kvm host: %s" % (
+            esxi_host, vmx_path, kvmhost.name
+        )
+        try:
+            vmx_uri = "ssh://root@%s/%s" % (esxi_host, vmx_path)
+
+            remote_command = 'command=`/usr/bin/ssh-agent | /usr/bin/head -n2`; eval "$command"; /usr/bin/ssh-add; ' \
+                             '/usr/bin/ssh %s -A "cd %s; LIBGUESTFS_BACKEND=direct sudo -E virt-v2v -i vmx -it ssh ' \
+                             '\\"%s\\" -o local -of qcow2 -os ./"' % \
+                             (kvmhost.ipaddress, self.get_migration_path(), vmx_uri)
+            process = os.system(remote_command)
+
+            print process
+        except Exception as e:
+            print e
+            return False
+
+    def get_disk_sizes(self, kvmhost):
+        print "Note: Getting disk sizes from host: %s" % kvmhost.ipaddress
+
+        try:
+            with settings(host_string=self.ssh_user + "@" + kvmhost.ipaddress):
+                command = "cd %s; ls | grep \"\-sd\" | xargs -I {} qemu-img info {} | grep \"virtual size\|image\" | awk '!(NR%%2){print$0p}{p=$0}' | awk '{ print substr($4,2) \" \" $6 }'" % self.get_migration_path()
+                return fab.run(command)
+        except Exception as e:
+            print e
+            return False
+
     def modify_os_files(self, kvmhost, volume_uuid):
         print "Note: Getting rid of XenServer legacy for disk %s on host %s" % (volume_uuid, kvmhost.name)
 
@@ -239,6 +270,15 @@ class Kvm(hypervisor.hypervisor):
             with settings(host_string=self.ssh_user + "@" + kvmhost.ipaddress):
                 command = "cd %s; sudo ./virt-customize-%s.sh %s" % \
                           (self.get_migration_path(), os_family, self.get_migration_path() + volume_uuid + "-sda")
+                return fab.run(command)
+        except:
+            return False
+
+    def move_disk_to_pool(self, kvmhost, volume_name, new_location):
+        print "Note: Moving disk %s to location %s on host %s" % (volume_name, new_location, kvmhost.name)
+        try:
+            with settings(host_string=self.ssh_user + "@" + kvmhost.ipaddress):
+                command = "cd %s; sudo mv %s %s" % (self.get_migration_path(), volume_name, new_location)
                 return fab.run(command)
         except:
             return False

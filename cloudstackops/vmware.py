@@ -1,11 +1,9 @@
 #!/usr/bin/python
 
-import os
-import sys
-import time
-
 from fabric import api as fab
 from fabric.api import *
+
+import hypervisor
 
 # Set user/passwd for fabric ssh
 env.user = 'root'
@@ -14,6 +12,7 @@ env.forward_agent = True
 env.disable_known_hosts = True
 env.parallel = False
 env.pool_size = 1
+env.keepalive = 1
 
 # Supress Fabric output by default, we will enable when needed
 output['debug'] = False
@@ -24,26 +23,14 @@ output['output'] = False
 output['warnings'] = False
 
 
-# Class to talk to hypervisors
-class hypervisor(object):
+class vmware(hypervisor.hypervisor):
 
     def __init__(self, ssh_user='root', threads=5):
+        hypervisor.__init__(ssh_user, threads)
         self.ssh_user = ssh_user
         self.threads = threads
-        self.DEBUG = 0
-
-    # Check if we are really offline
-    def check_offline(self, host):
-        print "Note: Waiting for " + host.name + " to go offline"
-        while os.system("ping -c 1 " + host.ipaddress + " 2>&1 >/dev/null") == 0:
-            # Progress indication
-            sys.stdout.write(".")
-            sys.stdout.flush()
-            time.sleep(5)
-        # Remove progress indication
-        sys.stdout.write("\033[F")
-        print "Note: Host " + host.name + " is now offline!                           "
-        time.sleep(120)
+        self.mountpoint = None
+        self.migration_path = None
 
     # Execute script on hypervisor
     def exec_script_on_hypervisor(self, host, script):
@@ -52,5 +39,19 @@ class hypervisor(object):
         try:
             with settings(show('output'), host_string=self.ssh_user + "@" + host.ipaddress):
                 return fab.run("bash /tmp/" + script)
+        except:
+            return False
+
+    def find_nfs_mountpoint(self, host):
+        print "Note: Looking for Datastores on VMware host %s" % host.name
+        if self.mountpoint is not None:
+            print "Note: Found " + str(self.mountpoint)
+            return self.mountpoint
+        try:
+            with settings(host_string=self.ssh_user + "@" + host.ipaddress):
+                command = "mount | grep sr-mount | grep \"type nfs\" | awk {'print $3'}"
+                self.mountpoint = fab.run(command)
+                print "Note: Found " + str(self.mountpoint)
+                return self.mountpoint
         except:
             return False
