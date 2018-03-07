@@ -49,8 +49,8 @@ def handleArguments(argv):
            '\n  --config-profile -c <profilename>\tSpecify the CloudMonkey profile name to get the credentials from ' \
            '(or specify in ./config file)' + \
            '\n  --instance-name -i <instancename>\tMigrate VM with this instance name' + \
-           '\n  --esxi-host -e <ipv4 address>\tMigrate VM from this esxi host' + \
-           '\n  --vmx-path -v <vmxpath>\tThe vmx path including /vmfs/volumes/' + \
+           '\n  --esxi-host -e <ipv4 address>\t\tMigrate VM from this esxi host' + \
+           '\n  --vmx-path -v <vmxpath>\t\tThe vmx path including /vmfs/volumes/' + \
            '\n  --to-cluster -t <clustername>\t\tMigrate VM to this cluster' + \
            '\n  --new-base-template -b <template>\tKVM template to link the VM to. Won\'t do much, mostly needed for ' \
            'properties like tags. We need to record it in the DB as it cannot be NULL and the XenServer one obviously ' \
@@ -58,7 +58,7 @@ def handleArguments(argv):
            '\n  --mysqlserver -s <mysql hostname>\tSpecify MySQL server config section name' + \
            '\n  --mysqlpassword <passwd>\t\tSpecify password to cloud ' + \
            'MySQL user' + \
-           '\n  --start-vm\t\t\tStart VM when migration is complete; default=true' + \
+           '\n  --start-vm\t\t\t\tStart VM when migration is complete; default=true' + \
            '\n  --helper-scripts-path\t\t\tFolder with scripts to be copied to hypervisor in migrate working folder' + \
            '\n  --debug\t\t\t\tEnable debug mode' + \
            '\n  --exec\t\t\t\tExecute for real'
