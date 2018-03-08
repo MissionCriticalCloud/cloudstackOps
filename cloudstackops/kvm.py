@@ -236,7 +236,7 @@ class Kvm(hypervisor.hypervisor):
             vmx_uri = "ssh://root@%s/%s" % (esxi_host, vmx_path)
 
             remote_command = 'command=`ssh-agent | head -n2`; eval "$command"; ssh-add; ssh %s -A "cd %s; ' \
-                             'LIBGUESTFS_BACKEND=direct sudo -E virt-v2v -i vmx -it ssh \"%s\" -o local -of qcow2 -os' \
+                             'LIBGUESTFS_BACKEND=direct sudo -E virt-v2v -i vmx -it ssh \\"%s\\" -o local -of qcow2 -os' \
                              ' ./"' % (
             kvmhost.ipaddress, self.get_migration_path(), vmx_uri)
 
