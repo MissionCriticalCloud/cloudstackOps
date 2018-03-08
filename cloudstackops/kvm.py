@@ -235,11 +235,15 @@ class Kvm(hypervisor.hypervisor):
         try:
             vmx_uri = "ssh://root@%s/%s" % (esxi_host, vmx_path)
 
-            print subprocess.Popen('command=`ssh-agent | head -n2`; eval "$command"; ssh-add; ssh %s -A "cd %s; '
-                                   'LIBGUESTFS_BACKEND=direct sudo -E virt-v2v -i vmx -it ssh \"%s\" -o local -of '
-                                   'qcow2 -os ./"' % (
-                kvmhost.ipaddress, self.get_migration_path(), vmx_uri
-            ), stdout=subprocess.PIPE).stdout.read()
+            remote_command = 'command=`ssh-agent | head -n2`; eval "$command"; ssh-add; ssh %s -A "cd %s; ' \
+                             'LIBGUESTFS_BACKEND=direct sudo -E virt-v2v -i vmx -it ssh \"%s\" -o local -of qcow2 -os' \
+                             ' ./"' % (
+            kvmhost.ipaddress, self.get_migration_path(), vmx_uri)
+
+            print remote_command
+
+            result = subprocess.run([remote_command], stdout=subprocess.PIPE)
+            print result.stdout
         except:
             return False
 
