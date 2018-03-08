@@ -64,7 +64,7 @@ def handleArguments(argv):
            '\n  --exec\t\t\t\tExecute for real' + \
            '\n\n\n\n' + \
            '\nMake sure the esxi host is in the known hosts file of every kvm host in the cluster ' \
-           'for h in 01 02 03 04 05 06 07 08 09 10 11 12 13 14; do ssh mccppod051-hv${h} "ssh -o StrictHostKeyChecking=no root@172.16.98.219 ls"; done'
+           'for h in 01 02 03 04 05 06 07 08 09 10 11 12 13 14; do ssh mccppod051-hv${h} -A "sudo -E ssh -o StrictHostKeyChecking=no root@172.16.98.219 ls"; done"; done'
 
     try:
         opts, args = getopt.getopt(

@@ -20,6 +20,7 @@
 #      under the License.
 
 import socket
+import subprocess
 import sys
 import time
 # We depend on these
@@ -232,20 +233,13 @@ class Kvm(hypervisor.hypervisor):
             esxi_host, vmx_path, kvmhost.name
         )
         try:
-            with settings(host_string=self.ssh_user + "@" + kvmhost.ipaddress, warn_only=True):
+            vmx_uri = "ssh://root@%s/%s" % (esxi_host, vmx_path)
 
-                vmx_uri = "ssh://root@%s/%s" % (esxi_host, vmx_path)
-
-                command = "cd %s; LIBGUESTFS_BACKEND=direct sudo -E virt-v2v -i vmx -it ssh \"%s\" -o local -of qcow2 -os ./" % \
-                          (self.get_migration_path(), vmx_uri)
-
-                output = fab.run(command)
-
-                if output.failed:
-                    print output
-                    return False
-
-                return output
+            print subprocess.Popen('command=`ssh-agent | head -n2`; eval "$command"; ssh-add; ssh %s -A "cd %s; '
+                                   'LIBGUESTFS_BACKEND=direct sudo -E virt-v2v -i vmx -it ssh \"%s\" -o local -of '
+                                   'qcow2 -os ./"' % (
+                kvmhost.ipaddress, self.get_migration_path(), vmx_uri
+            ), stdout=subprocess.PIPE).stdout.read()
         except:
             return False
 
