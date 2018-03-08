@@ -267,7 +267,8 @@ if DEBUG == 1:
 # k.vmware_virt_v2v(kvm_host, esxiHost, vmxPath)
 
 # Gather disk info from kvm host
-print k.get_disk_sizes({'ipaddress': '172.16.98.78'})
+print k.get_disk_sizes({}).splitlines()
+
 
 
 
