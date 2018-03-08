@@ -237,13 +237,15 @@ class Kvm(hypervisor.hypervisor):
 
             remote_command = 'command=`ssh-agent | head -n2`; eval "$command"; ssh-add; ssh %s -A "cd %s; ' \
                              'LIBGUESTFS_BACKEND=direct sudo -E virt-v2v -i vmx -it ssh \\"%s\\" -o local -of qcow2 -os' \
-                             ' ./"' % (
-            kvmhost.ipaddress, self.get_migration_path(), vmx_uri)
+                             ' ./"' % (kvmhost.ipaddress, self.get_migration_path(), vmx_uri)
 
             print remote_command
 
-            result = subprocess.run([remote_command], stdout=subprocess.PIPE)
-            print result.stdout
+            process = subprocess.Popen(remote_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            stdout, stderr = process.communicate()
+            print stdout
+            print stderr
+
         except:
             return False
 
