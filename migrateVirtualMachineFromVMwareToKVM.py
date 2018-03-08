@@ -258,15 +258,18 @@ if DEBUG == 1:
     print "Note: You selected a storage pool with tags '" + str(storagepooltags) + "'"
 
 # SSH to random host on tocluster -> create migration folder
-if k.prepare_kvm(kvm_host, targetStoragePoolData.id) is False:
-    sys.exit(1)
-if k.put_scripts(kvm_host) is False:
-    sys.exit(1)
+# if k.prepare_kvm(kvm_host, targetStoragePoolData.id) is False:
+#     sys.exit(1)
+# if k.put_scripts(kvm_host) is False:
+#     sys.exit(1)
 
 # SSH to random host on tocluster -> do virt-v2v
-k.vmware_virt_v2v(kvm_host, esxiHost, vmxPath)
+# k.vmware_virt_v2v(kvm_host, esxiHost, vmxPath)
 
 # Gather disk info from kvm host
+print k.get_disk_sizes({'ipaddress': '172.16.98.78'})
+
+
 
 # Create virtualmachine
 # Add data disks

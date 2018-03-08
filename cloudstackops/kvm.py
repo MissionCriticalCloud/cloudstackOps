@@ -26,6 +26,7 @@ import time
 # We depend on these
 import uuid
 
+import os
 from fabric import api as fab
 # Fabric
 from fabric.api import (
@@ -235,17 +236,26 @@ class Kvm(hypervisor.hypervisor):
         try:
             vmx_uri = "ssh://root@%s/%s" % (esxi_host, vmx_path)
 
-            remote_command = 'command=`ssh-agent | head -n2`; eval "$command"; ssh-add; ssh %s -A "cd %s; ' \
-                             'LIBGUESTFS_BACKEND=direct sudo -E virt-v2v -i vmx -it ssh \\"%s\\" -o local -of qcow2 -os' \
-                             ' ./"' % (kvmhost.ipaddress, self.get_migration_path(), vmx_uri)
+            remote_command = 'command=`/usr/bin/ssh-agent | /usr/bin/head -n2`; eval "$command"; /usr/bin/ssh-add; ' \
+                             '/usr/bin/ssh %s -A "cd %s; LIBGUESTFS_BACKEND=direct sudo -E virt-v2v -i vmx -it ssh ' \
+                             '\\"%s\\" -o local -of qcow2 -os ./"' % \
+                             (kvmhost.ipaddress, self.get_migration_path(), vmx_uri)
+            process = os.system(remote_command)
 
-            print remote_command
+            print process
+        except Exception as e:
+            print e
+            return False
 
-            process = subprocess.Popen(remote_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            stdout, stderr = process.communicate()
-            print stdout
-            print stderr
+    def get_disk_sizes(self, kvmhost):
+        print "Note: Figuring out what OS Familiy the disk %s has"
 
+        try:
+            with settings(host_string=self.ssh_user + "@" + kvmhost.ipaddress):
+                command = "cd %s; ls | grep \"\-sd\" | xargs -I {} qemu-img info {} | grep \"virtual size\" | awk '{ print substr($4,2) }'" % self.get_migration_path()
+                self.disks = fab.run(command)
+                print "Note: Disk sizes: %s" % self.disks.title()
+                return self.disks
         except:
             return False
 
