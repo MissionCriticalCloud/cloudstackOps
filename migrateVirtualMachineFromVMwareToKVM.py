@@ -217,7 +217,8 @@ class migrateVirtualMachineFromVMwareToKVM():
                 sys.exit(1)
 
             if result.virtualmachine.state == "Running":
-                message = "%s is started successfully on %s" % (result.virtualmachine.name, result.virtualmachine.hostname)
+                message = "%s is started successfully on %s" % (
+                    result.virtualmachine.name, result.virtualmachine.hostname)
                 self.cosmic.print_message(message=message, message_type="Note", to_slack=True)
             else:
                 warningMsg = "Warning: " + result.virtualmachine.name + " is in state " + \
@@ -365,7 +366,7 @@ class migrateVirtualMachineFromVMwareToKVM():
             self.cosmic.print_message(message=message, message_type="Note", to_slack=False)
 
             self.networkIp.append({
-                'ip': networkIpList[x],
+                'ip': networkIpList[x].split('/')[0],
                 'networkid': networkID
             })
             x += 1
@@ -404,9 +405,9 @@ class migrateVirtualMachineFromVMwareToKVM():
 
     def gather_disk_info(self):
         # Gather disk info from kvm host
-        disks = self.cosmic.kvm.get_disk_sizes(self.kvm_host).splitlines()
+        disks = self.cosmic.kvm.get_disk_sizes(self.kvm_host)
 
-        for disk in disks.splitlines():
+        for disk in disks.split('\n'):
             size = int(disk.split(' ')[0]) / 1024 / 1024 / 1024  # Byte to GByte
             print "Note: Found disk -> name: " + disk.split(' ')[1] + " size: " + str(size) + "GB"
             self.disk_sizes.append({
@@ -420,7 +421,8 @@ class migrateVirtualMachineFromVMwareToKVM():
     def deploy_vm(self):
         disk_size = filter(lambda x: '-sda' in x['name'], self.disk_sizes)[0]['size']
 
-        print "Note: Deploying VM -> name: " + self.instancename + " serviceoffering: " + self.serviceOffering + " root disk size: " + str(disk_size) + "GB"
+        print "Note: Deploying VM -> name: " + self.instancename + " serviceoffering: " + self.serviceOffering + " root disk size: " + str(
+            disk_size) + "GB"
 
         # Create virtualmachine
         ret = self.cosmic.deployVirtualMachine({
@@ -444,7 +446,8 @@ class migrateVirtualMachineFromVMwareToKVM():
     def add_data_disks(self):
         for disk in self.disk_sizes:
             if '-sda' not in disk['name']:
-                print "Note: Creating data disk -> name: " + disk['name'] + " size: " + str(disk['size']) + " disk offering: " + self.diskoffering
+                print "Note: Creating data disk -> name: " + disk['name'] + " size: " + str(
+                    disk['size']) + " disk offering: " + self.diskoffering
                 ret = self.cosmic.createVolume({
                     'name': disk['name'],
                     'zoneid': self.zone,
@@ -463,7 +466,7 @@ class migrateVirtualMachineFromVMwareToKVM():
                 })
 
     def gather_disk_locations_from_database(self):
-        ret = self.sql.get_volume_paths_for_instance('i-11-100158-NL1')
+        ret = self.sql.get_volume_paths_for_instance(self.vm_instance_name)
 
         for disk in ret:
             if 'ROOT' in disk[5]:
@@ -476,6 +479,7 @@ class migrateVirtualMachineFromVMwareToKVM():
     def move_disks_to_new_location(self):
         for disk in self.disk_sizes:
             self.cosmic.kvm.move_disk_to_pool(self.kvm_host, disk['name'], disk['path'])
+
 
 # Parse arguments
 if __name__ == "__main__":
