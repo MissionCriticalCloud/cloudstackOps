@@ -172,37 +172,34 @@ class migrateVirtualMachineFromVMwareToKVM():
         self.verify_input()
 
         # Configure kvm -> choose host / storage pool
-        # self.prepare_kvm()
+        self.prepare_kvm()
 
         # Do virt-v2v migration
-        # self.vmware_virt_v2v()
+        self.vmware_virt_v2v()
 
         # Gather disk info
         self.gather_disk_info()
 
         # Deploy the vm
-        # self.deploy_vm()
+        self.deploy_vm()
 
         # Add extra data disks
-        # self.add_data_disks()
+        self.add_data_disks()
 
         # Start virtual machine
-        # self.start_vm()
+        self.start_vm()
 
         # Stop virtual machine
-        # self.cosmic.stopVirtualMachine(vmid=self.vmId)
+        self.cosmic.stopVirtualMachine(vmid=self.vmId)
 
         # Gather disk location
         self.gather_disk_locations_from_database()
 
-        # TODO Move disks on kvm host to correct location
-        # TODO Start vm
+        # Move disks to new location
+        self.move_disks_to_new_location()
 
-        print "hello"
-
-    def exit_script(self, message):
-        print "Fatal Error: %s" % message
-        sys.exit(1)
+        # Start virtual machine
+        self.start_vm()
 
     def start_vm(self, start=True):
         if self.DRYRUN == 1:
@@ -407,11 +404,7 @@ class migrateVirtualMachineFromVMwareToKVM():
 
     def gather_disk_info(self):
         # Gather disk info from kvm host
-        # disks = self.cosmic.kvm.get_disk_sizes(self.kvm_host).splitlines()
-
-        disks = """10737418240 boris-test-01-sda
-1073741824 boris-test-01-sdb
-1073741824 boris-test-01-sdc"""
+        disks = self.cosmic.kvm.get_disk_sizes(self.kvm_host).splitlines()
 
         for disk in disks.splitlines():
             size = int(disk.split(' ')[0]) / 1024 / 1024 / 1024  # Byte to GByte
@@ -480,6 +473,9 @@ class migrateVirtualMachineFromVMwareToKVM():
                 print 'Note: Found volume location for ' + disk[3] + ": " + disk[0]
                 filter(lambda x: disk[3] in x['name'], self.disk_sizes)[0]['path'] = disk[0]
 
+    def move_disks_to_new_location(self):
+        for disk in self.disk_sizes:
+            self.cosmic.kvm.move_disk_to_pool(self.kvm_host, disk['name'], disk['path'])
 
 # Parse arguments
 if __name__ == "__main__":

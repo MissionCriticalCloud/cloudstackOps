@@ -275,6 +275,15 @@ class Kvm(hypervisor.hypervisor):
         except:
             return False
 
+    def move_disk_to_pool(self, kvmhost, volume_name, new_location):
+        print "Note: Moving disk %s to location %s on host %s" % (volume_name, new_location, kvmhost.name)
+        try:
+            with settings(host_string=self.ssh_user + "@" + kvmhost.ipaddress):
+                command = "cd %s; sudo mv %s %s" % (self.get_migration_path(), volume_name, new_location)
+                return fab.run(command)
+        except:
+            return False
+
     def move_rootdisk_to_pool(self, kvmhost, volume_uuid):
         print "Note: Moving disk %s into place on host %s" % (volume_uuid, kvmhost.name)
         try:
