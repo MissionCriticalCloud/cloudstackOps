@@ -320,6 +320,40 @@ class CloudStackSQL(CloudStackOpsBase):
         return result
 
     # Return volumes that belong to a given instance ID
+    def get_volume_paths_for_instance(self, instancename):
+        if not self.conn:
+            return 1
+        if not instancename:
+            return 1
+
+        cursor = self.conn.cursor()
+        cursor.execute(
+            """
+            SELECT CONCAT('/mnt/', `storage_pool`.`uuid`, '/', `volumes`.`uuid`) AS `path`, `storage_pool`.`name` AS `storage_pool_name`, `storage_pool`.`uuid` AS `storage_pool_uuid`, `volumes`.`name` AS `volume_name`, `volumes`.`uuid` AS `volume_uuid`, `volumes`.`volume_type` AS `volume_type`, `vm_instance`.`state` AS `vm_state`
+            FROM `storage_pool`, `vm_instance`, `volumes`
+            WHERE
+            (
+                `volumes`.`instance_id` = `vm_instance`.`id`
+                AND
+                `volumes`.`removed` IS NULL
+                AND
+                `volumes`.`state` = 'Ready'
+                AND
+                `instance_name` ='%s'
+                AND
+                `storage_pool`.`id` = `volumes`.`pool_id`
+            );
+           """ % instancename
+        )
+        result = cursor.fetchall()
+        if self.DEBUG == 1:
+            print "DEBUG: Executed SQL: " + cursor.statement
+
+        cursor.close()
+
+        return result
+
+    # Return volumes that belong to a given instance ID
     def get_volume(self, volumename):
         if not self.conn:
             return 1

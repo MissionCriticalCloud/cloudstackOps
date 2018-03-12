@@ -40,8 +40,12 @@ class migrateVirtualMachineFromVMwareToKVM():
         self.sql = None
 
         self.kvm_host = None
-        self.disk_sizes = {}
+        self.disk_sizes = []
         self.disk_name = ''
+        self.diskoffering = ''
+
+        self.vmId = ''
+        self.vm_instance_name = ''
 
     # Function to handle our arguments
     def handleArguments(self, argv):
@@ -180,36 +184,49 @@ class migrateVirtualMachineFromVMwareToKVM():
         # self.deploy_vm()
 
         # Add extra data disks
-        self.add_data_disks()
+        # self.add_data_disks()
+
+        # Start virtual machine
+        # self.start_vm()
+
+        # Stop virtual machine
+        # self.cosmic.stopVirtualMachine(vmid=self.vmId)
+
+        # Gather disk location
+        self.gather_disk_locations_from_database()
+
+        # TODO Move disks on kvm host to correct location
+        # TODO Start vm
+
+        print "hello"
 
     def exit_script(self, message):
         print "Fatal Error: %s" % message
         sys.exit(1)
 
-    # def start_vm(self, hypervisor_name, start=startVM):
-    #     global message, result
-    #     if self.DRYRUN == 1:
-    #         message = "Would have started vm %s with id %s" % (vm.name, vm.id)
-    #         c.print_message(message=message, message_type="Note", to_slack=False)
-    #     elif start:
-    #         message = "Starting virtualmachine %s with id %s" % (vm.name, vm.id)
-    #         c.print_message(message=message, message_type="Note", to_slack=True)
-    #         result = c.startVirtualMachine(vm.id)
-    #         if result == 1:
-    #             message = "Start vm failed -- exiting."
-    #             c.print_message(message=message, message_type="Error", to_slack=True)
-    #             message = "investegate manually!"
-    #             c.print_message(message=message, message_type="Note", to_slack=False)
-    #             sys.exit(1)
-    #
-    #         if result.virtualmachine.state == "Running":
-    #             message = "%s is started successfully on %s" % (result.virtualmachine.name, hypervisor_name)
-    #             c.print_message(message=message, message_type="Note", to_slack=True)
-    #         else:
-    #             warningMsg = "Warning: " + result.virtualmachine.name + " is in state " + \
-    #                          result.virtualmachine.state + \
-    #                          " instead of Running. Please investigate (could just take some time)."
-    #             print warningMsg
+    def start_vm(self, start=True):
+        if self.DRYRUN == 1:
+            message = "Would have started vm %s with id %s" % (self.instancename, self.vmId)
+            self.cosmic.print_message(message=message, message_type="Note", to_slack=False)
+        elif start:
+            message = "Starting virtualmachine %s with id %s" % (self.instancename, self.vmId)
+            self.cosmic.print_message(message=message, message_type="Note", to_slack=True)
+            result = self.cosmic.startVirtualMachine(self.vmId)
+            if result == 1:
+                message = "Start vm failed -- exiting."
+                self.cosmic.print_message(message=message, message_type="Error", to_slack=True)
+                message = "investegate manually!"
+                self.cosmic.print_message(message=message, message_type="Note", to_slack=False)
+                sys.exit(1)
+
+            if result.virtualmachine.state == "Running":
+                message = "%s is started successfully on %s" % (result.virtualmachine.name, result.virtualmachine.hostname)
+                self.cosmic.print_message(message=message, message_type="Note", to_slack=True)
+            else:
+                warningMsg = "Warning: " + result.virtualmachine.name + " is in state " + \
+                             result.virtualmachine.state + \
+                             " instead of Running. Please investigate (could just take some time)."
+                print warningMsg
 
     def init_classes(self):
         # Init CloudStackOps class
@@ -302,6 +319,20 @@ class migrateVirtualMachineFromVMwareToKVM():
         self.newBaseTemplate = templateID
 
         # Check service offering of the new vm
+        if 'SBP' in self.serviceOffering:
+            diskOfferingName = 'MCC_v1.ZWPS.SBP1'
+        else:
+            diskOfferingName = 'MCC_v1.ZWPS.EQXAMS2'
+
+        diskOfferingID = self.cosmic.checkCloudStackName({'csname': diskOfferingName, 'csApiCall': 'listDiskOfferings'})
+
+        self.verify_checked_cosmic_name('Disk Offering', diskOfferingID)
+
+        message = "Disk offering ID found for %s is %s" % (diskOfferingName, diskOfferingID)
+        self.cosmic.print_message(message=message, message_type="Note", to_slack=False)
+        self.diskoffering = diskOfferingID
+
+        # Check service offering of the new vm
         serviceOfferingID = self.cosmic.checkCloudStackName(
             {'csname': self.serviceOffering, 'csApiCall': 'listServiceOfferings', 'domainid': custDomainID})
 
@@ -383,16 +414,23 @@ class migrateVirtualMachineFromVMwareToKVM():
 1073741824 boris-test-01-sdc"""
 
         for disk in disks.splitlines():
-            self.disk_sizes[disk.split(' ')[1]] = {
-                'size': int(disk.split(' ')[0]) / 1024 / 1024 / 1024  # Byte to GByte
-            }
+            size = int(disk.split(' ')[0]) / 1024 / 1024 / 1024  # Byte to GByte
+            print "Note: Found disk -> name: " + disk.split(' ')[1] + " size: " + str(size) + "GB"
+            self.disk_sizes.append({
+                'name': disk.split(' ')[1],
+                'size': size
+            })
 
-        self.disk_name = self.disk_sizes.keys()[0].split('-sd')[0]
+        self.disk_name = self.disk_sizes[0]['name'].split('-sd')[0]
+        print "Note: Set disk name prefix to: " + self.disk_name
 
     def deploy_vm(self):
+        disk_size = filter(lambda x: '-sda' in x['name'], self.disk_sizes)[0]['size']
+
+        print "Note: Deploying VM -> name: " + self.instancename + " serviceoffering: " + self.serviceOffering + " root disk size: " + str(disk_size) + "GB"
 
         # Create virtualmachine
-        self.cosmic.deployVirtualMachine({
+        ret = self.cosmic.deployVirtualMachine({
             'name': self.instancename,
             'displayname': self.instancename,
             'startvm': 'false',
@@ -402,35 +440,51 @@ class migrateVirtualMachineFromVMwareToKVM():
             'account': self.account,
             'domainid': self.domain,
             'iptonetworklist': self.networkIp,
-            'rootdisksize': self.disk_sizes[self.disk_name + '-sda']['size'],
+            'rootdisksize': disk_size,
             'hypervisor': 'KVM'
         })
 
+        self.vmId = ret.virtualmachine.id
+        self.vm_instance_name = ret.virtualmachine.instancename
+        print "Note: VM deployed successfully, found uuid: " + self.vmId + " and instance name: " + self.vm_instance_name
+
     def add_data_disks(self):
-        for disk in self.disk_sizes.keys():
-            if '-sda' not in disk:
-                pass
-                self.cosmic.createVolume({
-                    'name': self.instancename,
+        for disk in self.disk_sizes:
+            if '-sda' not in disk['name']:
+                print "Note: Creating data disk -> name: " + disk['name'] + " size: " + str(disk['size']) + " disk offering: " + self.diskoffering
+                ret = self.cosmic.createVolume({
+                    'name': disk['name'],
                     'zoneid': self.zone,
                     'account': self.account,
                     'domainid': self.domain,
-                    'size': self.disk_sizes[disk]['size'],
-
+                    'size': disk['size'],
+                    'diskofferingid': self.diskoffering
                 })
 
+                disk['uuid'] = ret.volume.id
 
-# TODO Add data disks
-# TODO Start virtual machine
-# TODO Stop virtual machine
-# TODO Get disks locations from database
-# TODO Move disks on kvm host to correct location
-# TODO Start vm
-# TODO Check if vm already exists before starting!
-# TODO add --exec and --debug features
+                print "Note: Data disk create successfully, attaching to vm: " + self.vmId
+                self.cosmic.attachVolume({
+                    'id': disk['uuid'],
+                    'virtualmachineid': self.vmId
+                })
+
+    def gather_disk_locations_from_database(self):
+        ret = self.sql.get_volume_paths_for_instance('i-11-100158-NL1')
+
+        for disk in ret:
+            if 'ROOT' in disk[5]:
+                print 'Note: Found volume location for ROOT: ' + disk[0]
+                filter(lambda x: '-sda' in x['name'], self.disk_sizes)[0]['path'] = disk[0]
+            else:
+                print 'Note: Found volume location for ' + disk[3] + ": " + disk[0]
+                filter(lambda x: disk[3] in x['name'], self.disk_sizes)[0]['path'] = disk[0]
 
 
 # Parse arguments
 if __name__ == "__main__":
     app = migrateVirtualMachineFromVMwareToKVM()
     app.migrate()
+
+# TODO Check if vm already exists before starting!
+# TODO add --exec and --debug features

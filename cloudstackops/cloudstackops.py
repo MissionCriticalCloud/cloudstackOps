@@ -384,6 +384,8 @@ class CloudStackOps(CloudStackOpsBase):
             apicall = listVPCs.listVPCsCmd()
         elif csApiCall == "listServiceOfferings":
             apicall = listServiceOfferings.listServiceOfferingsCmd()
+        elif csApiCall == "listDiskOfferings":
+            apicall = listDiskOfferings.listDiskOfferingsCmd()
         else:
             print "No API command to call"
             sys.exit(1)
@@ -957,6 +959,18 @@ class CloudStackOps(CloudStackOpsBase):
         apicall.diskofferingid = (str(args['diskofferingid'])) if 'diskofferingid' in args else None
         apicall.size = (str(args['size'])) if 'size' in args else None
         apicall.zoneid = (str(args['zoneid'])) if 'zoneid' in args else None
+
+        # Call CloudStack API
+        return self._callAPI(apicall)
+
+    # Attach volume
+    def attachVolume(self, args):
+        args = self.remove_empty_values(args)
+
+        apicall = attachVolume.attachVolumeCmd()
+        apicall.id = (str(args['id'])) if 'id' in args else None
+        apicall.virtualmachineid = (str(args['virtualmachineid'])) if 'virtualmachineid' in args else None
+        apicall.deviceid = (str(args['deviceid'])) if 'deviceid' in args else None
 
         # Call CloudStack API
         return self._callAPI(apicall)
