@@ -379,17 +379,17 @@ class migrateVirtualMachineFromVMwareToKVM():
 
     def prepare_kvm(self):
         # Get cluster hosts
-        self.kvm_host = self.cosmic.getRandomHostFromCluster(self.toClusterID)
+        self.kvm_host = self.cosmic.getRandomHostFromCluster(self.toCluster)
 
         # Select storage pool
-        targetStorage = self.cosmic.getStoragePoolWithMostFreeSpace(self.toClusterID)
+        targetStorage = self.cosmic.getStoragePoolWithMostFreeSpace(self.toCluster)
         targetStorageID = targetStorage.id
         targetStoragePoolData = self.cosmic.getStoragePoolData(targetStorageID)[0]
         storagepooltags = targetStoragePoolData.tags
         storagepoolname = targetStoragePoolData.name
 
         # Get hosts that belong to toCluster
-        toClusterHostsData = self.cosmic.getHostsFromCluster(self.toClusterID)
+        toClusterHostsData = self.cosmic.getHostsFromCluster(self.toCluster)
         if self.DEBUG == 1:
             print "Note: You selected a storage pool with tags '" + str(storagepooltags) + "'"
 

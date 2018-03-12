@@ -251,7 +251,7 @@ class Kvm(hypervisor.hypervisor):
         print "Note: Figuring out what OS Familiy the disk %s has"
 
         try:
-            with settings(host_string=self.ssh_user + "@172.16.98.78"):
+            with settings(host_string=self.ssh_user + "@" + kvmhost.ipaddress):
                 command = "cd %s; ls | grep \"\-sd\" | xargs -I {} qemu-img info {} | grep \"virtual size\|image\" | awk '!(NR%2){print$0p}{p=$0}' | awk '{ print substr($4,2) " " $6 }'" % '/mnt/5b19833b-4412-30fb-9182-1a5a7ae3a882/migration/0014c4d1-462e-4965-93f2-0eeb6e97bac6'
 
                 return fab.run(command)
