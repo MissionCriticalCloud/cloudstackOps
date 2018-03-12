@@ -800,12 +800,12 @@ class CloudStackOps(CloudStackOpsBase):
         s.quit()
 
     # Stop virtualvirtualmachine
-    def stopVirtualMachine(self, vmid, timeout=900):
+    def stopVirtualMachine(self, vmid, force="false", timeout=900):
         try:
             with Timeout(timeout):
                 apicall = stopVirtualMachine.stopVirtualMachineCmd()
                 apicall.id = str(vmid)
-                apicall.forced = "false"
+                apicall.forced = force
 
                 # Call CloudStack API
                 return self._callAPI(apicall)

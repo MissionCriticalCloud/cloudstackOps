@@ -190,7 +190,7 @@ class migrateVirtualMachineFromVMwareToKVM():
         self.start_vm()
 
         # Stop virtual machine
-        self.cosmic.stopVirtualMachine(vmid=self.vmId)
+        self.cosmic.stopVirtualMachine(vmid=self.vmId, force="true")
 
         # Gather disk location
         self.gather_disk_locations_from_database()
