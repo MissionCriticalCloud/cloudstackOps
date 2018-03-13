@@ -35,10 +35,15 @@ class Args:
         argparser.add_argument("-d", "--disablehost", dest="disablehost", help="Disable 'from' host", default=False,
                                action="store_true")
         argparser.add_argument("-f", "--from", dest="src", help="From hypervisor", required=True, action="store")
-        argparser.add_argument("-t", "--to", dest="dst", help="To hypervisor", required=True, action="store")
+        argparser.add_argument("-t", "--to", dest="dst",
+                               help="To hypervisor, specify '@auto' to migrate to host with most available memory or "
+                                    "'@balance' to balance them across multiple hypervisors", required=True,
+                               action="store")
         argparser.add_argument("--config", dest="conf", help="Alternate config file", action="store",
                                default="~/.cloudmonkey/config")
         argparser.add_argument("--exec", dest="DRYRUN", help="Execute migration", default=True, action="store_false")
+        argparser.add_argument("--noslack", dest="slack", help="Don't send slack messages", default=True,
+                               action="store_false")
         arggroup.add_argument("--domain", dest="domain", help="Only migrate VM's from domain", action="store")
         arggroup.add_argument("--exceptdomain", dest="excdomain", help="Migrate all VM's except domain", action="store")
         self.__args = argparser.parse_args()
@@ -53,6 +58,8 @@ class Cosmic(object):
     __hvtypes = ('KVM', 'XenServer')
     __quit = False
     disablehost = False
+    slack = True
+    balanced = False
 
     def __init__(self, endpoint=None, apikey=None, secretkey=None, verify=True):
         self.__cs = cs.CloudStack(endpoint=endpoint, key=apikey, secret=secretkey, verify=verify)
@@ -70,6 +77,8 @@ class Cosmic(object):
         self.clops.instance_name = "N/A"
         self.zone = "N/A"
         self.cluster = "N/A"
+        if len(self.hosts) == 0:
+            self.getHosts()
 
     def __contains__(self, item):
         return item in self.hosts
@@ -86,8 +95,6 @@ class Cosmic(object):
     @srchost.setter
     def srchost(self, value):
         self.__srchost = value
-        if len(self.hosts) == 0:
-            self.getHosts()
 
     @property
     def dsthost(self):
@@ -96,13 +103,29 @@ class Cosmic(object):
     @dsthost.setter
     def dsthost(self, value):
         self.__dsthost = value
-        if len(self.hosts) == 0:
-            self.getHosts()
 
     def getHosts(self):
         hosts = self.__cs.listHosts()
         for host in hosts['host']:
+            if 'clustertype' not in host:
+                continue
             self.hosts[host['name']] = host
+
+    @property
+    def getFreeHost(self):
+        self.getHosts()
+        hv = {'free': 0}
+        for host in self.hosts:
+            if host.startswith(self.srchost):
+                continue
+            if self.hosts[host]['state'].lower() == 'down' and self.hosts[host]['resourcestate'].lower() == 'disabled':
+                continue
+
+            free_mem = self.hosts[host]['memorytotal'] - self.hosts[host]['memoryallocated']
+            hv_id = self.hosts[host]['id']
+            if free_mem > hv['free']:
+                hv = {'host': host, 'id': hv_id, 'free': free_mem}
+        return hv
 
     def __getDomains(self):
         self.domains = self.__cs.listDomains(listall=True)
@@ -121,6 +144,11 @@ class Cosmic(object):
 
     def __getRouters(self, hostid=None):
         self.routervms = self.__cs.listRouters(hostid=hostid, listall=True)
+        projectrvms = self.__cs.listRouters(hostid=hostid, listall=True, projectid=-1)
+        if len(projectrvms) > 0 and 'router' in self.routervms:
+            self.routervms['router'] += projectrvms['router']
+        else:
+            self.routervms = projectrvms
 
     def __sighandler(self, signal, frame):
         self.__quit = True
@@ -142,6 +170,8 @@ class Cosmic(object):
         return False
 
     def send_slack(self, message=None, instance_name=None, vm_name=None, **kwargs):
+        if not self.slack:
+            return
         self.clops.cluster = self.cluster
         self.clops.zone_name = self.zone
         self.clops.instance_name = instance_name
@@ -150,16 +180,16 @@ class Cosmic(object):
         color = kwargs['color'] if 'color' in kwargs and kwargs['color'] else "good"
         self.clops.send_slack_message(message=message, color=color)
 
-    def migrate(self, srchost=None, dsthost=None, DRYRUN=True, **kwargs):
+    def migrate(self, srchost=None, DRYRUN=True, **kwargs):
         """ Migrate VMS to another HV """
 
         signal.signal(signal.SIGINT, self.__sighandler)
 
-        src_hostid = self.hosts[srchost]['id']
-        dst_hostid = self.hosts[dsthost]['id']
+        src_hostid = self.hosts[self.srchost]['id']
+        # dst_hostid = self.hosts[dsthost]['id']
         self.zone = kwargs['zone'] if 'zone' in kwargs and kwargs['zone'] else "N/A"
-        self.cluster = self.hosts[srchost]['clustername']
-        self.clops.slack_custom_value = srchost
+        self.cluster = self.hosts[self.srchost]['clustername']
+        self.clops.slack_custom_value = self.srchost
 
         self.__getDomains()
         self.__getSystemVms(hostid=src_hostid)
@@ -181,19 +211,27 @@ class Cosmic(object):
                     if host['domain'] == kwargs['excdomain']:
                         continue
 
-                print("    UUID: %s  Name: %-16s [%-24s] %8iMb  State: " % (host['id'], host['instancename'],
+                print("    UUID: %s  Name: %-20s [%-24s] %8iMb  State: " % (host['id'], host['instancename'],
                                                                             host['name'][:24], host['memory']),
                       end='')
                 sys.stdout.flush()
 
+                if self.balanced:
+                    freehost = self.getFreeHost
+                    dst_hostid = freehost['id']
+                    self.dsthost = freehost['host']
+                else:
+                    dst_hostid = self.hosts[self.dsthost]['id']
+
                 if not DRYRUN:
-                    self.send_slack(message="Live migrating vm %s to host %s" % (host['name'], dsthost),
-                                    instance_name=host['instancename'], vm_name=host['name'])
+                    message = "Live migrating vm %s to host %s" % (host['name'], self.dsthost)
+                    print(message + ' - ', end='')
+                    self.send_slack(message=message, instance_name=host['instancename'], vm_name=host['name'])
                     jobid = self.__cs.migrateVirtualMachine(hostid=dst_hostid, virtualmachineid=host['id'])
                     if self.__waitforjob(jobid['jobid']):
                         print("Migration successful")
                     else:
-                        self.send_slack(message="Error migrating vm %s to host %s" % (host['name'], dsthost),
+                        self.send_slack(message="Error migrating vm %s to host %s" % (host['name'], self.dsthost),
                                         instance_name=host['instancename'], vm_name=host['name'], color="danger")
                         print("Migration unsuccessful!")
                 else:
@@ -208,14 +246,23 @@ class Cosmic(object):
                 for host in self.systemvms['systemvm']:
                     print("    UUID: %s  Name: %-16s State: " % (host['id'], host['name']), end='')
                     sys.stdout.flush()
+
+                    if self.balanced:
+                        freehost = self.getFreeHost
+                        dst_hostid = freehost['id']
+                        self.dsthost = freehost['host']
+                    else:
+                        dst_hostid = self.hosts[self.dsthost]['id']
+
                     if not DRYRUN:
-                        self.send_slack(message="Live migrating SVM %s to host %s" % (host['name'], dsthost),
-                                        instance_name=host['id'], vm_name=host['name'])
+                        message = "Live migrating SVM %s to host %s" % (host['name'], self.dsthost)
+                        print(message + " - ", end='')
+                        self.send_slack(message=message, instance_name=host['id'], vm_name=host['name'])
                         jobid = self.__cs.migrateSystemVm(hostid=dst_hostid, virtualmachineid=host['id'])
                         if self.__waitforjob(jobid['jobid']):
                             print("Migration successful")
                         else:
-                            self.send_slack(message="Error migrating SVM %s to host %s" % (host['name'], dsthost),
+                            self.send_slack(message="Error migrating SVM %s to host %s" % (host['name'], self.dsthost),
                                             instance_name=host['id'], vm_name=host['name'], color="danger")
                             print("Migration unsuccessful!")
                     else:
@@ -228,14 +275,23 @@ class Cosmic(object):
                 for host in self.routervms['router']:
                     print("    UUID: %s  Name: %-16s State: " % (host['id'], host['name']), end='')
                     sys.stdout.flush()
+
+                    if self.balanced:
+                        freehost = self.getFreeHost
+                        dst_hostid = freehost['id']
+                        self.dsthost = freehost['host']
+                    else:
+                        dst_hostid = self.hosts[self.dsthost]['id']
+
                     if not DRYRUN:
-                        self.send_slack(message="Live migrating RVM %s to host %s" % (host['name'], dsthost),
-                                        instance_name=host['id'], vm_name=host['name'])
+                        message = "Live migrating RVM %s to host %s" % (host['name'], self.dsthost)
+                        print(message + " - ", end='')
+                        self.send_slack(message=message, instance_name=host['id'], vm_name=host['name'])
                         jobid = self.__cs.migrateSystemVm(hostid=dst_hostid, virtualmachineid=host['id'])
                         if self.__waitforjob(jobid['jobid']):
                             print("Migration successful")
                         else:
-                            self.send_slack(message="Error migrating RVM %s to host %s" % (host['name'], dsthost),
+                            self.send_slack(message="Error migrating RVM %s to host %s" % (host['name'], self.dsthost),
                                             instance_name=host['id'], vm_name=host['name'], color="danger")
                             print("Migration unsuccessful!")
                     else:
@@ -254,26 +310,45 @@ def main():
     dsthv = args['dst']
     domain = args['domain']
     excdomain = args['excdomain']
+    slack = args['slack']
 
     config = ConfigParser.ConfigParser()
     config.read(os.path.expanduser(configfile))
     cosmic = Cosmic(endpoint=config.get(zone, 'url'), apikey=config.get(zone, 'apikey'),
                     secretkey=config.get(zone, 'secretkey'), verify=False)
 
-    cosmic.srchost = srchv
-    cosmic.dsthost = dsthv
     cosmic.disablehost = disablehost
+    cosmic.slack = slack
 
-    srchost = [x for x in cosmic.hosts if x.startswith(srchv)][0]
-    dsthost = [x for x in cosmic.hosts if x.startswith(dsthv)][0]
-    if not srchost:
+    srchost = [x for x in cosmic.hosts if x.startswith(srchv)]
+    if len(srchost) == 0:
         print("Hypervisor %s not found, exiting..." % srchv)
         return 1
-    if not dsthost:
-        print("Hypervisor %s not found, exiting..." % dsthv)
-        return 1
-    cosmic.migrate(srchost=srchost, dsthost=dsthost, domain=domain, excdomain=excdomain, DRYRUN=args['DRYRUN'],
-                   zone=zone)
+    cosmic.srchost = srchost[0]
+
+    if dsthv.lower() == '@auto':
+        print("Auto selected host %s as destination" % cosmic.getFreeHost['host'])
+        cosmic.dsthost = cosmic.getFreeHost['host']
+    elif dsthv.lower() == '@balance':
+        print("Balancing VM's over multiple hosts")
+        cosmic.balanced = True
+    else:
+        dsthost = [x for x in cosmic.hosts if x.startswith(dsthv)][0]
+        if not dsthost:
+            print("Hypervisor %s not found, exiting..." % dsthv)
+            return 1
+
+        if cosmic.hosts[dsthost]['state'].lower() == 'down':
+            print("%s is down, unable to migrate machines to this host" % dsthost)
+            return 1
+
+        if cosmic.hosts[dsthost]['resourcestate'].lower() == 'disabled':
+            print("%s is disabled, unable to to migrate VM's to this host" % dsthost)
+            return 1
+        cosmic.dsthost = dsthost
+
+    return (cosmic.migrate(srchost=srchost, domain=domain, excdomain=excdomain,
+                           DRYRUN=args['DRYRUN'], zone=zone))
 
 
 if __name__ == "__main__":
