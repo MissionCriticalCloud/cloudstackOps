@@ -248,15 +248,7 @@ class migrateVirtualMachineFromVMwareToKVM():
         # Init SQL class
         self.sql = cloudstacksql.CloudStackSQL(self.DEBUG, self.DRYRUN)
 
-        # Connect MySQL
-        result = self.sql.connectMySQL(self.mysqlHost, self.mysqlPasswd)
-        if result > 0:
-            message = "MySQL connection failed"
-            self.cosmic.print_message(message=message, message_type="Error", to_slack=True)
-            sys.exit(1)
-        elif self.DEBUG == 1:
-            print "DEBUG: MySQL connection successful"
-            print self.sql.conn
+        self.connect_mysql()
 
         # make credentials file known to our class
         self.cosmic.configProfileName = self.configProfileName
@@ -274,6 +266,17 @@ class migrateVirtualMachineFromVMwareToKVM():
             print "Debug: Checking CloudStack IDs of provided input.."
 
         self.cosmic.slack_custom_title = "Migration details for vmx %s" % self.vmxPath
+
+    def connect_mysql(self):
+        # Connect MySQL
+        result = self.sql.connectMySQL(self.mysqlHost, self.mysqlPasswd)
+        if result > 0:
+            message = "MySQL connection failed"
+            self.cosmic.print_message(message=message, message_type="Error", to_slack=True)
+            sys.exit(1)
+        elif self.DEBUG == 1:
+            print "DEBUG: MySQL connection successful"
+            print self.sql.conn
 
     def verify_input(self):
         # Check domain of the new vm
@@ -468,6 +471,8 @@ class migrateVirtualMachineFromVMwareToKVM():
                 })
 
     def gather_disk_locations_from_database(self):
+        self.connect_mysql()
+
         ret = self.sql.get_volume_paths_for_instance(self.vm_instance_name)
 
         for disk in ret:
