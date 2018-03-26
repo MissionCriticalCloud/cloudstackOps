@@ -116,8 +116,13 @@ class Cosmic(object):
         self.getHosts()
         hv = {'free': 0}
         for host in self.hosts:
+            # Skip sourcehost
             if host.startswith(self.srchost):
                 continue
+            # Skip nodes in another cluster
+            if self.hosts[host]['clustername'] != self.hosts[self.srchost]['clustername']:
+                continue
+            # Skip host which are down or disabled
             if self.hosts[host]['state'].lower() == 'down' and self.hosts[host]['resourcestate'].lower() == 'disabled':
                 continue
 
@@ -147,8 +152,6 @@ class Cosmic(object):
         projectrvms = self.__cs.listRouters(hostid=hostid, listall=True, projectid=-1)
         if len(projectrvms) > 0 and 'router' in self.routervms:
             self.routervms['router'] += projectrvms['router']
-        else:
-            self.routervms = projectrvms
 
     def __sighandler(self, signal, frame):
         self.__quit = True
@@ -326,6 +329,9 @@ def main():
         return 1
     cosmic.srchost = srchost[0]
 
+    if dsthv[0] == '@' and dsthv.lower() not in ('@auto', '@balance'):
+        print('Target can only be hostname/fqdn or @auto/@balance')
+        return 1
     if dsthv.lower() == '@auto':
         print("Auto selected host %s as destination" % cosmic.getFreeHost['host'])
         cosmic.dsthost = cosmic.getFreeHost['host']
