@@ -180,6 +180,9 @@ class migrateVirtualMachineFromVMwareToKVM():
         # Gather disk info
         self.gather_disk_info()
 
+        # Windows magix
+        self.windows_magic()
+
         # Deploy the vm
         self.deploy_vm()
 
@@ -406,6 +409,15 @@ class migrateVirtualMachineFromVMwareToKVM():
 
     def vmware_virt_v2v(self):
         self.cosmic.kvm.vmware_virt_v2v(self.kvm_host, self.esxiHost, self.vmxPath)
+
+    def windows_magic(self):
+        rootdisk = filter(lambda x: '-sda' in x['name'], self.disk_sizes)[0]['name']
+
+        if self.cosmic.kvm.get_os_family(self.kvm_host, rootdisk) == "windows":
+            registryresult = self.cosmic.kvm.fix_windows_registry(self.kvm_host, rootdisk.split('-sda')[0])
+            if registryresult is False:
+                print "Error: Altering the registry failed."
+                return False
 
     def gather_disk_info(self):
         # Gather disk info from kvm host
