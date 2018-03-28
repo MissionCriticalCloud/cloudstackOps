@@ -148,9 +148,9 @@ class migrateVirtualMachineFromVMwareToKVM():
             print help
             sys.exit()
 
-        # if not os.path.isdir(helperScriptsPath):
-        #     print "Error: Directory %s as specified with --helper-scripts-path does not exist!" % helperScriptsPath
-        #     sys.exit(1)
+        if not os.path.isdir(helperScriptsPath):
+            print "Error: Directory %s as specified with --helper-scripts-path does not exist!" % helperScriptsPath
+            sys.exit(1)
 
     def migrate(self):
         # First handle the arguments!
