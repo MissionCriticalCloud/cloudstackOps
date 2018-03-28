@@ -1787,6 +1787,8 @@ class CloudStackOps(CloudStackOpsBase):
                 # And are not in Maintenance, Error or Disabled
                 if h.resourcestate == "Disabled" or h.resourcestate == "Maintenance" or h.resourcestate == "Error":
                     continue
+                if h.state == "Alert" or h.state == "Disconnected":
+                    continue
                 # Check memory availability
                 # Available memory in Bytes
                 memoryavailable = h.memorytotal - h.memoryallocated
