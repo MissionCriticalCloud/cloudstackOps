@@ -26,7 +26,7 @@ class migrateVirtualMachineFromVMwareToKVM():
         self.mysqlHost = ''
         self.mysqlPasswd = ''
         self.newBaseTemplate = ''
-        self.helperScriptsPath = None
+        self.helperScriptsPath = ''
         self.startVM = True
         self.esxiHost = ''
         self.vmxPath = ''
@@ -148,8 +148,8 @@ class migrateVirtualMachineFromVMwareToKVM():
             print help
             sys.exit()
 
-        if not os.path.isdir(helperScriptsPath):
-            print "Error: Directory %s as specified with --helper-scripts-path does not exist!" % helperScriptsPath
+        if not os.path.isdir(self.helperScriptsPath):
+            print "Error: Directory %s as specified with --helper-scripts-path does not exist!" % self.helperScriptsPath
             sys.exit(1)
 
     def migrate(self):
