@@ -190,7 +190,11 @@ class migrateVirtualMachineFromVMwareToKVM():
         self.add_data_disks()
 
         # Start virtual machine
-        self.start_vm()
+        print "Note: Starting virtualmachine to create disks"
+        result = self.cosmic.startVirtualMachine(vmid=self.vmId, hostid=self.kvm_host.id)
+        if result == 1:
+            print "Start vm failed -- exiting."
+            exit(result)
 
         # Stop virtual machine
         print "Note: Stopping virtualmachines again"
@@ -203,32 +207,12 @@ class migrateVirtualMachineFromVMwareToKVM():
         self.move_disks_to_new_location()
 
         # Start virtual machine
-        self.start_vm()
-
-    def start_vm(self, start=True):
-        if self.DRYRUN == 1:
-            message = "Would have started vm %s with id %s" % (self.instancename, self.vmId)
-            self.cosmic.print_message(message=message, message_type="Note", to_slack=False)
-        elif start:
-            message = "Starting virtualmachine %s with id %s" % (self.instancename, self.vmId)
-            self.cosmic.print_message(message=message, message_type="Note", to_slack=False)
-            result = self.cosmic.startVirtualMachine(self.vmId)
-            if result == 1:
-                message = "Start vm failed -- exiting."
-                self.cosmic.print_message(message=message, message_type="Error", to_slack=False)
-                message = "investegate manually!"
-                self.cosmic.print_message(message=message, message_type="Note", to_slack=False)
-                sys.exit(1)
-
-            if result.virtualmachine.state == "Running":
-                message = "%s is started successfully on %s" % (
-                    result.virtualmachine.name, result.virtualmachine.hostname)
-                self.cosmic.print_message(message=message, message_type="Note", to_slack=False)
-            else:
-                warningMsg = "Warning: " + result.virtualmachine.name + " is in state " + \
-                             result.virtualmachine.state + \
-                             " instead of Running. Please investigate (could just take some time)."
-                print warningMsg
+        result = self.cosmic.startVirtualMachine(self.vmId)
+        if result == 1:
+            print "Start vm failed -- exiting."
+            exit(result)
+        if result.virtualmachine.state == "Running":
+            print "%s is started successfully on %s" % (result.virtualmachine.name, result.virtualmachine.hostname)
 
     def init_classes(self):
         # Init CloudStackOps class
