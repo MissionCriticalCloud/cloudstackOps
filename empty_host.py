@@ -123,7 +123,7 @@ class Cosmic(object):
             if self.hosts[host]['clustername'] != self.hosts[self.srchost]['clustername']:
                 continue
             # Skip host which are down or disabled
-            if self.hosts[host]['state'].lower() == 'down' and self.hosts[host]['resourcestate'].lower() == 'disabled':
+            if self.hosts[host]['state'].lower() == 'down' or self.hosts[host]['state'].lower() == 'disconnected' or self.hosts[host]['resourcestate'].lower() == 'disabled':
                 continue
 
             free_mem = self.hosts[host]['memorytotal'] - self.hosts[host]['memoryallocated']
