@@ -310,7 +310,7 @@ class CloudStackSQL(CloudStackOpsBase):
                        "volumes.volume_type as voltype" +
                        " FROM vm_instance, volumes" +
                        " WHERE volumes.instance_id = vm_instance.id AND volumes.removed IS NULL AND volumes.state = 'Ready'" +
-                       " AND instance_name='" + instancename + "';")
+                       " AND instance_name='" + instancename + "' ORDER by `voltype` DESC;")
         result = cursor.fetchall()
         if self.DEBUG == 1:
             print "DEBUG: Executed SQL: " + cursor.statement
