@@ -25,6 +25,6 @@ elif [ "$ZONE" == "nl1" ]; then
   if echo $PODNAME | grep -q -i SBP; then
     echo "./migrateVirtualMachineFromXenServerToKVM.py -c $ZONE -t mccppod053-cs01 -s $ZONE --helper-scripts-path /home/mcc_stenley/shared/cosmic/xen2kvm/ -i $VMNAME --exec"
   else
-    echo "./migrateVirtualMachineFromXenServerToKVM.py -c $ZONE -t mccppod061-cs01 -s $ZONE --helper-scripts-path /home/mcc_stenley/shared/cosmic/xen2kvm/ -i $VMNAME --exec"
+    echo "./migrateVirtualMachineFromXenServerToKVM.py -c $ZONE -t mccppod063-cs01 -s $ZONE --helper-scripts-path /home/mcc_stenley/shared/cosmic/xen2kvm/ -i $VMNAME --exec"
   fi
 fi
