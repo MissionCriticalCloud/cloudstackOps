@@ -380,6 +380,11 @@ for host in cluster_hosts:
     message = "Host %s is connected to Cosmic, Enabled and in Up state" % host.name
     c.print_message(message=message, message_type="Note", to_slack=True)
 
+    # Start all VM's with migration policy ShutdownAndStart
+    message = "Starting all VM's on Host %s with ShutdownAndStart policy" % host.name
+    c.print_message(message=message, message_type="Note", to_slack=True)
+    c.startVmsWithShutPolicy()
+
     message = "Gathering some info about hypervisors in cluster '%s'" % clustername
     c.print_message(message=message, message_type="Note", to_slack=False)
     c.printHypervisors(clusterID, False, checkBonds, "KVM")

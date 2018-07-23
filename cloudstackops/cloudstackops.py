@@ -56,52 +56,38 @@ except:
     print "Error: Please install clint library to support color in the terminal:"
     print "       pip install clint"
     sys.exit(1)
-
+# Exoscale CS library
+try:
+    from cs import CloudStack
+except:
+    print "Error: Please install cs library to talk to Cosmic API:"
+    print "       pip install cs"
+    sys.exit(1)
 
 class CloudStackOps(CloudStackOpsBase):
     # Init function
     def __init__(self, debug=0, dryrun=0, force=0):
-        # type: (object, object, object) -> object
+        super(CloudStackOps, self).__init__(debug, dryrun, force)
         self.apikey = ''
         self.secretkey = ''
         self.username = ''
         self.password = ''
         self.api = ''
         self.cloudstack = ''
-        self.DEBUG = debug
-        self.DRYRUN = dryrun
-        self.FORCE = force
-        self.configProfileNameFullPath = ''
         self.apiurl = ''
         self.apiserver = ''
         self.apiprotocol = ''
         self.apiport = ''
         self.csApiClass = ''
         self.conn = ''
-        self.organization = ''
-        self.smtpserver = 'localhost'
-        self.mail_from = ''
-        self.errors_to = ''
-        self.configfile = os.getcwd() + '/config'
-        self.pp = pprint.PrettyPrinter(depth=6)
+        self.exoCsApi = None
         self.ssh = None
         self.xenserver = None
         self.kvm = None
         self.vmware = None
-        self.slack = None
-        self.slack_custom_title = "Undefined"
-        self.slack_custom_value = "Undefined"
-        self.cluster = "Undefined"
-        self.instance_name = "Undefined"
-        self.task = "Undefined"
-        self.vm_name = "Undefined"
-        self.zone_name = "Undefined"
-
-        self.printWelcome()
-        self.configure_slack()
+        self.vmshutpolicy = {}
         self.check_screen_alike()
 
-        signal.signal(signal.SIGINT, self.catch_ctrl_C)
 
     def printWelcome(self):
         print colored.green("Welcome to CloudStackOps")
@@ -291,6 +277,15 @@ class CloudStackOps(CloudStackOpsBase):
                 print self.cloudstack
         except:
             print "Error connecting to CloudStack. Are you using the right Marvin version? See README file. Halting."
+            sys.exit(1)
+        try:
+            self.exoCsApi = CloudStack(
+                endpoint=self.apiurl,
+                key=self.apikey,
+                secret=self.secretkey
+            )
+        except:
+            print "Error connecting to Cosmic. Halting."
             sys.exit(1)
 
         # Print name of cloud we're connected to
@@ -1851,10 +1846,22 @@ class CloudStackOps(CloudStackOpsBase):
                 if vmdata is None:
                     continue
                 for vm in vmdata:
+
                     sys.stdout.write(vm.name + ", ")
                     sys.stdout.flush()
                     vmresult = 1
                     if self.DRYRUN == 0:
+                        if vm.maintenancepolicy == "ShutdownAndStart":
+                            message = "Shutting down vm %s on host %s, has ShutdownAndStart policy" % (vm.name, vm.hostname)
+                            self.print_message(message=message, message_type="Note", to_slack=to_slack)
+
+                            vmresult = self.exoCsApi.stopVirtualMachine(id=vm.id)
+                            if self.__waitforjob(vmresult['jobid']):
+                                self.vmshutpolicy[vm.id] = {"name": vm.name, "hostid": vm.hostid, "hostname": vm.hostname}
+                            else:
+                                vmresult = 1
+                            continue
+
                         requested_memory = self.get_needed_memory(vm)
                         migrationHost = self.findBestMigrationHost(
                             foundHostData.clusterid,
@@ -1911,6 +1918,26 @@ class CloudStackOps(CloudStackOpsBase):
                             sys.stdout.flush()
                             return False
         return True
+
+    # Start machines with ShutdownAndStart policy
+    def startVmsWithShutPolicy(self):
+        to_slack = True
+        if self.DEBUG == 1:
+            to_slack = False
+
+        for i, vm in self.vmshutpolicy.iteritems():
+            if 'status' in self.vmshutpolicy[i]:
+                continue
+            message = "Starting vm %s with ShutdownAndStart policy on host %s" % (vm['name'], vm['hostname'])
+            self.print_message(message=message, message_type="Note", to_slack=to_slack)
+            if self.DEBUG == 0:
+                vmresult = self.exoCsApi.startVirtualMachine(id=i, hostid=vm['hostid'])
+                if self.__waitforjob(vmresult['jobid']):
+                    self.vmshutpolicy[i].update({'status': 'done'})
+                else:
+                    self.vmshutpolicy[i].update({'status': 'error'})
+                    message = "Error starting vm %s with ShutdownAndStart policy on host %s" % (vm['name'], vm['hostname'])
+                    self.print_message(message=message, message_type="Error", to_slack=to_slack)
 
     # list oscategories
     def listOsCategories(self, args):
@@ -1980,3 +2007,19 @@ class CloudStackOps(CloudStackOpsBase):
             else:
                 system_vm.memory = 1024
         return int(system_vm.memory) * 1024 * 1024
+
+    def __waitforjob(self, jobid=None, retries=120):
+        while True:
+            if retries < 0:
+                break
+            # jobstatus 0 = Job still running
+            jobstatus = self.exoCsApi.queryAsyncJobResult(jobid=jobid)
+            # jobstatus 1 = Job done successfully
+            if int(jobstatus['jobstatus']) == 1:
+                return True
+            # jobstatus 2 = Job has an error
+            if int(jobstatus['jobstatus']) == 2:
+                break
+            retries -= 1
+            time.sleep(1)
+        return False
