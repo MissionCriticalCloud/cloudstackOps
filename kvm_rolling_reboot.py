@@ -65,6 +65,8 @@ def handleArguments(argv):
     force_reset_hypervisor = False
     global skip_reboot_hypervisor
     skip_reboot_hypervisor = False
+    global firmware_reboot_hypervisor
+    firmware_reboot_hypervisor = False
     global pre_empty_script
     pre_empty_script = 'kvm_pre_empty_script.sh'
     global post_empty_script
@@ -90,6 +92,7 @@ def handleArguments(argv):
         'situations where a normal reboot would hang. It will sync filesystems first.) ' + \
         '\n  --skip-reboot-hypervisor\t\t\tInstead of the default reboot, skip the hypervisor reboot (useful in ' \
         'situations where you would only want to live migrate virtual machines in the cluster.) ' + \
+        '\n  --upgrade-firmware-reboot\t\t\tInstead of the default reboot, upgrade the HP firmware and reboot the hypervisor' \
         '\n  --pre-empty-script\t\t\t\tBash script to run on hypervisor before starting the live migrations to empty ' \
         'hypervisor (expected in same folder as this script)' + \
         '\n  --post-empty-script\t\t\t\tBash script to run on hypervisor after a hypervisor has no more VMs running' \
@@ -103,7 +106,7 @@ def handleArguments(argv):
         opts, args = getopt.getopt(
             argv, "hc:n:t:p", [
                 "credentials-file=", "clustername=", "ignore-hosts=", "only-hosts=", "threads=", "pre-empty-script=",
-                "post-empty-script=", "force-reset-hypervisor", "skip-reboot-hypervisor", "no-bond-check", "halt", "debug", "exec",
+                "post-empty-script=", "force-reset-hypervisor", "skip-reboot-hypervisor", "upgrade-firmware-reboot", "no-bond-check", "halt", "debug", "exec",
                 "post-reboot-script=", "prepare"])
     except getopt.GetoptError as e:
         print "Error: " + str(e)
@@ -130,6 +133,8 @@ def handleArguments(argv):
             force_reset_hypervisor = True
         elif opt in ("--skip-reboot-hypervisor"):
             skip_reboot_hypervisor = True
+        elif opt in ("--upgrade-firmware-reboot"):
+            firmware_reboot_hypervisor = True
         elif opt in ("--pre-empty-script"):
             pre_empty_script = arg
         elif opt in ("--post-empty-script"):
@@ -241,6 +246,10 @@ if skip_reboot_hypervisor:
     message = "Skipping the reboot of the hypervisors!"
     c.print_message(message=message, message_type="Warning", to_slack=to_slack)
 
+if firmware_reboot_hypervisor:
+    message = "Upgrading HP firmware and rebooting the hypervisor!"
+    c.print_message(message=message, message_type="Warning", to_slack=to_slack)
+
 if DRYRUN == 1:
     print
     print "Warning: We are running in DRYRUN mode."
@@ -252,7 +261,7 @@ if DRYRUN == 1:
     print "      - live migrate all VMs off of it"
     print "      - execute the --post-empty-script script '" + post_empty_script + "' on the hypervisor"
     print "      - when empty, it will reboot the hypervisor"
-    print "        (halting is " + str(halt_hypervisor) + ") and (force_reset is " + str(force_reset_hypervisor) + ")  and (skip_reboot is " + str(skip_reboot_hypervisor) + ")"
+    print "        (halting is " + str(halt_hypervisor) + ") and (force_reset is " + str(force_reset_hypervisor) + ")  and (skip_reboot is " + str(skip_reboot_hypervisor) + ") and (firmware_reboot is " + str(firmware_reboot_hypervisor) + ")"
     print "      - will wait for it to come back online (checks SSH connection)"
     print "      - execute the --post-reboot-script script '" + post_reboot_script + "' on the hypervisor"
     print "      - enable the host in Cosmic"
@@ -347,9 +356,11 @@ for host in cluster_hosts:
         message = "About to force-reset hypervisor %s" % host.name
     if skip_reboot_hypervisor:
         message = "About to skip reboot of hypervisor %s" % host.name
+    if firmware_reboot_hypervisor:
+        message = "About to upgrade HP firmware and  reboot hypervisor %s" % host.name
     c.print_message(message=message, message_type="Note", to_slack=True)
 
-    if not k.host_reboot(host, halt_hypervisor=halt_hypervisor, force_reset_hypervisor=force_reset_hypervisor, skip_reboot_hypervisor=skip_reboot_hypervisor):
+    if not k.host_reboot(host, halt_hypervisor=halt_hypervisor, force_reset_hypervisor=force_reset_hypervisor, skip_reboot_hypervisor=skip_reboot_hypervisor, firmware_reboot_hypervisor=firmware_reboot_hypervisor):
         message = "Reboot/Halt/Force-reset failed for %s. Please investigate.." % host.name
         c.print_message(message=message, message_type="Error", to_slack=True)
         sys.exit(1)
