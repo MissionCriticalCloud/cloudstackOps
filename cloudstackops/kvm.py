@@ -342,7 +342,7 @@ class Kvm(hypervisor.hypervisor):
             return fab.run("virsh list | grep running | wc -l")
 
     # Reboot host and execute scripts
-    def host_reboot(self, host, halt_hypervisor=False, force_reset_hypervisor=False, skip_reboot_hypervisor=False):
+    def host_reboot(self, host, halt_hypervisor=False, force_reset_hypervisor=False, skip_reboot_hypervisor=False, firmware_reboot_hypervisor=False):
 
         # Count VMs to be sure
         if self.host_get_vms(host) != "0":
@@ -366,6 +366,9 @@ class Kvm(hypervisor.hypervisor):
                     fab.run("sudo sync; sudo echo b > /proc/sysrq-trigger")
                 elif skip_reboot_hypervisor:
                     print "Note: Skipping reboot on host %s" % host.name
+                elif firmware_reboot_hypervisor:
+                    print "Note: Rebooting hypervisor after firmware upgrade on host %s" % host.name
+                    fab.run("tmux new -d 'yes |sudo /usr/sbin/smartupdate upgrade && sudo reboot'")
                 else:
                     print "Note: Rebooting host %s in 60s. Undo with 'sudo shutdown -c' " % host.name
                     fab.run("sudo shutdown -r 1")
