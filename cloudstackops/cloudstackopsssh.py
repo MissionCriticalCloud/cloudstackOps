@@ -26,7 +26,7 @@ from cloudstackopsbase import *
 import subprocess
 from subprocess import Popen, PIPE
 import getpass
-
+import time
 
 class CloudStackOpsSSH(CloudStackOpsBase):
 
@@ -106,15 +106,15 @@ class CloudStackOpsSSH(CloudStackOpsBase):
         vmname = (args['vmname']) if 'vmname' in args else ''
 
         if len(vmname) > 0 and len(desthostname) > 0 and len(hostname):
-            remoteCmd = "xe vm-migrate vm=" + vmname + " host=" + desthostname
+            remote_cmd = "xe vm-migrate vm=" + vmname + " host=" + desthostname
             if self.DEBUG == 1:
-                print "Debug: Running SSH command on " + hostname + " :" + remoteCmd
+                print "Debug: Running SSH command on " + hostname + " :" + remote_cmd
             p = subprocess.Popen(['ssh',
                                   '-oStrictHostKeyChecking=no',
                                   '-oUserKnownHostsFile=/dev/null',
                                   '-q',
                                   'root@' + hostname,
-                                  remoteCmd],
+                                  remote_cmd],
                                  stdout=subprocess.PIPE)
             output = ""
             try:
@@ -129,4 +129,38 @@ class CloudStackOpsSSH(CloudStackOpsBase):
             elif self.DEBUG == 1:
                 print "Note: Output: " + output
             return retcode, output
-        return false
+        return False
+
+    # Migrate vm via libvirt
+    def migrateVirtualMachineViaLibVirt(self, args):
+
+        # Handle arguments
+        hostname = (args['hostname']) if 'hostname' in args else ''
+        desthostname = (args['desthostname']) if 'desthostname' in args else ''
+        vmname = (args['vmname']) if 'vmname' in args else ''
+
+        if len(vmname) > 0 and len(desthostname) > 0 and len(hostname):
+            remote_cmd = "sudo virsh migrate --live --verbose --desturi qemu+tcp://%s/system %s" % (desthostname, vmname)
+            if self.DEBUG == 1:
+                print "Debug: Running SSH command on " + hostname + " :" + remote_cmd
+            p = subprocess.Popen(['ssh',
+                                  '-oStrictHostKeyChecking=no',
+                                  '-oUserKnownHostsFile=/dev/null',
+                                  '-q',
+                                  hostname,
+                                  remote_cmd],
+                                 stdout=subprocess.PIPE)
+            output = ""
+            try:
+                output = p.stdout.read().strip()
+                while p.poll() is None:
+                    time.sleep(0.5)
+            except:
+                pass
+            retcode = p.returncode
+            if retcode != 0:
+                print "Error: something went wrong on host " + hostname + ". Got return code " + str(retcode)
+            elif self.DEBUG == 1:
+                print "Note: Output: " + output
+            return retcode, output
+        return False

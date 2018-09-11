@@ -29,8 +29,7 @@ from datetime import datetime
 import os
 import getopt
 import getpass
-from cloudstackops import cloudstackops
-from cloudstackops import kvm
+from cloudstackops import cloudstackops, kvm, cloudstackopsssh
 # Fabric
 from fabric.api import *
 from fabric import *
@@ -75,6 +74,8 @@ def handleArguments(argv):
     post_reboot_script = 'kvm_post_reboot_script.sh'
     global checkBonds
     checkBonds = True
+    global force_out_of_band_live_migration
+    force_out_of_band_live_migration = False
 
     # Usage message
     help = "Usage: ./" + os.path.basename(__file__) + ' [options]' + \
@@ -98,6 +99,7 @@ def handleArguments(argv):
         '\n  --post-empty-script\t\t\t\tBash script to run on hypervisor after a hypervisor has no more VMs running' \
         '\n  --post-reboot-script\t\t\t\tBash script to run on hypervisor after a hypervisor has been rebooted' \
         '\n  --no-bond-check\t\t\t\tSkip the bond check' + \
+        '\n  --force-out-of-band-live-migration\t\tUse LibVirt to live migrate directly instead of Cosmic' + \
         '\n  --debug\t\t\t\t\tEnable debug mode' + \
         '\n  --exec\t\t\t\t\tExecute for real' + \
         '\n  --prepare\t\t\t\t\tExecute some prepare commands'
@@ -106,8 +108,8 @@ def handleArguments(argv):
         opts, args = getopt.getopt(
             argv, "hc:n:t:p", [
                 "credentials-file=", "clustername=", "ignore-hosts=", "only-hosts=", "threads=", "pre-empty-script=",
-                "post-empty-script=", "force-reset-hypervisor", "skip-reboot-hypervisor", "upgrade-firmware-reboot", "no-bond-check", "halt", "debug", "exec",
-                "post-reboot-script=", "prepare"])
+                "post-empty-script=", "force-reset-hypervisor", "skip-reboot-hypervisor", "upgrade-firmware-reboot", "no-bond-check", "force-out-of-band-live-migration",
+                "halt", "debug", "exec", "post-reboot-script=", "prepare"])
     except getopt.GetoptError as e:
         print "Error: " + str(e)
         print help
@@ -135,6 +137,8 @@ def handleArguments(argv):
             skip_reboot_hypervisor = True
         elif opt in ("--upgrade-firmware-reboot"):
             firmware_reboot_hypervisor = True
+        elif opt in ("--force-out-of-band-live-migration"):
+            force_out_of_band_live_migration = True
         elif opt in ("--pre-empty-script"):
             pre_empty_script = arg
         elif opt in ("--post-empty-script"):
@@ -177,6 +181,9 @@ if __name__ == '__main__':
 
 # Init CloudStack class
 c = cloudstackops.CloudStackOps(DEBUG, DRYRUN)
+ssh = cloudstackopsssh.CloudStackOpsSSH(DEBUG, DRYRUN)
+c.ssh = ssh
+
 c.task = "KVM Rolling Reboot"
 c.slack_custom_title = "Hypervisor"
 c.slack_custom_value = ""
@@ -337,7 +344,7 @@ for host in cluster_hosts:
 
     # Migrate all vm's and empty hypervisor
     retries = 0
-    while not c.emptyHypervisor(host.id):
+    while not c.emptyHypervisor(host.id, force_out_of_band_live_migration):
         to_slack = False
         if retries == 0:
             to_slack = True

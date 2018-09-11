@@ -1819,7 +1819,7 @@ class CloudStackOps(CloudStackOpsBase):
         return migrationHost
 
     # Migrate all vm's and empty hypervisor
-    def emptyHypervisor(self, hostID):
+    def emptyHypervisor(self, hostID, force_out_of_band_live_migration=False):
         # Host data
         hostData = self.getHostData({'hostid': hostID})
         foundHostData = hostData[0]
@@ -1870,6 +1870,22 @@ class CloudStackOps(CloudStackOpsBase):
                         if not migrationHost:
                             print "\nError: No hosts with enough capacity to migrate vm's to. Please migrate manually to another cluster."
                             sys.exit(1)
+
+                        # When OOB is forced
+                        if force_out_of_band_live_migration:
+                            message = "Live migrating vm %s to host %s (OOB)" % (vm.name, migrationHost.name)
+                            self.print_message(message=message, message_type="Note", to_slack=to_slack)
+
+                            libvirtresult, libvirtoutput = self.ssh.migrateVirtualMachineViaLibVirt(
+                                {'hostname': hostname, 'desthostname': migrationHost.name, 'vmname': vm.instancename})
+                            if self.DEBUG == 1:
+                                print "Debug: Output: " + str(libvirtoutput) + " code " + str(libvirtresult)
+
+                            if libvirtresult == 0:
+                                return True
+                            return False
+
+                        # When OOB is not forced
                         try:
                             message = "Live migrating vm %s to host %s" % (vm.name, migrationHost.name)
                             self.print_message(message=message, message_type="Note", to_slack=to_slack)
@@ -1906,7 +1922,11 @@ class CloudStackOps(CloudStackOpsBase):
                                     if self.DEBUG == 1:
                                         print "Debug: Output: " + str(xapioutput) + " code " + str(xapiresult)
                                 if foundHostData.hypervisor == "KVM":
-                                    pass
+                                    libvirtresult, libvirtoutput = self.ssh.migrateVirtualMachineViaLibVirt(
+                                        {'hostname': hostname, 'desthostname': migrationHost.name, 'vmname': vm.instancename})
+                                    if self.DEBUG == 1:
+                                        print "Debug: Output: " + str(libvirtoutput) + " code " + str(libvirtresult)
+
                             elif self.DEBUG == 1:
                                 print "Debug: VM " + vm.name + " migrated OK"
                         except:
