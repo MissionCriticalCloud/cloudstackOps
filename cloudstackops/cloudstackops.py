@@ -1853,7 +1853,7 @@ class CloudStackOps(CloudStackOpsBase):
                     vmresult = 1
                     if self.DRYRUN == 0:
                         if vm.maintenancepolicy == "ShutdownAndStart":
-                            message = "Shutting down vm %s on host %s, has ShutdownAndStart policy" % (vm.name, vm.hostname)
+                            message = "Note: Shutting down vm %s on host %s, has ShutdownAndStart policy" % (vm.name, vm.hostname)
                             self.print_message(message=message, message_type="Note", to_slack=to_slack)
 
                             vmresult = self.exoCsApi.stopVirtualMachine(id=vm.id)
@@ -1863,24 +1863,54 @@ class CloudStackOps(CloudStackOpsBase):
                                 vmresult = 1
                             continue
 
+                        # Affinity
+                        host_affinity = self.exoCsApi.listAffinityGroups(virtualmachineid=vm.id)
+                        try:
+                            affinity_groups = host_affinity['affinitygroup']
+                        except:
+                            affinity_groups = []
+
+                        vm_on_dedicated_hv = False
+                        dedicated_affinity_id = None
+                        for affinity_group in affinity_groups:
+                            # Is VM on dedicated hypervisor
+                            if affinity_group['type'] == 'ExplicitDedication':
+                                vm_on_dedicated_hv = True
+                                dedicated_affinity_id = affinity_group['id']
+
                         available_hosts = self.exoCsApi.findHostsForMigration(virtualmachineid=vm.id)
                         available_hosts = sorted(available_hosts['host'], key=lambda k: k['memoryallocated'], reverse=False)
 
                         for available_host in available_hosts:
                             # Skip hosts that require storage migration
                             if available_host['requiresStorageMotion']:
-                                print "Skipping %s because need storage_migration is %s" \
+                                print "Note: Skipping %s because need storage_migration is %s" \
                                       % (available_host['name'], available_host['requiresStorageMotion'])
                                 continue
 
+                            # Only from the same cluster
                             if available_host['clusterid'] != current_host['clusterid']:
-                                print "Skipping %s because part of another cluster" % available_host['name']
+                                print "Note: Skipping %s because part of another cluster" % available_host['name']
                                 continue
 
+                            # Only suitable hosts
                             if not available_host['suitableformigration']:
+                                print "Note: Skipping %s because is not suitable" % available_host['name']
                                 continue
 
-                            print "Selecting %s" % available_host['name']
+                            # Check dedication
+                            if vm_on_dedicated_hv:
+                                # VM is on dedicated HV, check to see if it is the right group
+                                if 'affinitygroupid' in available_host and available_host['affinitygroupid'] != dedicated_affinity_id:
+                                    print "Note: Skipping %s because host does not match dedication group of VM" % available_host['name']
+                                    continue
+                            else:
+                                # VM is not dedicated: skip dedicated HVs
+                                if 'affinitygroupid' in available_host:
+                                    print "Note: Skipping %s because hv is dedicated and VM is not" % available_host['name']
+                                    continue
+
+                            print "Note: Selecting %s" % available_host['name']
                             break
 
                         if not available_host:
