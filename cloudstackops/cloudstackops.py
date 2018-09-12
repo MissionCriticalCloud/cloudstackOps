@@ -1884,18 +1884,21 @@ class CloudStackOps(CloudStackOpsBase):
                         for available_host in available_hosts:
                             # Skip hosts that require storage migration
                             if available_host['requiresStorageMotion']:
-                                print "Note: Skipping %s because need storage_migration is %s" \
-                                      % (available_host['name'], available_host['requiresStorageMotion'])
+                                if self.DEBUG == 1:
+                                    print "Note: Skipping %s because need storage_migration is %s" \
+                                          % (available_host['name'], available_host['requiresStorageMotion'])
                                 continue
 
                             # Only from the same cluster
                             if available_host['clusterid'] != current_host['clusterid']:
-                                print "Note: Skipping %s because part of another cluster" % available_host['name']
+                                if self.DEBUG == 1:
+                                    print "Note: Skipping %s because part of another cluster" % available_host['name']
                                 continue
 
                             # Only suitable hosts
                             if not available_host['suitableformigration']:
-                                print "Note: Skipping %s because is not suitable" % available_host['name']
+                                if self.DEBUG == 1:
+                                    print "Note: Skipping %s because is not suitable" % available_host['name']
                                 continue
 
                             # Check dedication
