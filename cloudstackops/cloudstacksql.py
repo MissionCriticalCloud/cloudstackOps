@@ -135,6 +135,7 @@ class CloudStackSQL(CloudStackOpsBase):
         LEFT JOIN cloud.domain d ON vm.domain_id = d.id \
         WHERE ha.created > DATE_SUB(NOW(), INTERVAL 1 DAY) " +
                        hypervisorNameWhere + " \
+        GROUP BY vm.name \
         ORDER BY domain,ha.created DESC \
         ;")
         result = cursor.fetchall()
