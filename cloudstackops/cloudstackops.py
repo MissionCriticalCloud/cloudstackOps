@@ -1864,8 +1864,8 @@ class CloudStackOps(CloudStackOpsBase):
                             continue
 
                         # Affinity
-                        host_affinity = self.exoCsApi.listAffinityGroups(virtualmachineid=vm.id)
                         try:
+                            host_affinity = self.exoCsApi.listAffinityGroups(virtualmachineid=vm.id)
                             affinity_groups = host_affinity['affinitygroup']
                         except:
                             affinity_groups = []
