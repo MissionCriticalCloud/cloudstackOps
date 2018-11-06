@@ -57,6 +57,8 @@ def handleArguments(argv):
     onlyHosts = ''
     global onlyHostList
     onlyHostList = ""
+    global skip_os_version
+    skip_os_version = ""
     global threads
     threads = 5
     global halt_hypervisor
@@ -85,6 +87,7 @@ def handleArguments(argv):
         'Example: --ignore-hosts="host1, host2" ' + \
         '\n  --only-hosts <list>\t\t\t\tOnly execute work on the specified hosts (for example if you need to resume): ' \
         'Example: --only-hosts="host1, host2" ' + \
+        '\n  --skip-os-version <version>\t\t\tSkip all hosts that match OS version (Example: CentOS 7.5.1804)' + \
         '\n  --threads <nr>\t\t\t\tUse this number or concurrent migration threads ' + \
         '\n  --halt\t\t\t\t\tInstead of the default reboot, halt the hypervisor (useful in case of hardware ' \
         'upgrades) ' + \
@@ -106,7 +109,8 @@ def handleArguments(argv):
         opts, args = getopt.getopt(
             argv, "hc:n:t:p", [
                 "credentials-file=", "clustername=", "ignore-hosts=", "only-hosts=", "threads=", "pre-empty-script=",
-                "post-empty-script=", "force-reset-hypervisor", "skip-reboot-hypervisor", "upgrade-firmware-reboot", "no-bond-check", "halt", "debug", "exec",
+                "post-empty-script=", "force-reset-hypervisor", "skip-reboot-hypervisor", "upgrade-firmware-reboot",
+                "no-bond-check", "skip-os-version=", "halt", "debug", "exec",
                 "post-reboot-script=", "prepare"])
     except getopt.GetoptError as e:
         print "Error: " + str(e)
@@ -141,6 +145,8 @@ def handleArguments(argv):
             post_empty_script = arg
         elif opt in ("--post-reboot-script"):
             post_reboot_script = arg
+        elif opt in ("--skip-os-version"):
+            skip_os_version = arg
         elif opt in ("--debug"):
             DEBUG = 1
         elif opt in ("--exec"):
@@ -277,6 +283,9 @@ if DRYRUN == 1:
     if len(onlyHosts) > 0:
         print "Note: Only processing these hosts: " + str(onlyHosts)
 
+    if len(skip_os_version) > 0:
+        print "Note: Skipping hosts with OS: " + str(skip_os_version)
+
     print "To kick it off, run with the --exec flag."
     print
     disconnect_all()
@@ -296,6 +305,11 @@ for host in cluster_hosts:
 
     if len(onlyHosts) > 0 and host.name not in onlyHosts:
         message = "Skipping %s due to --only-hosts setting" % host.name
+        c.print_message(message=message, message_type="Warning", to_slack=False)
+        continue
+
+    if len(skip_os_version) > 0 and skip_os_version in host.hypervisorversion:
+        message = "Skipping %s with OS '%s' due to --skip-os-version set to '%s'" % (host.name, host.hypervisorversion, skip_os_version)
         c.print_message(message=message, message_type="Warning", to_slack=False)
         continue
 
