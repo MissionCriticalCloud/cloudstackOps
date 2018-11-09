@@ -283,7 +283,8 @@ class CloudStackOps(CloudStackOpsBase):
             self.exoCsApi = CloudStack(
                 endpoint=self.apiurl,
                 key=self.apikey,
-                secret=self.secretkey
+                secret=self.secretkey,
+                timeout=60
             )
         except:
             print "Error connecting to Cosmic. Halting."
