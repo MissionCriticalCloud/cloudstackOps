@@ -108,7 +108,8 @@ else:
     projectParam = "false"
 
 # check routerID
-VPCUUID = c.checkCloudStackName({'csname': vpcname,
+if len(vpcuuid) == 0:
+    vpcuuid = c.checkCloudStackName({'csname': vpcname,
                                   'csApiCall': 'listVPCs',
                                   'listAll': 'true',
                                   'isProjectVm': projectParam})
@@ -116,16 +117,13 @@ VPCUUID = c.checkCloudStackName({'csname': vpcname,
 if len(networkuuid) > 0:
     print "Note: Getting VPC id from network uuid %s" % networkuuid
     network = c.listNetworks(networkuuid)[0]
-    VPCUUID = network.vpcid
+    vpcuuid = network.vpcid
 
-if not VPCUUID:
-    VPCUUID = vpcuuid
-
-if VPCUUID == 1 or VPCUUID == "":
+if vpcuuid == 1 or vpcuuid == "":
     print "Error: VPC cannot be found!"
     exit(1)
 
-vpc = c.listVPCs(VPCUUID)[0]
+vpc = c.listVPCs(vpcuuid)[0]
 
 print "Note: Found VPC " + vpcname
 
@@ -138,25 +136,25 @@ c.zone_name = vpc.zonename
 print "Note: Let's reboot the VPC.."
 
 if DRYRUN == 1:
-    print "Note: Would have rebooted vpc " + vpc.name + " (" + VPCUUID + ")"
+    print "Note: Would have rebooted vpc " + vpc.name + " (" + vpcuuid + ")"
 else:
     # If the network is a VPC
     c.task = "Restart VPC with clean up"
-    message = "Restarting VPC " + vpc.name + " with clean up (" + VPCUUID + ")"
+    message = "Restarting VPC " + vpc.name + " with clean up (" + vpcuuid + ")"
     c.print_message(message=message, message_type="Note", to_slack=True)
-    result = c.restartVPC(VPCUUID)
+    result = c.restartVPC(vpcuuid)
     if result == 1:
         print "Restarting failed, will try again!"
-        result = c.restartVPC(VPCUUID)
+        result = c.restartVPC(vpcuuid)
         if result == 1:
-            message = "Restarting VPC " + vpc.name + "(" + VPCUUID + ") with clean up failed.\nError: investigate manually!"
+            message = "Restarting VPC " + vpc.name + "(" + vpcuuid + ") with clean up failed.\nError: investigate manually!"
             c.print_message(message=message, message_type="Error", to_slack=True)
             sys.exit(1)
         else:
-            message = "Successfully restarted VPC " + vpc.name + " (" + VPCUUID + ")"
+            message = "Successfully restarted VPC " + vpc.name + " (" + vpcuuid + ")"
             c.print_message(message=message, message_type="Note", to_slack=True)
     else:
-        message = "Successfully restarted VPC " + vpc.name + " (" + VPCUUID + ")"
+        message = "Successfully restarted VPC " + vpc.name + " (" + vpcuuid + ")"
         c.print_message(message=message, message_type="Note", to_slack=True)
 
 
