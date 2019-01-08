@@ -1236,3 +1236,71 @@ WHERE
         cursor.close()
 
         return result[0][0]
+
+    # Update db volumes table
+    def kill_jobs_of_instance(self, instance_id):
+        if not self.conn:
+            return False
+        if len(instance_id) == 0:
+            print "Error: We have no instance_id passed: %s" % instance_id
+            return False
+
+        cursor = self.conn.cursor()
+
+        # Kill Jobs
+        try:
+            query = "DELETE FROM `async_job` WHERE `instance_id` = %s;" % instance_id
+            cursor.execute(query)
+
+            if self.DRYRUN == 0:
+                self.conn.commit()
+            else:
+                print "Note: Would have executed: %s" % cursor.statement
+
+            if self.DEBUG == 1:
+                print "DEBUG: Executed SQL: " + cursor.statement
+
+        except mysql.connector.Error as err:
+            print("Error: MySQL: {}".format(err))
+            print cursor.statement
+            cursor.close()
+            return False
+
+        try:
+            query = "DELETE FROM `vm_work_job` WHERE  `vm_instance_id` = %s;" % instance_id
+            cursor.execute(query)
+
+            if self.DRYRUN == 0:
+                self.conn.commit()
+            else:
+                print "Note: Would have executed: %s" % cursor.statement
+
+            if self.DEBUG == 1:
+                print "DEBUG: Executed SQL: " + cursor.statement
+
+        except mysql.connector.Error as err:
+            print("Error: MySQL: {}".format(err))
+            print cursor.statement
+            cursor.close()
+            return False
+
+        try:
+            query = "DELETE FROM `sync_queue` WHERE `sync_objid` = %s;" % instance_id
+            cursor.execute(query)
+
+            if self.DRYRUN == 0:
+                self.conn.commit()
+            else:
+                print "Note: Would have executed: %s" % cursor.statement
+
+            if self.DEBUG == 1:
+                print "DEBUG: Executed SQL: " + cursor.statement
+
+        except mysql.connector.Error as err:
+            print("Error: MySQL: {}".format(err))
+            print cursor.statement
+            cursor.close()
+            return False
+
+        cursor.close()
+        return True
