@@ -86,12 +86,12 @@ class migrateVirtualMachineFromVMwareToKVM():
                     "helper-scripts-path=", "debug", "exec", "force", "service-offering=", "network-ip="]
             )
         except getopt.GetoptError as e:
-            print "Error: " + str(e)
-            print help
+            print("Error: " + str(e))
+            print(help)
             sys.exit(2)
         for opt, arg in opts:
             if opt == '-h':
-                print help
+                print(help)
                 sys.exit()
             elif opt in ("-c", "--config-profile"):
                 self.configProfileName = arg
@@ -145,11 +145,11 @@ class migrateVirtualMachineFromVMwareToKVM():
                 len(self.zone) == 0 or \
                 len(self.domain) == 0 or \
                 len(self.account) == 0:
-            print help
+            print(help)
             sys.exit()
 
         if not os.path.isdir(self.helperScriptsPath):
-            print "Error: Directory %s as specified with --helper-scripts-path does not exist!" % self.helperScriptsPath
+            print("Error: Directory %s as specified with --helper-scripts-path does not exist!" % self.helperScriptsPath)
             sys.exit(1)
 
     def migrate(self):
@@ -157,13 +157,13 @@ class migrateVirtualMachineFromVMwareToKVM():
         self.handleArguments(sys.argv[1:])
 
         # Start time
-        print "Note: Starting @ %s" % time.strftime("%Y-%m-%d %H:%M")
+        print("Note: Starting @ %s" % time.strftime("%Y-%m-%d %H:%M"))
 
         if self.DEBUG == 1:
-            print "Warning: Debug mode is enabled!"
+            print("Warning: Debug mode is enabled!")
 
         if self.DRYRUN == 1:
-            print "Warning: dry-run mode is enabled, not running any commands!"
+            print("Warning: dry-run mode is enabled, not running any commands!")
 
         # Init classes
         self.init_classes()
@@ -190,14 +190,14 @@ class migrateVirtualMachineFromVMwareToKVM():
         self.add_data_disks()
 
         # Start virtual machine
-        print "Note: Starting virtualmachine to create disks"
+        print("Note: Starting virtualmachine to create disks")
         result = self.cosmic.startVirtualMachine(vmid=self.vmId, hostid=self.kvm_host.id)
         if result == 1:
-            print "Start vm failed -- exiting."
+            print("Start vm failed -- exiting.")
             exit(result)
 
         # Stop virtual machine
-        print "Note: Stopping virtualmachines again"
+        print("Note: Stopping virtualmachines again")
         self.cosmic.stopVirtualMachine(vmid=self.vmId, force="true")
 
         # Gather disk location
@@ -209,10 +209,10 @@ class migrateVirtualMachineFromVMwareToKVM():
         # Start virtual machine
         result = self.cosmic.startVirtualMachine(self.vmId)
         if result == 1:
-            print "Start vm failed -- exiting."
+            print("Start vm failed -- exiting.")
             exit(result)
         if result.virtualmachine.state == "Running":
-            print "%s is started successfully on %s" % (result.virtualmachine.name, result.virtualmachine.hostname)
+            print("%s is started successfully on %s" % (result.virtualmachine.name, result.virtualmachine.hostname))
 
     def init_classes(self):
         # Init CloudStackOps class
@@ -244,13 +244,13 @@ class migrateVirtualMachineFromVMwareToKVM():
         self.cosmic.initCloudStackAPI()
 
         if self.DEBUG == 1:
-            print "API address: " + self.cosmic.apiurl
-            print "ApiKey: " + self.cosmic.apikey
-            print "SecretKey: " + self.cosmic.secretkey
+            print("API address: " + self.cosmic.apiurl)
+            print("ApiKey: " + self.cosmic.apikey)
+            print("SecretKey: " + self.cosmic.secretkey)
 
         # Check cloudstack IDs
         if self.DEBUG == 1:
-            print "Debug: Checking CloudStack IDs of provided input.."
+            print("Debug: Checking CloudStack IDs of provided input..")
 
         self.cosmic.slack_custom_title = "Migration details for vmx %s" % self.vmxPath
 
@@ -262,8 +262,8 @@ class migrateVirtualMachineFromVMwareToKVM():
             self.cosmic.print_message(message=message, message_type="Error", to_slack=True)
             sys.exit(1)
         elif self.DEBUG == 1:
-            print "DEBUG: MySQL connection successful"
-            print self.sql.conn
+            print("DEBUG: MySQL connection successful")
+            print(self.sql.conn)
 
     def verify_input(self):
         # Check domain of the new vm
@@ -295,8 +295,8 @@ class migrateVirtualMachineFromVMwareToKVM():
 
         # Check template
         if len(self.newBaseTemplate) == 0:
-            print "Please specify a template one using the --new-base-template " \
-                  "flag and try again. Using 'Linux - Unknown template converted from XenServer'"
+            print("Please specify a template one using the --new-base-template " \
+                  "flag and try again. Using 'Linux - Unknown template converted from XenServer'")
             self.newBaseTemplate = 'Linux - Unknown template converted from XenServer'
 
         templateID = self.cosmic.checkCloudStackName({'csname': self.newBaseTemplate, 'csApiCall': 'listTemplates'})
@@ -383,7 +383,7 @@ class migrateVirtualMachineFromVMwareToKVM():
         # Get hosts that belong to toCluster
         toClusterHostsData = self.cosmic.getHostsFromCluster(self.toCluster)
         if self.DEBUG == 1:
-            print "Note: You selected a storage pool with tags '" + str(storagepooltags) + "'"
+            print("Note: You selected a storage pool with tags '" + str(storagepooltags) + "'")
 
         # SSH to random host on tocluster -> create migration folder
         if self.cosmic.kvm.prepare_kvm(self.kvm_host, targetStoragePoolData.id) is False:
@@ -395,12 +395,12 @@ class migrateVirtualMachineFromVMwareToKVM():
         self.cosmic.kvm.vmware_virt_v2v(self.kvm_host, self.esxiHost, self.vmxPath)
 
     def windows_magic(self):
-        rootdisk = filter(lambda x: '-sda' in x['name'], self.disk_sizes)[0]['name']
+        rootdisk = [x for x in self.disk_sizes if '-sda' in x['name']][0]['name']
 
         if self.cosmic.kvm.get_os_family(self.kvm_host, rootdisk) == "windows":
             registryresult = self.cosmic.kvm.fix_windows_registry(self.kvm_host, rootdisk.split('-sda')[0])
             if registryresult is False:
-                print "Error: Altering the registry failed."
+                print("Error: Altering the registry failed.")
                 return False
 
     def gather_disk_info(self):
@@ -410,20 +410,20 @@ class migrateVirtualMachineFromVMwareToKVM():
         for disk in disks.split('\n'):
             size = int(disk.split(' ')[0].strip()) / 1024 / 1024 / 1024  # Byte to GByte
             name = disk.split(' ')[1].strip()
-            print "Note: Found disk -> name: " + name + " size: " + str(size) + "GB"
+            print("Note: Found disk -> name: " + name + " size: " + str(size) + "GB")
             self.disk_sizes.append({
                 'name': name,
                 'size': size
             })
 
         self.disk_name = self.disk_sizes[0]['name'].split('-sd')[0]
-        print "Note: Set disk name prefix to: " + self.disk_name
+        print("Note: Set disk name prefix to: " + self.disk_name)
 
     def deploy_vm(self):
-        disk_size = filter(lambda x: '-sda' in x['name'], self.disk_sizes)[0]['size']
+        disk_size = [x for x in self.disk_sizes if '-sda' in x['name']][0]['size']
 
-        print "Note: Deploying VM -> name: " + self.instancename + " serviceoffering: " + self.serviceOffering + " root disk size: " + str(
-            disk_size) + "GB"
+        print("Note: Deploying VM -> name: " + self.instancename + " serviceoffering: " + self.serviceOffering + " root disk size: " + str(
+            disk_size) + "GB")
 
         # Create virtualmachine
         ret = self.cosmic.deployVirtualMachine({
@@ -442,13 +442,13 @@ class migrateVirtualMachineFromVMwareToKVM():
 
         self.vmId = ret.virtualmachine.id
         self.vm_instance_name = ret.virtualmachine.instancename
-        print "Note: VM deployed successfully, found uuid: " + self.vmId + " and instance name: " + self.vm_instance_name
+        print("Note: VM deployed successfully, found uuid: " + self.vmId + " and instance name: " + self.vm_instance_name)
 
     def add_data_disks(self):
         for disk in self.disk_sizes:
             if '-sda' not in disk['name']:
-                print "Note: Creating data disk -> name: " + disk['name'] + " size: " + str(
-                    disk['size']) + "GB disk offering: " + self.diskoffering
+                print("Note: Creating data disk -> name: " + disk['name'] + " size: " + str(
+                    disk['size']) + "GB disk offering: " + self.diskoffering)
                 ret = self.cosmic.createVolume({
                     'name': disk['name'],
                     'zoneid': self.zone,
@@ -460,7 +460,7 @@ class migrateVirtualMachineFromVMwareToKVM():
 
                 disk['uuid'] = ret.volume.id
 
-                print "Note: Data disk create successfully, attaching to vm: " + self.vmId
+                print("Note: Data disk create successfully, attaching to vm: " + self.vmId)
                 self.cosmic.attachVolume({
                     'id': disk['uuid'],
                     'virtualmachineid': self.vmId
@@ -473,11 +473,11 @@ class migrateVirtualMachineFromVMwareToKVM():
 
         for disk in ret:
             if 'ROOT' in disk[5]:
-                print 'Note: Found volume location for ROOT: ' + disk[0]
-                filter(lambda x: '-sda' in x['name'], self.disk_sizes)[0]['path'] = disk[0]
+                print('Note: Found volume location for ROOT: ' + disk[0])
+                [x for x in self.disk_sizes if '-sda' in x['name']][0]['path'] = disk[0]
             else:
-                print 'Note: Found volume location for ' + disk[3] + ": " + disk[0]
-                filter(lambda x: disk[3] in x['name'], self.disk_sizes)[0]['path'] = disk[0]
+                print('Note: Found volume location for ' + disk[3] + ": " + disk[0])
+                [x for x in self.disk_sizes if disk[3] in x['name']][0]['path'] = disk[0]
 
     def move_disks_to_new_location(self):
         for disk in self.disk_sizes:

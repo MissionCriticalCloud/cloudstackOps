@@ -21,7 +21,7 @@
 # Remi Bergsma - rbergsma@schubergphilis.com
 
 # Import the class we depend on
-from cloudstackopsbase import *
+from .cloudstackopsbase import *
 # Import our dependencies
 import subprocess
 from subprocess import Popen, PIPE
@@ -36,7 +36,7 @@ class CloudStackOpsSSH(CloudStackOpsBase):
         ssh_user=getpass.getuser()
 
         if self.DEBUG == 1:
-            print "Debug: Running SSH command on " + hostname + " :" + remoteCmd
+            print("Debug: Running SSH command on " + hostname + " :" + remoteCmd)
         p = subprocess.Popen(['ssh',
                               '-oStrictHostKeyChecking=no',
                               '-oUserKnownHostsFile=/dev/null',
@@ -56,10 +56,10 @@ class CloudStackOpsSSH(CloudStackOpsBase):
 
     def __parseReturnCode(self, retcode, hostname):
         if retcode != 0:
-            print "Error: SSH connection to '" + hostname + "' returned code " + str(retcode)
-            print "Note: Please make sure 'ssh " + hostname + "' works key-based and try again."
+            print("Error: SSH connection to '" + hostname + "' returned code " + str(retcode))
+            print("Note: Please make sure 'ssh " + hostname + "' works key-based and try again.")
         elif self.DEBUG == 1:
-            print "Note: SSH remoteCmd executed OK."
+            print("Note: SSH remoteCmd executed OK.")
         return retcode
 
     # Test SSH connection
@@ -69,7 +69,7 @@ class CloudStackOpsSSH(CloudStackOpsBase):
 
     # Fake PV tools
     def fakePVTools(self, hostname):
-        print "Note: We're faking the presence of PV tools of all vm's reporting no tools on hypervisor '" + hostname + "'. Migration will not work otherwise."
+        print("Note: We're faking the presence of PV tools of all vm's reporting no tools on hypervisor '" + hostname + "'. Migration will not work otherwise.")
         remoteCmd = "xe vm-list PV-drivers-up-to-date='<not in database>' is-control-domain=false resident-on=$(xe host-list name-label=$HOSTNAME --minimal) params=uuid --minimal |tr ', ' '\n'| grep \"-\" | awk {'print \"/opt/tools/sysadmin/bin/fakepv.sh \" $1'} | sh"
         return self.runSSHCommand(hostname, remoteCmd)
 
@@ -108,7 +108,7 @@ class CloudStackOpsSSH(CloudStackOpsBase):
         if len(vmname) > 0 and len(desthostname) > 0 and len(hostname):
             remoteCmd = "xe vm-migrate vm=" + vmname + " host=" + desthostname
             if self.DEBUG == 1:
-                print "Debug: Running SSH command on " + hostname + " :" + remoteCmd
+                print("Debug: Running SSH command on " + hostname + " :" + remoteCmd)
             p = subprocess.Popen(['ssh',
                                   '-oStrictHostKeyChecking=no',
                                   '-oUserKnownHostsFile=/dev/null',
@@ -125,8 +125,8 @@ class CloudStackOpsSSH(CloudStackOpsBase):
                 pass
             retcode = p.returncode
             if retcode != 0:
-                print "Error: something went wrong on host " + hostname + ". Got return code " + str(retcode)
+                print("Error: something went wrong on host " + hostname + ". Got return code " + str(retcode))
             elif self.DEBUG == 1:
-                print "Note: Output: " + output
+                print("Note: Output: " + output)
             return retcode, output
         return false

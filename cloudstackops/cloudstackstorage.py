@@ -24,9 +24,9 @@ import time
 import os
 
 # Import the class we depend on
-from cloudstackops import *
-from cloudstackopsssh import *
-from cloudstackopsbase import *
+from .cloudstackops import *
+from .cloudstackopsssh import *
+from .cloudstackopsbase import *
 
 # Fabric
 from fabric import *
@@ -79,7 +79,7 @@ class StorageHelper():
 
         try:
             if self.debug > 0:
-                print "[DEBUG]: Running remote command: ", cmd, " on", env.user + "@" + hostname
+                print("[DEBUG]: Running remote command: ", cmd, " on", env.user + "@" + hostname)
 
             with settings(host_string=env.user + "@" + hostname, warn_only=True, capture=False):
                 result = fab.run(command=cmd)
@@ -92,7 +92,7 @@ class StorageHelper():
 
             if result:
                 if self.debug > 0:
-                    print "[DEBUG]: command success:", result.succeeded, "command failed:", result.failed, "command returncode:", result.return_code, "command error:", result.stderr
+                    print("[DEBUG]: command success:", result.succeeded, "command failed:", result.failed, "command returncode:", result.return_code, "command error:", result.stderr)
 
                 returncode = result.return_code
                 output = result.stdout
@@ -121,7 +121,7 @@ class StorageHelper():
                 mount_list[mount_path] = mount_device
 
         else:
-            print "[ERROR]: Failed to retrieve list of mounts on " + hostname + " due to: ", errmsg
+            print("[ERROR]: Failed to retrieve list of mounts on " + hostname + " due to: ", errmsg)
 
         return mount_list
 
@@ -136,7 +136,7 @@ class StorageHelper():
             device_path = device_path[:-1]
 
         if len(mount_list) > 0:
-            for path, device in mount_list.iteritems():
+            for path, device in mount_list.items():
 
                 if device.endswith('/'):
                     # strip the slash
@@ -169,6 +169,6 @@ class StorageHelper():
                     file_list[file_path] = file_size
 
             else:
-                print "[ERROR]: Failed to retrieve list from " + hostname + "of file due to: ", output, errmsg
+                print("[ERROR]: Failed to retrieve list from " + hostname + "of file due to: ", output, errmsg)
 
         return file_list

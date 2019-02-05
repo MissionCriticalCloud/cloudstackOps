@@ -95,12 +95,12 @@ def handleArguments(argv):
                 "new-base-template=", "always-start", "skip-virt-v2v", "helper-scripts-path=", "debug",
                 "exec", "is-projectvm", "force"])
     except getopt.GetoptError as e:
-        print "Error: " + str(e)
-        print help
+        print("Error: " + str(e))
+        print(help)
         sys.exit(2)
     for opt, arg in opts:
         if opt == '-h':
-            print help
+            print(help)
             sys.exit()
         elif opt in ("-c", "--config-profile"):
             configProfileName = arg
@@ -135,15 +135,15 @@ def handleArguments(argv):
 
     # We need at least these vars
     if len(instancename) == 0 or len(toCluster) == 0 or len(mysqlHost) == 0:
-        print help
+        print(help)
         sys.exit()
 
     if not os.path.isdir(helperScriptsPath):
-        print "Error: Directory %s as specified with --helper-scripts-path does not exist!" % helperScriptsPath
+        print("Error: Directory %s as specified with --helper-scripts-path does not exist!" % helperScriptsPath)
         sys.exit(1)
 
 def exit_script(message):
-    print "Fatal Error: %s" % message
+    print("Fatal Error: %s" % message)
     sys.exit(1)
 
 
@@ -170,21 +170,21 @@ def start_vm(hypervisor_name):
             warningMsg = "Warning: " + result.virtualmachine.name + " is in state " + \
                          result.virtualmachine.state + \
                          " instead of Running. Please investigate (could just take some time)."
-            print warningMsg
+            print(warningMsg)
 
 # Parse arguments
 if __name__ == "__main__":
     handleArguments(sys.argv[1:])
 
 # Start time
-print "Note: Starting @ %s" % time.strftime("%Y-%m-%d %H:%M")
+print("Note: Starting @ %s" % time.strftime("%Y-%m-%d %H:%M"))
 start_time = datetime.now()
 
 if DEBUG == 1:
-    print "Warning: Debug mode is enabled!"
+    print("Warning: Debug mode is enabled!")
 
 if DRYRUN == 1:
-    print "Warning: dry-run mode is enabled, not running any commands!"
+    print("Warning: dry-run mode is enabled, not running any commands!")
 
 # Init CloudStackOps class
 c = cloudstackops.CloudStackOps(DEBUG, DRYRUN)
@@ -213,8 +213,8 @@ if result > 0:
     c.print_message(message=message, message_type="Error", to_slack=True)
     sys.exit(1)
 elif DEBUG == 1:
-    print "DEBUG: MySQL connection successful"
-    print s.conn
+    print("DEBUG: MySQL connection successful")
+    print(s.conn)
 
 # make credentials file known to our class
 c.configProfileName = configProfileName
@@ -223,13 +223,13 @@ c.configProfileName = configProfileName
 c.initCloudStackAPI()
 
 if DEBUG == 1:
-    print "API address: " + c.apiurl
-    print "ApiKey: " + c.apikey
-    print "SecretKey: " + c.secretkey
+    print("API address: " + c.apiurl)
+    print("ApiKey: " + c.apikey)
+    print("SecretKey: " + c.secretkey)
 
 # Check cloudstack IDs
 if DEBUG == 1:
-    print "Debug: Checking CloudStack IDs of provided input.."
+    print("Debug: Checking CloudStack IDs of provided input..")
 
 if isProjectVm == 1:
     projectParam = "true"
@@ -303,21 +303,21 @@ template_dict = {
     'Ubuntu-10': 'Ubuntu1404-x86_64-Hardened-KVM-latest'
 }
 
-for key, value in template_dict.iteritems():
+for key, value in template_dict.items():
     if key.lower() in vm.templatedisplaytext.lower():
         if len(newBaseTemplate) > 0 and newBaseTemplate != value:
-            print "Warning: Would have guessed to use template '%s' but now using overridden value '%s'" \
-                  % (value, newBaseTemplate)
+            print("Warning: Would have guessed to use template '%s' but now using overridden value '%s'" \
+                  % (value, newBaseTemplate))
             continue
         newBaseTemplate = value
 
 if len(newBaseTemplate) == 0:
-    print "Warning: Was unable to detect a KVM template for vm %s. Please specify one using the --new-base-template " \
-          "flag and try again. Using 'Linux - Unknown template converted from XenServer'" % (vm.name)
+    print("Warning: Was unable to detect a KVM template for vm %s. Please specify one using the --new-base-template " \
+          "flag and try again. Using 'Linux - Unknown template converted from XenServer'" % (vm.name))
     newBaseTemplate = 'Linux - Unknown template converted from XenServer'
 
 if 'Netscaler' in newBaseTemplate or 'NSVPX' in newBaseTemplate:
-    print "Warning: Setting doVirtvtov = False due to Netscaler detected"
+    print("Warning: Setting doVirtvtov = False due to Netscaler detected")
     doVirtvtov = False
 
 templateID = c.checkCloudStackName(
@@ -333,10 +333,10 @@ if templateID == 1 or templateID is None:
 
 # Detach any isos
 if vm.isoid is not None:
-    print "Note: Detaching any connected ISO from vm %s" % vm.name
+    print("Note: Detaching any connected ISO from vm %s" % vm.name)
     c.detach_iso(vm.id)
 else:
-    print "Note: No ISOs connected to detach"
+    print("Note: No ISOs connected to detach")
 
 # Get cluster hosts
 kvm_host = c.getRandomHostFromCluster(toClusterID)
@@ -351,7 +351,7 @@ storagepoolname = targetStoragePoolData.name
 # Get hosts that belong to toCluster
 toClusterHostsData = c.getHostsFromCluster(toClusterID)
 if DEBUG == 1:
-    print "Note: You selected a storage pool with tags '" + str(storagepooltags) + "'"
+    print("Note: You selected a storage pool with tags '" + str(storagepooltags) + "'")
 
 if vm.hypervisor == "KVM":
     message = "VM %s aka '%s' is already happily running on KVM!" % (vm.instancename, vm.name)
@@ -400,7 +400,7 @@ for vol in voldata:
         continue
 
 if currentStorageID is None:
-    print "Error: Unable to determine the current storage pool of the volumes."
+    print("Error: Unable to determine the current storage pool of the volumes.")
     sys.exit(1)
 
 # Get hosts that belong to toCluster vm is currently running on
@@ -425,16 +425,16 @@ if sodata is not None:
 
     if hosttags != '' and kvm_host.hosttags != hosttags and c.FORCE == 0:
         if DEBUG == 1:
-            print "Error: hosttags of new KVM hypervisor '" + kvm_host + \
-                  "' do not match your vm's service offering '" + hosttags
+            print("Error: hosttags of new KVM hypervisor '" + kvm_host + \
+                  "' do not match your vm's service offering '" + hosttags)
             sys.exit(1)
     elif hosttags != '' and kvm_host.hosttags != hosttags and c.FORCE == 1:
         if DEBUG == 1:
-            print "Warning: hosttags of new KVM hypervisor '" + kvm_host + \
+            print("Warning: hosttags of new KVM hypervisor '" + kvm_host + \
                   "' do not match your vm's service offering '" + hosttags + "'. Since you used --FORCE you " \
-                  "probably know what you manually need to edit in the database."
+                  "probably know what you manually need to edit in the database.")
     elif DEBUG == 1:
-        print "Note: hosttags look OK."
+        print("Note: hosttags look OK.")
 
 # Stop this vm if it was running
 if needToStop:
@@ -483,7 +483,7 @@ for (name, path, uuid, size, vmstate, voltype) in volumes_result:
     c.print_message(message=message, message_type="Note", to_slack=to_slack)
 
     if DRYRUN == 1:
-        print "Note: Would have extracted, downloaded, converted volume %s " % name
+        print("Note: Would have extracted, downloaded, converted volume %s " % name)
     else:
         if vmstate != "Stopped":
             message = "Volume %s is attached to a VM state %s (should be Stopped). Halting." % (name, vmstate)
@@ -557,8 +557,8 @@ if result > 0:
     c.print_message(message=message, message_type="Error", to_slack=to_slack)
     sys.exit(1)
 elif DEBUG == 1:
-    print "DEBUG: MySQL connection successful"
-    print s.conn
+    print("DEBUG: MySQL connection successful")
+    print(s.conn)
 
 # Revery Query
 revert_sql = s.generate_revert_query(vm.instancename)

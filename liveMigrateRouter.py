@@ -57,11 +57,11 @@ def handleArguments(argv):
             argv, "hc:r:p", [
                 "config-profile=", "routerinstance-name=", "debug", "exec", "is-projectrouter", "only-when-required"])
     except getopt.GetoptError:
-        print help
+        print(help)
         sys.exit(2)
     for opt, arg in opts:
         if opt == '-h':
-            print help
+            print(help)
             sys.exit()
         elif opt in ("-c", "--config-profile"):
             configProfileName = arg
@@ -80,7 +80,7 @@ def handleArguments(argv):
 
     # We need at least these vars
     if len(vmname) == 0:
-        print help
+        print(help)
         sys.exit()
 
 # Parse arguments
@@ -91,10 +91,10 @@ if __name__ == "__main__":
 c = cloudstackops.CloudStackOps(DEBUG, DRYRUN)
 
 if DEBUG == 1:
-    print "Warning: Debug mode is enabled!"
+    print("Warning: Debug mode is enabled!")
 
 if DRYRUN == 1:
-    print "Warning: dry-run mode is enabled, not running any commands!"
+    print("Warning: dry-run mode is enabled, not running any commands!")
 
 # make credentials file known to our class
 c.configProfileName = configProfileName
@@ -103,13 +103,13 @@ c.configProfileName = configProfileName
 c.initCloudStackAPI()
 
 if DEBUG == 1:
-    print "DEBUG: API address: " + c.apiurl
-    print "DEBUG: ApiKey: " + c.apikey
-    print "DEBUG: SecretKey: " + c.secretkey
+    print("DEBUG: API address: " + c.apiurl)
+    print("DEBUG: ApiKey: " + c.apikey)
+    print("DEBUG: SecretKey: " + c.secretkey)
 
 # Check cloudstack IDs
 if DEBUG == 1:
-    print "DEBUG: Checking CloudStack IDs of provided input.."
+    print("DEBUG: Checking CloudStack IDs of provided input..")
 
 if isProjectVm == 1:
     projectParam = "true"
@@ -127,25 +127,25 @@ routerData = c.getRouterData({'name': vmname, 'isProjectVm': projectParam})
 router = routerData[0]
 
 if DEBUG == 1:
-    print routerData
+    print(routerData)
 
-print "Note: Found router " + router.name + " that belongs to account " + str(router.account) + " with router ID " + router.id
-print "Note: This router has " + str(len(router.nic)) + " nics."
+print("Note: Found router " + router.name + " that belongs to account " + str(router.account) + " with router ID " + router.id)
+print("Note: This router has " + str(len(router.nic)) + " nics.")
 
-print "Note: Let's live migrate the router VM.."
+print("Note: Let's live migrate the router VM..")
 
 # Reboot router
 if DRYRUN == 1:
-    print "Note: Would have live migrated router " + router.name + " (" + router.id + ")"
+    print("Note: Would have live migrated router " + router.name + " (" + router.id + ")")
 else:
-    print "Executing: live migrate router " + router.name + " (" + router.id + ")"
+    print("Executing: live migrate router " + router.name + " (" + router.id + ")")
 
     result = c.migrateSystemVm({'vmid': router.id, 'projectParam': projectParam})
     if result == 1:
-        print "Live migrating failed, will try again!"
+        print("Live migrating failed, will try again!")
         result = c.migrateSystemVm({'vmid': router.id, 'projectParam': projectParam})
         if result == 1:
-            print "live migrating failed again -- exiting."
-            print "Error: investigate manually!"
+            print("live migrating failed again -- exiting.")
+            print("Error: investigate manually!")
 
-print "Note: We're done!"
+print("Note: We're done!")

@@ -37,7 +37,7 @@ from prettytable import PrettyTable
 def get_volume_filesize(file_uuid_in_cloudstack, *filelist):
     filelist, = filelist
     size = None
-    for filepath in filelist.keys():
+    for filepath in list(filelist.keys()):
         file_uuid_on_storagepool = filepath.split('/')[-1].split('.')[:1][0]
 
         if file_uuid_in_cloudstack == file_uuid_on_storagepool:
@@ -72,12 +72,12 @@ def handle_arguments(argv):
             argv, "hc:z:t:", ["config-profile=", "zone=", "clusterarg=", "debug"])
 
     except getopt.GetoptError as e:
-        print "Error: " + str(e)
+        print("Error: " + str(e))
         sys.exit(2)
 
     for opt, arg in opts:
         if opt == '-h':
-            print help
+            print(help)
             sys.exit()
         elif opt in ("-c", "--config-profile"):
             configProfileName = arg
@@ -90,7 +90,7 @@ def handle_arguments(argv):
 
     # Print help if required options not provided
     if len(configProfileName) == 0 or len(zone) == 0:
-        print help
+        print(help)
         exit(1)
 
 ## MAIN ##
@@ -110,19 +110,19 @@ c.configProfileName = configProfileName
 c.initCloudStackAPI()
 
 if DEBUG == 1:
-    print "DEBUG: API address: " + c.apiurl
-    print "DEBUG: ApiKey: " + c.apikey
-    print "DEBUG: SecretKey: " + c.secretkey
+    print("DEBUG: API address: " + c.apiurl)
+    print("DEBUG: ApiKey: " + c.apikey)
+    print("DEBUG: SecretKey: " + c.secretkey)
 
 # Check cloudstack IDs
 if DEBUG == 1:
-    print "DEBUG: Checking CloudStack IDs of provided input.."
+    print("DEBUG: Checking CloudStack IDs of provided input..")
 
 zoneid = c.getZoneId(zone)
 
 
 if zoneid is None:
-    print "Cannot find zone " + zone
+    print("Cannot find zone " + zone)
     exit(1)
 
 # get all clusters in zone if no cluster is given as input
@@ -137,7 +137,7 @@ else:
 
 # die if there are no clusters found (unlikely)
 if clusters is None:
-    print "DEBUG: No clusters found in zone"
+    print("DEBUG: No clusters found in zone")
     exit(1)
 
 
@@ -161,7 +161,7 @@ for cluster in clusters:
             used_space = 0
 
             # Get list of orphaned cloudstack disks for storagepool
-            print "[INFO]: Retrieving list of orphans for storage pool", storagepool.name
+            print("[INFO]: Retrieving list of orphans for storage pool", storagepool.name)
             orphans = c.getDetachedVolumes(storagepool.id)
 
             storagepool_devicepath = storagepool.ipaddress + \
@@ -173,7 +173,7 @@ for cluster in clusters:
                 random_hypervisor.ipaddress, storagepool_devicepath)
 
             if primary_mountpoint is None:
-                print "[DEBUG]: no physical volume list retrieved for " + storagepool.name + " skipping"
+                print("[DEBUG]: no physical volume list retrieved for " + storagepool.name + " skipping")
                 storagepool_filelist = None
 
             else:
@@ -211,9 +211,9 @@ for cluster in clusters:
                            orphan_allocated_sizeGB, orphan_real_sizeGB, isorphaned])
 
             # Print orphan table
-            print t.get_string()
+            print(t.get_string())
             t_storagepool.add_row(
                 [cluster.name, storagepool.name, len(orphans), format(used_space, '.2f')])
 
-print "Storagepool Totals"
-print t_storagepool.get_string()
+print("Storagepool Totals")
+print(t_storagepool.get_string())

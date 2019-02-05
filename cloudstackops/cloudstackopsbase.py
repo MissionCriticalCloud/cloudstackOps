@@ -20,7 +20,7 @@
 # CloudStackOps Base Class
 # Remi Bergsma - rbergsma@schubergphilis.com
 
-import ConfigParser
+import configparser
 import os
 import pprint
 import signal
@@ -30,16 +30,16 @@ import sys
 try:
     import slackweb
 except Exception as e:
-    print "Error: Please install slackweb library to support Slack messaging: %s" % e
-    print "       pip install slackweb"
+    print("Error: Please install slackweb library to support Slack messaging: %s" % e)
+    print("       pip install slackweb")
     sys.exit(1)
 
 # Colored terminals
 try:
     from clint.textui import colored
 except Exception as e:
-    print "Error: Please install clint library to support color in the terminal: %s" % e
-    print "       pip install clint"
+    print("Error: Please install clint library to support color in the terminal: %s" % e)
+    print("       pip install clint")
     sys.exit(1)
 
 
@@ -97,12 +97,12 @@ class CloudStackOpsBase(object):
         slack_url = ""
         try:
             self.configfile = os.getcwd() + '/config'
-            config = ConfigParser.RawConfigParser()
+            config = configparser.RawConfigParser()
             config.read(self.configfile)
             slack_url = config.get('slack', 'hookurl')
 
         except:
-            print "Warning: No Slack integration found, so not using. See config file to setup."
+            print("Warning: No Slack integration found, so not using. See config file to setup.")
 
         self.slack = None
         if len(slack_url) > 0:
@@ -110,7 +110,7 @@ class CloudStackOpsBase(object):
 
     def print_message(self, message, message_type="Note", to_slack=False):
         if message_type != "Plain":
-            print "%s: %s" % (message_type.title(), message)
+            print("%s: %s" % (message_type.title(), message))
 
         if to_slack and self.slack is not None:
             color = "good"
@@ -161,16 +161,16 @@ class CloudStackOpsBase(object):
             attachments.append(attachment)
             self.slack.notify(attachments=attachments, icon_emoji=":robot_face:", username="cloudstackOps")
         except:
-            print "Warning: Slack said NO."
+            print("Warning: Slack said NO.")
 
     # Handle unwanted CTRL+C presses
     def catch_ctrl_C(self, sig, frame):
-        print "Warning: do not interrupt! If you really want to quit, use kill -9."
+        print("Warning: do not interrupt! If you really want to quit, use kill -9.")
 
     # Read config files
     def readConfigFile(self):
         # Read our own config file for some more settings
-        config = ConfigParser.RawConfigParser()
+        config = configparser.RawConfigParser()
         config.read(self.configfile)
         try:
             self.organization = config.get('cloudstackOps', 'organization')
@@ -178,6 +178,6 @@ class CloudStackOpsBase(object):
             self.mail_from = config.get('mail', 'mail_from')
             self.errors_to = config.get('mail', 'errors_to')
         except:
-            print "Error: Cannot read or parse CloudStackOps config file '" + self.configfile + "'"
-            print "Hint: Setup the local config file 'config', using 'config.sample' as a starting point. See documentation."
+            print("Error: Cannot read or parse CloudStackOps config file '" + self.configfile + "'")
+            print("Hint: Setup the local config file 'config', using 'config.sample' as a starting point. See documentation.")
             sys.exit(1)

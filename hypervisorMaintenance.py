@@ -67,12 +67,12 @@ def handleArguments(argv):
             argv, "hc:n:", [
                 "credentials-file=", "hostname=", "debug", "exec", "cancel-maintenance", "force", "no-bond-check"])
     except getopt.GetoptError as e:
-        print "Error: " + str(e)
-        print help
+        print("Error: " + str(e))
+        print(help)
         sys.exit(2)
     for opt, arg in opts:
         if opt == '-h':
-            print help
+            print(help)
             sys.exit()
         elif opt in ("-c", "--config-profile"):
             configProfileName = arg
@@ -95,7 +95,7 @@ def handleArguments(argv):
 
     # We need at least these vars
     if len(hostname) == 0:
-        print help
+        print(help)
         sys.exit()
 
 # Parse arguments
@@ -120,10 +120,10 @@ k.DRYRUN = DRYRUN
 c.kvm = k
 
 if DEBUG == 1:
-    print "Warning: Debug mode is enabled!"
+    print("Warning: Debug mode is enabled!")
 
 if DRYRUN == 1:
-    print "Warning: dry-run mode is enabled, not running any commands!"
+    print("Warning: dry-run mode is enabled, not running any commands!")
 
 # make credentials file known to our class
 c.configProfileName = configProfileName
@@ -132,16 +132,16 @@ c.configProfileName = configProfileName
 c.initCloudStackAPI()
 
 if DEBUG == 1:
-    print "API address: " + c.apiurl
-    print "ApiKey: " + c.apikey
-    print "SecretKey: " + c.secretkey
+    print("API address: " + c.apiurl)
+    print("ApiKey: " + c.apikey)
+    print("SecretKey: " + c.secretkey)
 
 # Check cloudstack IDs
 if DEBUG == 1:
-    print "Note: Checking CloudStack IDs of provided input.."
+    print("Note: Checking CloudStack IDs of provided input..")
 hostID = c.checkCloudStackName({'csname': hostname, 'csApiCall': 'listHosts'})
 if hostID == 1:
-    print "Error: Host " + hostname + " could not be found."
+    print("Error: Host " + hostname + " could not be found.")
     sys.exit(1)
 
 # Get hosts data
@@ -152,10 +152,10 @@ for host in hostData:
 
 # Get hosts that belong to toCluster
 clusterHostsData = c.getAllHostsFromCluster(foundHostData.clusterid)
-print "Note: Host '" + hostname + "' belongs to cluster '" + foundHostData.clustername + "'"
+print("Note: Host '" + hostname + "' belongs to cluster '" + foundHostData.clustername + "'")
 
 if foundHostData.hypervisor not in ("XenServer", "KVM"):
-    print "Error: This is only tested for KVM and XenServer at the moment!"
+    print("Error: This is only tested for KVM and XenServer at the moment!")
     sys.exit(1)
 
 # Test SSH connection
@@ -167,9 +167,9 @@ if retcode != 0:
 poolmaster = "n/a"
 if foundHostData.hypervisor == "XenServer":
     retcode, poolmaster = ssh.getPoolmaster(foundHostData.ipaddress)
-    print "Note: Poolmaster is: '" + poolmaster + "'"
+    print("Note: Poolmaster is: '" + poolmaster + "'")
 
-print "Note: Looking for other hosts in this cluster and checking their health.."
+print("Note: Looking for other hosts in this cluster and checking their health..")
 
 # Print overview
 c.printHypervisors(foundHostData.clusterid, poolmaster, checkBonds, foundHostData.hypervisor)
@@ -178,21 +178,21 @@ c.printHypervisors(foundHostData.clusterid, poolmaster, checkBonds, foundHostDat
 if foundHostData.hypervisor == "XenServer":
     retcode, output = ssh.fakePVTools(foundHostData.ipaddress)
     if retcode != 0:
-        print "Error: something went wrong. Got return code " + str(retcode)
+        print("Error: something went wrong. Got return code " + str(retcode))
     else:
-        print "Note: Command executed OK."
+        print("Note: Command executed OK.")
 
 # Cancel maintenance
 if cancelmaintenance == 1 and DRYRUN == 0:
-    print "Note: You want to cancel maintenance for host '" + hostname + "'"
+    print("Note: You want to cancel maintenance for host '" + hostname + "'")
     # Does it make sense?
     if foundHostData.resourcestate != "Maintenance" and foundHostData.resourcestate != "PrepareForMaintenance":
-        print "Error: Host '" + hostname + "' is not in maintenance, so can not cancel. Halting."
+        print("Error: Host '" + hostname + "' is not in maintenance, so can not cancel. Halting.")
         sys.exit(1)
     # Cancel maintenance
     cancelresult = c.cancelHostMaintenance(hostID)
     if cancelresult is None or cancelresult == 1:
-        print "Error: Cancel maintenance failed. Please investigate manually. Halting."
+        print("Error: Cancel maintenance failed. Please investigate manually. Halting.")
     # Check result
     while True:
         hostData = c.getHostData({'hostname': hostname})
@@ -201,36 +201,36 @@ if cancelmaintenance == 1 and DRYRUN == 0:
                 foundHostData = host
 
         if foundHostData.resourcestate != "Enabled":
-            print "Note: Resource state currently is '" + foundHostData.resourcestate + "', waiting some more.."
+            print("Note: Resource state currently is '" + foundHostData.resourcestate + "', waiting some more..")
             time.sleep(5)
         else:
-            print "Note: Resource state currently is '" + foundHostData.resourcestate + "', returning"
+            print("Note: Resource state currently is '" + foundHostData.resourcestate + "', returning")
             break
-    print "Note: Cancel maintenance succeeded for host '" + hostname + "'"
+    print("Note: Cancel maintenance succeeded for host '" + hostname + "'")
     # Print overview
     c.printHypervisors(foundHostData.clusterid, poolmaster, checkBonds, foundHostData.hypervisor)
-    print "Note: We're done!"
+    print("Note: We're done!")
     sys.exit(0)
 elif cancelmaintenance == 1 and DRYRUN == 1:
-    print "Note: Would have cancelled maintenance for host '" + hostname + "'."
+    print("Note: Would have cancelled maintenance for host '" + hostname + "'.")
     sys.exit(0)
 elif DRYRUN == 1:
-    print "Note: Would have enabled maintenance for host '" + hostname + "'."
+    print("Note: Would have enabled maintenance for host '" + hostname + "'.")
 
 # Check if we are safe to put a hypervisor in Maintenance
 safe = c.safeToPutInMaintenance(foundHostData.clusterid)
 if safe == False and force == 0:
-    print "Error: All hosts should be in resouce state 'Enabled' before putting a host to maintenance. " \
-          "Use --force to to ignore WARNING states. Halting."
+    print("Error: All hosts should be in resouce state 'Enabled' before putting a host to maintenance. " \
+          "Use --force to to ignore WARNING states. Halting.")
     sys.exit(1)
 elif safe == False and force == 1:
-    print "Warning: To be safe, all hosts should be in resouce state 'Enabled' before putting a host to maintenance"
-    print "Warning: You used --force to to ignore WARNING states. Assuming you know what you are doing.."
+    print("Warning: To be safe, all hosts should be in resouce state 'Enabled' before putting a host to maintenance")
+    print("Warning: You used --force to to ignore WARNING states. Assuming you know what you are doing..")
 else:
-    print "Note: All resource states are 'Enabled', we can safely put one to maintenance"
+    print("Note: All resource states are 'Enabled', we can safely put one to maintenance")
 
 if DEBUG == 1:
-    print "Debug: Host to put in maintenance: " + hostID
+    print("Debug: Host to put in maintenance: " + hostID)
 
 # Migrate all vm's and empty hypervisor
 c.emptyHypervisor(hostID)
@@ -240,12 +240,12 @@ maintenanceresult = c.startMaintenance(hostID, hostname)
 if maintenanceresult:
     # Print overview
     c.printHypervisors(foundHostData.clusterid, poolmaster, checkBonds, foundHostData.hypervisor)
-    print "Note: We're done!"
+    print("Note: We're done!")
     sys.exit(0)
 elif DRYRUN == 0:
-    print "Error: Could not enable Maintenance for host '" + hostname + "'. Please investigate manually. Halting."
+    print("Error: Could not enable Maintenance for host '" + hostname + "'. Please investigate manually. Halting.")
 elif DRYRUN == 1:
-    print "Note: We're done!"
+    print("Note: We're done!")
 
 if DRYRUN == 0:
     # Print overview

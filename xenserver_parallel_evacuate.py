@@ -42,11 +42,11 @@ class handleArguments(object):
         try:
             opts, args = getopt.getopt(argv,"ht:",["threads=","debug","exec","skip-checks"])
         except getopt.GetoptError:
-            print help
+            print(help)
             sys.exit(2)
         for opt, arg in opts:
             if opt == '-h':
-                print help
+                print(help)
                 sys.exit()
             elif opt in ("-t","--threads"):
                 self.threads = arg
@@ -72,7 +72,7 @@ class xenserver_parallel_evacuation(object):
     # Run local command
     def run_local_command(self, command):
         if self.DEBUG == 1:
-            print "Debug: Running command:" + command
+            print("Debug: Running command:" + command)
 
         # XenServer 6.2 runs an ancient python 2.4
         # and the subprocess module did not work
@@ -130,19 +130,19 @@ class xenserver_parallel_evacuation(object):
     def get_hypervisor_with_most_free_memory(self):
         if self.poolmember == False:
             self.poolmember = self.construct_poolmembers()
-        return sorted(self.poolmember.items(),key = lambda x :x[1]['memory_free'],reverse = True)[:1][0][1]
+        return sorted(list(self.poolmember.items()),key = lambda x :x[1]['memory_free'],reverse = True)[:1][0][1]
 
     # Generate migration plan
     def generate_migration_plan(self, grep_for=None):
         if self.skip_checks is False:
             # Make sure host is disabled
             if self.is_host_enabled() is not False:
-                print "Error: Host should be disabled first."
+                print("Error: Host should be disabled first.")
                 return False
 
             # Make sure pool HA is turned off
             if self.pool_ha_check() is not False:
-                print "Error: Pool HA should be disabled first."
+                print("Error: Pool HA should be disabled first.")
                 return False
 
         # Generate migration plan
@@ -169,11 +169,11 @@ class xenserver_parallel_evacuation(object):
                     self.poolmember[to_hv['name']]['memory_free'] -= int(mem)
                     # Prepare migration command
                     migration_cmds += "xe vm-migrate vm=" + vm + " host=" + to_hv['name'] + ";\n"
-                    print "OK, found migration destination for " + vm
+                    print("OK, found migration destination for " + vm)
                     break
                 else:
                     # Unable to empty this hv
-                    print "Error: not enough memory (need: " + str(mem)  + ") on any hypervisor to migrate vm " + vm + ". This means N+1 rule is not met, please investigate!"
+                    print("Error: not enough memory (need: " + str(mem)  + ") on any hypervisor to migrate vm " + vm + ". This means N+1 rule is not met, please investigate!")
                     return False
         return migration_cmds
 
@@ -190,7 +190,7 @@ class xenserver_parallel_evacuation(object):
 
     # Is host enabled?
     def is_host_enabled(self):
-        print "Note: Checking if host is enabled or disabled.."
+        print("Note: Checking if host is enabled or disabled..")
         try:
             if self.run_local_command("xe host-list params=enabled name-label=$HOSTNAME --minimal").strip() == "true":
                 return True
@@ -219,21 +219,21 @@ if __name__ == "__main__":
     x = xenserver_parallel_evacuation(arg)
 
     if arg.DRYRUN == 1:
-        print "Note: Running in DRY-run mode, not executing. Use --exec to execute."
-        print "Note: Calculating migration plan.."
-        print "Note: This is the migration plan:"
-        print "Instances (threads = %s)" % str(x.threads)
-        print x.generate_migration_plan("i-")
+        print("Note: Running in DRY-run mode, not executing. Use --exec to execute.")
+        print("Note: Calculating migration plan..")
+        print("Note: This is the migration plan:")
+        print("Instances (threads = %s)" % str(x.threads))
+        print(x.generate_migration_plan("i-"))
         x.threads = 1
         x.vmlist = False
-        print "Routers (threads = %s)" % str(x.threads)
-        print x.generate_migration_plan("r-")
+        print("Routers (threads = %s)" % str(x.threads))
+        print(x.generate_migration_plan("r-"))
         sys.exit(0)
 
-    print "Note: Executing migration plan using " + str(x.threads) + " threads.."
-    print x.execute_migration_plan("i-")
+    print("Note: Executing migration plan using " + str(x.threads) + " threads..")
+    print(x.execute_migration_plan("i-"))
     x.threads = 1
     x.vmlist = False
-    print "Note: Executing migration plan using " + str(x.threads) + " threads.."
-    print x.execute_migration_plan()
+    print("Note: Executing migration plan using " + str(x.threads) + " threads..")
+    print(x.execute_migration_plan())
 

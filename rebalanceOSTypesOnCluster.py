@@ -51,17 +51,17 @@ def handleArguments(argv):
    try:
       opts, args = getopt.getopt(argv,"hc:n:p:",["config-profile=","cluster","debug","exec","is-projectvm"])
    except getopt.GetoptError as e:
-     print "Error: " + str(e)
-     print help
+     print("Error: " + str(e))
+     print(help)
      sys.exit(2)
 
    if len(opts) == 0:
-     print help
+     print(help)
      sys.exit(2)
 
    for opt, arg in opts:
       if opt == '-h':
-         print help
+         print(help)
          sys.exit()
       elif opt in ("-c", "--config-profile"):
          configProfileName = arg
@@ -79,30 +79,30 @@ def handleArguments(argv):
      configProfileName = "config"
 
    if len(clusterName) == 0:
-     print "ERROR: Please provide cluster name"
-     print help
+     print("ERROR: Please provide cluster name")
+     print(help)
      sys.exit(1)
 
 # Check available memory
 def hostHasEnhoughMemory(h):
   # Available memory
   memoryavailable = h.memorytotal - h.memoryallocated
-  print "Host " + h.name + " has available memory: " + str(memoryavailable)
+  print("Host " + h.name + " has available memory: " + str(memoryavailable))
 
   # Don't try if host has less than 10GB memory left or if vm does not fit at all
   # vm.memory is in Mega Bytes
   if memoryavailable < (10 * 1024 * 1024 * 1024):
-    print "Warning: Skipping " + h.name + " as it has not enough free memory (" + str(memoryavailable) + ")."
+    print("Warning: Skipping " + h.name + " as it has not enough free memory (" + str(memoryavailable) + ").")
     return False
   return True
 
 # Get host with min/max instances
 def sortHostByVmCounter(vmcounter,reverse=False):
-    return sorted(vmcounter.items(), key=lambda x:x[1], reverse=reverse)
+    return sorted(list(vmcounter.items()), key=lambda x:x[1], reverse=reverse)
 
 # Get host with min/max memory
 def sortHostByMemory(hosts,reverse=False):
-    return dict(sorted(hosts.items(), key=lambda x:x[1].memoryallocated, reverse=reverse))
+    return dict(sorted(list(hosts.items()), key=lambda x:x[1].memoryallocated, reverse=reverse))
 
 # Parse arguments
 if __name__ == "__main__":
@@ -118,10 +118,10 @@ else:
 c = cloudstackops.CloudStackOps(DEBUG,DRYRUN)
 
 if DEBUG == 1:
-  print "Warning: Debug mode is enabled!"
+  print("Warning: Debug mode is enabled!")
 
 if DRYRUN == 1:
-  print "Warning: dry-run mode is enabled, not running any commands!"
+  print("Warning: dry-run mode is enabled, not running any commands!")
 
 # make credentials file known to our class
 c.configProfileName = configProfileName
@@ -133,17 +133,17 @@ if len(clusterName) > 1:
   clusterID = c.checkCloudStackName({'csname': clusterName, 'csApiCall': 'listClusters'})
 
 if DEBUG == 1:
-  print "API address: " + c.apiurl
-  print "ApiKey: " + c.apikey
-  print "SecretKey: " + c.secretkey
+  print("API address: " + c.apiurl)
+  print("ApiKey: " + c.apikey)
+  print("SecretKey: " + c.secretkey)
 
 # Fetch the list of hosts in a cluster which are not marked dedicated aka shared:
 fromClusterHostsData = c.getSharedHostsFromCluster(clusterID)
 if fromClusterHostsData == [] or fromClusterHostsData == None:
-  print
+  print()
   sys.stdout.write("\033[F")
-  print "No (enabled or non-dedicated) hosts found on cluster " + clusterName
-  print "Nothing to work on, exiting."
+  print("No (enabled or non-dedicated) hosts found on cluster " + clusterName)
+  print("Nothing to work on, exiting.")
   exit (1)
 
 # Settings
@@ -169,7 +169,7 @@ for family in osFamilies:
   osData[family]['hosts'] = {}
 
   if osTypes is None:
-    print "Warning: No OS Types found for " + family + " skipping.."
+    print("Warning: No OS Types found for " + family + " skipping..")
     continue
 
   for type in osTypes:
@@ -182,15 +182,15 @@ for family in osFamilies:
     osData[family]['hosts'][fromHostData.name] = fromHostData
 
     if DEBUG ==1:
-      print "# Looking for VMS on node " + fromHostData.name
-      print "# Memory of this host: " + str(fromHostData.memorytotal)
+      print("# Looking for VMS on node " + fromHostData.name)
+      print("# Memory of this host: " + str(fromHostData.memorytotal))
 
     # Get all vm's: project and non project
     vmdata_non_project = c.listVirtualmachines({'hostid': fromHostData.id, 'isProjectVm': 'false' })
     vmdata_project = c.listVirtualmachines({'hostid': fromHostData.id, 'isProjectVm': 'true' })
 
     if vmdata_project is None and vmdata_non_project is None:
-      print "Note: No vm's of type " + family  + " found on " + fromHostData.name
+      print("Note: No vm's of type " + family  + " found on " + fromHostData.name)
       continue
     if vmdata_project is None and vmdata_non_project is not None:
       vmdata = vmdata_non_project
@@ -202,7 +202,7 @@ for family in osFamilies:
     oscounter = 0
     for vm in vmdata:
       if DEBUG == 1:
-        print vm.name + " -> " + str(vm.guestosid)
+        print(vm.name + " -> " + str(vm.guestosid))
       if vm.guestosid in osData[family]['types']:
         osData[family]['vms'][fromHostData.name][vm.id] = vm
         osData[family]['vmcounter'][fromHostData.name] += 1
@@ -213,39 +213,39 @@ for family in osFamilies:
   # Sort by most memory free
   osData[family]['hosts'] = sortHostByMemory(osData[family]['hosts'], False)
 
-print "Note: Cluster " + clusterName + " has " + str(osData['RedHat']['grandCounter']) + " Red Hat vm's and " + str(osData['Windows']['grandCounter']) + " Windows Server vm's"
+print("Note: Cluster " + clusterName + " has " + str(osData['RedHat']['grandCounter']) + " Red Hat vm's and " + str(osData['Windows']['grandCounter']) + " Windows Server vm's")
 
 # Process the generated OS Family data
-for family, familyData in osData.iteritems():
-  print
-  print "Note: Processing " + family + " Family"
-  print "Note: ======================================="
+for family, familyData in osData.items():
+  print()
+  print("Note: Processing " + family + " Family")
+  print("Note: =======================================")
   migrateTo = []
   migrateFrom = []
 
-  if 'vmcounter' not in familyData.keys():
-    print "Warning: key vmcounter not found"
+  if 'vmcounter' not in list(familyData.keys()):
+    print("Warning: key vmcounter not found")
     if DEBUG == 1:
       c.pp.pprint(familyData)
     continue
 
   if DEBUG == 1:
-    print "DEBUG: Overview: "
+    print("DEBUG: Overview: ")
     c.pp.pprint(familyData['vmcounter'])
-    print
+    print()
 
   for h in familyData['vmcounter']:
     if familyData['vmcounter'][h] == 0:
       if DEBUG == 1:
-        print "DEBUG: No VMs on " + h + " running family " + family
+        print("DEBUG: No VMs on " + h + " running family " + family)
         continue
 
     if DEBUG == 1:
-      print h + " " + str(familyData['vmcounter'][h])
+      print(h + " " + str(familyData['vmcounter'][h]))
 
     if familyData['vmcounter'][h] >= minInstances and familyData['vmcounter'][h] < maxInstances:
       if DEBUG == 1:
-        print h + " is migration-to candidate!"
+        print(h + " is migration-to candidate!")
 
       # Available memory
       if not hostHasEnhoughMemory(familyData['hosts'][h]):
@@ -255,18 +255,18 @@ for family, familyData in osData.iteritems():
 
     elif familyData['vmcounter'][h] < minInstances:
       if DEBUG == 1:
-        print h + " is migration-from candidate!"
+        print(h + " is migration-from candidate!")
       migrateFrom.append(h)
 
   if DEBUG == 1:
-    print "DEBUG: MigrateTo:"
-    print migrateTo
+    print("DEBUG: MigrateTo:")
+    print(migrateTo)
 
   # If no host with minCounter vm's, then select the one with the most
   if len(migrateTo) == 0:
     maxHosts = sortHostByVmCounter(familyData['vmcounter'], True)
-    print "Note: Hosts in sorted order:"
-    print maxHosts
+    print("Note: Hosts in sorted order:")
+    print(maxHosts)
     maxHost = ""
 
     # Select the best host to migrate to
@@ -278,37 +278,37 @@ for family, familyData in osData.iteritems():
         continue
       # Too many instances already
       if familyData['vmcounter'][m] >= maxInstances:
-        print "Note: Skipping " + m + " because it has more than maxInstances vm's already " + str(maxInstances)
+        print("Note: Skipping " + m + " because it has more than maxInstances vm's already " + str(maxInstances))
         continue
       # Take the next best one
       maxHost = m
-      print "Note: Selecting " + m + " because it already has some instances running."
+      print("Note: Selecting " + m + " because it already has some instances running.")
       break
 
     # If it did not work, halt
     if len(maxHost) == 0:
-      print "Error: Could not select a suitable host. Halting."
+      print("Error: Could not select a suitable host. Halting.")
       sys.exit(1)
 
     if DEBUG == 1:
-      print "DEBUG: Selecting the host with max vm's already."
+      print("DEBUG: Selecting the host with max vm's already.")
     migrateTo.append(maxHost)
 
   osData[family]['vmcounterafter'] = osData[family]['vmcounter']
 
   # Display what we'd do
   for h in migrateFrom:
-    for key,vm in familyData['vms'][h].iteritems():
+    for key,vm in familyData['vms'][h].items():
       to = choice(migrateTo)
       if to != h:
-        print "Note: Would have migrated " + vm.name + " (from " + h + " to " + str(to) + ") " + str(vm.memory) + " mem"
+        print("Note: Would have migrated " + vm.name + " (from " + h + " to " + str(to) + ") " + str(vm.memory) + " mem")
         osData[family]['vmcounterafter'][to] +=1
         osData[family]['vmcounterafter'][h] -=1
       else:
-        print "Note: Skipping " + vm.name + " (already on " + h + " / " + to + ")"
+        print("Note: Skipping " + vm.name + " (already on " + h + " / " + to + ")")
 
-  print "DEBUG Result after migration:"
+  print("DEBUG Result after migration:")
   c.pp.pprint(osData[family]['vmcounterafter'])
 
 if DEBUG == 1:
-  print "Note: We're done!"
+  print("Note: We're done!")

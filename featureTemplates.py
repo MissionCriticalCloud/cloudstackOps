@@ -57,17 +57,17 @@ def handleArguments(argv):
             argv, "hc:z:", [
                 "config-profile=", "zone", "debug", "exec"])
     except getopt.GetoptError as e:
-        print "Error: " + str(e)
-        print help
+        print("Error: " + str(e))
+        print(help)
         sys.exit(2)
 
     if len(opts) == 0:
-        print help
+        print(help)
         sys.exit(2)
 
     for opt, arg in opts:
         if opt == '-h':
-            print help
+            print(help)
             sys.exit()
         elif opt in ("-c", "--config-profile"):
             configProfileName = arg
@@ -90,10 +90,10 @@ if __name__ == "__main__":
 c = cloudstackops.CloudStackOps(DEBUG, DRYRUN)
 
 if DEBUG == 1:
-    print "Warning: Debug mode is enabled!"
+    print("Warning: Debug mode is enabled!")
 
 if DRYRUN == 1:
-    print "Warning: dry-run mode is enabled, not running any commands!"
+    print("Warning: dry-run mode is enabled, not running any commands!")
 
 # make credentials file known to our class
 c.configProfileName = configProfileName
@@ -104,14 +104,14 @@ c.initCloudStackAPI()
 if len(zoneName) > 1:
     zoneID = c.checkCloudStackName(
         {'csname': zoneName, 'csApiCall': 'listZones'})
-    print "Note: Only processing templates in zone " + zoneName
+    print("Note: Only processing templates in zone " + zoneName)
 
-print "Warning: We only manage XenServer templates!"
+print("Warning: We only manage XenServer templates!")
 
 if DEBUG == 1:
-    print "API address: " + c.apiurl
-    print "ApiKey: " + c.apikey
-    print "SecretKey: " + c.secretkey
+    print("API address: " + c.apiurl)
+    print("ApiKey: " + c.apikey)
+    print("SecretKey: " + c.secretkey)
 
 # get templates from CloudStack
 if len(zoneName) > 1:
@@ -203,7 +203,7 @@ for template in templateData:
         keepCount[countkey] = 0
 
     if DEBUG == 1:
-        print "Counter " + countkey + " " + str(keepCount[countkey])
+        print("Counter " + countkey + " " + str(keepCount[countkey]))
 
     keepkey = countkey + str(keepCount[countkey])
     if keepCount[countkey] > keepNr:
@@ -224,9 +224,9 @@ if DRYRUN == 1:
                          "Created",
                          "CrossZones",
                          "Type"])
-        print work + ":"
+        print(work + ":")
         # Generate table
-        for templatekey, template in eval(work).iteritems():
+        for templatekey, template in eval(work).items():
             t.add_row([template.name,
                        template.displaytext,
                        template.ostypename,
@@ -236,47 +236,47 @@ if DRYRUN == 1:
                        template.created,
                        template.crossZones,
                        template.templatetype])
-        print t
+        print(t)
 
 # Make changes to the templates
 elif DRYRUN == 0:
     for work in loopWork:
-        print "Processing " + work + ".."
+        print("Processing " + work + "..")
         if work == "featureTemplates":
-            for templatekey, template in eval(work).iteritems():
+            for templatekey, template in eval(work).items():
                 if DEBUG == 1:
-                    print "DEBUG: Setting feature flag for " + template.name + " .."
+                    print("DEBUG: Setting feature flag for " + template.name + " ..")
                 if template.isfeatured == False:
                     result = c.updateTemplatePermissins(
                         {'templateid': template.id, 'isfeatured': 'true'})
                     if result == 1:
-                        print "ERROR: Something went wrong!"
+                        print("ERROR: Something went wrong!")
                     else:
-                        print "Feature flag set OK for " + template.name
+                        print("Feature flag set OK for " + template.name)
                 else:
-                    print "Note: Template " + template.name + " is alreay featured, ignoring."
+                    print("Note: Template " + template.name + " is alreay featured, ignoring.")
         elif work == "unfeatureTemplates":
-            for templatekey, template in eval(work).iteritems():
+            for templatekey, template in eval(work).items():
                 if DEBUG == 1:
-                    print "DEBUG: Unsetting feature flag for " + template.name + " .."
+                    print("DEBUG: Unsetting feature flag for " + template.name + " ..")
                 if template.isfeatured:
                     result = c.updateTemplatePermissins(
                         {'templateid': template.id, 'isfeatured': 'false'})
                     if result == 1:
-                        print "ERROR: Something went wrong!"
+                        print("ERROR: Something went wrong!")
                     else:
-                        print "Feature flag removed OK for " + template.name
+                        print("Feature flag removed OK for " + template.name)
                 else:
-                    print "Note: Template " + template.name + " is not featured, ignoring."
+                    print("Note: Template " + template.name + " is not featured, ignoring.")
         elif work == "deleteTemplates":
-            for templatekey, template in eval(work).iteritems():
+            for templatekey, template in eval(work).items():
                 if DEBUG == 1:
-                    print "DEBUG: Deleting template " + template.name + " .."
+                    print("DEBUG: Deleting template " + template.name + " ..")
                 result = c.deleteTemplate({'id': template.id})
                 if result == 1:
-                    print "ERROR: Something went wrong!"
+                    print("ERROR: Something went wrong!")
                 else:
-                    print "Template " + template.name + " removed OK!"
+                    print("Template " + template.name + " removed OK!")
 
 if DEBUG == 1:
-    print "Note: We're done!"
+    print("Note: We're done!")

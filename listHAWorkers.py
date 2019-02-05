@@ -77,12 +77,12 @@ def handleArguments(argv):
             "exec"
         ])
     except getopt.GetoptError as e:
-        print "Error: " + str(e)
-        print help
+        print("Error: " + str(e))
+        print(help)
         sys.exit(2)
     for opt, arg in opts:
         if opt == '-h':
-            print help
+            print(help)
             sys.exit()
         elif opt in ("-s", "--mysqlserver"):
             mysqlHost = arg
@@ -103,7 +103,7 @@ def handleArguments(argv):
 
     # We need at least these vars
     if len(mysqlHost) == 0:
-        print help
+        print(help)
         sys.exit()
 
 # Parse arguments
@@ -114,19 +114,19 @@ if __name__ == "__main__":
 s = cloudstacksql.CloudStackSQL(DEBUG, DRYRUN)
 
 if DEBUG == 1:
-    print "Warning: Debug mode is enabled!"
+    print("Warning: Debug mode is enabled!")
 
 if DRYRUN == 1:
-    print "Warning: dry-run mode is enabled, not running any commands!"
+    print("Warning: dry-run mode is enabled, not running any commands!")
 
 # Connect MySQL
 result = s.connectMySQL(mysqlHost, mysqlPasswd)
 if result > 0:
-    print "Error: MySQL connection failed"
+    print("Error: MySQL connection failed")
     sys.exit(1)
 elif DEBUG == 1:
-    print "DEBUG: MySQL connection successful"
-    print s.conn
+    print("DEBUG: MySQL connection successful")
+    print(s.conn)
 
 haworkers = s.getHAWorkerData(hypervisorName)
 counter = 0
@@ -175,7 +175,7 @@ for (domain,vmname, vm_type, state, created, taken, step, hypervisor, mgtname,
 
 # Disconnect MySQL
 s.disconnectMySQL()
-print t.get_string(sortby="VM")
+print(t.get_string(sortby="VM"))
 
 if plainDisplay == 0:
-    print "Note: Found " + str(counter) + " HA workers."
+    print("Note: Found " + str(counter) + " HA workers.")

@@ -34,7 +34,7 @@ class hypervisor(object):
 
     # Check if we are really offline
     def check_offline(self, host):
-        print "Note: Waiting for " + host.name + " to go offline"
+        print("Note: Waiting for " + host.name + " to go offline")
         while os.system("ping -c 1 " + host.ipaddress + " 2>&1 >/dev/null") == 0:
             # Progress indication
             sys.stdout.write(".")
@@ -42,13 +42,13 @@ class hypervisor(object):
             time.sleep(5)
         # Remove progress indication
         sys.stdout.write("\033[F")
-        print "Note: Host " + host.name + " is now offline!                           "
+        print("Note: Host " + host.name + " is now offline!                           ")
         time.sleep(120)
 
     # Execute script on hypervisor
     def exec_script_on_hypervisor(self, host, script):
         script = script.split('/')[-1]
-        print "Note: Executing script '%s' on host %s.." % (script, host.name)
+        print("Note: Executing script '%s' on host %s.." % (script, host.name))
         try:
             with settings(show('output'), host_string=self.ssh_user + "@" + host.ipaddress):
                 return fab.run("bash /tmp/" + script)

@@ -25,18 +25,18 @@ import re
 # Import our dependencies
 import smtplib
 import string
-import urllib2
+import urllib.request, urllib.error, urllib.parse
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 # Import the class we depend on
 from os.path import expanduser
 from random import choice
-from urlparse import urlparse
+from urllib.parse import urlparse
 
 import time
 from prettytable import PrettyTable
 
-from cloudstackopsbase import *
+from .cloudstackopsbase import *
 
 # Marvin
 try:
@@ -46,22 +46,22 @@ try:
     from marvin.cloudstackAPI import *
     from marvin import cloudstackAPI
 except:
-    print "Error: Please install Marvin to talk to the CloudStack API:"
-    print "       pip install ./marvin/Marvin-0.1.0.tar.gz (file is in this repository)"
+    print("Error: Please install Marvin to talk to the CloudStack API:")
+    print("       pip install ./marvin/Marvin-0.1.0.tar.gz (file is in this repository)")
     sys.exit(1)
 # Colored terminals
 try:
     from clint.textui import colored
 except:
-    print "Error: Please install clint library to support color in the terminal:"
-    print "       pip install clint"
+    print("Error: Please install clint library to support color in the terminal:")
+    print("       pip install clint")
     sys.exit(1)
 # Exoscale CS library
 try:
     from cs import CloudStack
 except:
-    print "Error: Please install cs library to talk to Cosmic API:"
-    print "       pip install cs"
+    print("Error: Please install cs library to talk to Cosmic API:")
+    print("       pip install cs")
     sys.exit(1)
 
 class CloudStackOps(CloudStackOpsBase):
@@ -90,14 +90,14 @@ class CloudStackOps(CloudStackOpsBase):
 
 
     def printWelcome(self):
-        print colored.green("Welcome to CloudStackOps")
+        print(colored.green("Welcome to CloudStackOps"))
 
     # Check if we run in a screen session
     def check_screen_sty(self):
         try:
             if len(os.environ['STY']) > 0:
                 if self.DEBUG == 1:
-                    print "DEBUG: We're running in screen."
+                    print("DEBUG: We're running in screen.")
                 return True
         except:
             return False
@@ -107,7 +107,7 @@ class CloudStackOps(CloudStackOpsBase):
         try:
             if len(os.environ['TMUX']) > 0:
                 if self.DEBUG == 1:
-                    print "DEBUG: We're running in tmux."
+                    print("DEBUG: We're running in tmux.")
                 return True
         except:
             return False
@@ -117,7 +117,7 @@ class CloudStackOps(CloudStackOpsBase):
         try:
             if os.environ['TERM'] == "screen":
                 if self.DEBUG == 1:
-                    print "DEBUG: We're running in a screen-alike program."
+                    print("DEBUG: We're running in a screen-alike program.")
                 return True
         except:
             return False
@@ -129,12 +129,12 @@ class CloudStackOps(CloudStackOpsBase):
             return True
         if self.check_screen_term():
             return True
-        print colored.red(
-            "Warning: You are NOT running inside screen/tmux. Please start a screen/tmux session to keep commands running in case you get disconnected!")
+        print(colored.red(
+            "Warning: You are NOT running inside screen/tmux. Please start a screen/tmux session to keep commands running in case you get disconnected!"))
 
     # Handle unwanted CTRL+C presses
     def catch_ctrl_C(self, sig, frame):
-        print "Warning: do not interupt! If you really want to quit, use kill -9."
+        print("Warning: do not interupt! If you really want to quit, use kill -9.")
 
     # Read config files
     def readConfigFile(self):
@@ -145,11 +145,11 @@ class CloudStackOps(CloudStackOpsBase):
 
         # Read config for CloudStack API credentials
         try:
-            print "Note: Trying to use API credentials from CloudMonkey profile '" + self.configProfileName + "'"
+            print("Note: Trying to use API credentials from CloudMonkey profile '" + self.configProfileName + "'")
             self.parseConfig(self.configProfileNameFullPath)
         except:
-            print colored.yellow(
-                "Warning: Cannot read or parse CloudMonkey profile '" + self.configProfileName + "'. Trying local config file..")
+            print(colored.yellow(
+                "Warning: Cannot read or parse CloudMonkey profile '" + self.configProfileName + "'. Trying local config file.."))
             tryLocal = True
 
         if self.configProfileName == "config":
@@ -158,18 +158,18 @@ class CloudStackOps(CloudStackOpsBase):
         if tryLocal:
             # Read config for CloudStack API credentials
             try:
-                print "Note: Trying to use API credentials from local config profile '" + self.configProfileName + "'"
+                print("Note: Trying to use API credentials from local config profile '" + self.configProfileName + "'")
                 self.parseConfig(self.configfile)
             except:
-                print colored.yellow(
-                    "Warning: Cannot read or parse profile '" + self.configProfileName + "' from local config file either")
+                print(colored.yellow(
+                    "Warning: Cannot read or parse profile '" + self.configProfileName + "' from local config file either"))
 
         # Do we have all required settings?
         if self.apiurl == '' or (self.apikey == '' or self.secretkey == '') and (
                 self.username == '' or self.password == ''):
-            print colored.red(
-                "Error: Could not load CloudStack API settings from local config file, nor from CloudMonkey config file. Halting.")
-            print "Hint: Specify a CloudMonkey profile or setup the local config file 'config'. See documentation."
+            print(colored.red(
+                "Error: Could not load CloudStack API settings from local config file, nor from CloudMonkey config file. Halting."))
+            print("Hint: Specify a CloudMonkey profile or setup the local config file 'config'. See documentation.")
             sys.exit(2)
 
         # Read our own config file for some more settings
@@ -181,28 +181,28 @@ class CloudStackOps(CloudStackOpsBase):
             self.mail_from = config.get('mail', 'mail_from')
             self.errors_to = config.get('mail', 'errors_to')
         except:
-            print "Error: Cannot read or parse CloudStackOps config file '" + self.configfile + "'"
-            print "Hint: Setup the local config file 'config', using 'config.sample' as a starting point. See documentation."
+            print("Error: Cannot read or parse CloudStackOps config file '" + self.configfile + "'")
+            print("Hint: Setup the local config file 'config', using 'config.sample' as a starting point. See documentation.")
             sys.exit(1)
 
     # Read and parse config file
     def parseConfig(self, configFile):
         if self.DEBUG == 1:
-            print "Debug: Parsing config file " + configFile
+            print("Debug: Parsing config file " + configFile)
         config = ConfigParser.RawConfigParser()
         config.read(configFile)
         if self.DEBUG == 1:
-            print "Selected profile: " + self.configProfileName
+            print("Selected profile: " + self.configProfileName)
         # lets figure out your config:
         if config.has_option('core', 'profile'):
             if self.configProfileName == 'config':
                 # cloudmonkey > 5.2.x config without the commandline profile
                 # option
                 if self.DEBUG == 1:
-                    print "Cloudmonkey > 5.2.x configfile found, no profile option, use profile directive from configfile"
+                    print("Cloudmonkey > 5.2.x configfile found, no profile option, use profile directive from configfile")
                 profile = config.get('core', 'profile')
                 if self.DEBUG == 1:
-                    print "Debug: profile " + profile
+                    print("Debug: profile " + profile)
                 self.apikey = config.get(profile, 'apikey')
                 self.secretkey = config.get(profile, 'secretkey')
                 self.username = config.get(profile, 'username')
@@ -212,7 +212,7 @@ class CloudStackOps(CloudStackOpsBase):
                 # cloudmonkey > 5.2.x config with the commandline profile
                 # option
                 if self.DEBUG == 1:
-                    print "Cloudmonkey > 5.2.x configfile found, profile option given"
+                    print("Cloudmonkey > 5.2.x configfile found, profile option given")
                 self.apikey = config.get(self.configProfileName, 'apikey')
                 self.secretkey = config.get(self.configProfileName, 'secretkey')
                 self.username = config.get(self.configProfileName, 'username')
@@ -233,7 +233,7 @@ class CloudStackOps(CloudStackOpsBase):
         else:
             # cloudmonkey < 5.2.x config
             if self.DEBUG == 1:
-                print "Cloudmonkey < 5.2.x configfile found"
+                print("Cloudmonkey < 5.2.x configfile found")
             self.apikey = config.get('user', 'apikey')
             self.secretkey = config.get('user', 'secretkey')
             self.username = config.get('user', 'username')
@@ -244,15 +244,15 @@ class CloudStackOps(CloudStackOpsBase):
             self.apiurl = self.apiprotocol + '://' + self.apiserver + \
                           ':' + self.apiport + config.get('server', 'path')
         if self.DEBUG == 1:
-            print "URL: " + self.apiurl
+            print("URL: " + self.apiurl)
 
     # create connection to CloudStack API
     def initCloudStackAPI(self):
         self.readConfigFile()
         log = logging.getLogger()
         if self.DEBUG == 1:
-            print "Debug: apiserver=" + self.apiserver + " apiKey=" + self.apikey + " securityKey=" + self.secretkey + " username=" + self.username + " password=" + self.password + " port=" + str(
-                self.apiport) + " scheme=" + self.apiprotocol
+            print("Debug: apiserver=" + self.apiserver + " apiKey=" + self.apikey + " securityKey=" + self.secretkey + " username=" + self.username + " password=" + self.password + " port=" + str(
+                self.apiport) + " scheme=" + self.apiprotocol)
         try:
             if self.apikey:
                 self.cloudstack = cloudConnection(
@@ -265,7 +265,7 @@ class CloudStackOps(CloudStackOpsBase):
                         self.apiport),
                     scheme=self.apiprotocol)
             elif self.password:
-                print "Using username + password for connection!"
+                print("Using username + password for connection!")
                 self.cloudstack = cloudConnection(
                     self.apiserver,
                     user=self.username,
@@ -274,9 +274,9 @@ class CloudStackOps(CloudStackOpsBase):
                     logging=log,
                     scheme=self.apiprotocol)
             if self.DEBUG == 1:
-                print self.cloudstack
+                print(self.cloudstack)
         except:
-            print "Error connecting to CloudStack. Are you using the right Marvin version? See README file. Halting."
+            print("Error connecting to CloudStack. Are you using the right Marvin version? See README file. Halting.")
             sys.exit(1)
         try:
             self.exoCsApi = CloudStack(
@@ -285,11 +285,11 @@ class CloudStackOps(CloudStackOpsBase):
                 secret=self.secretkey
             )
         except:
-            print "Error connecting to Cosmic. Halting."
+            print("Error connecting to Cosmic. Halting.")
             sys.exit(1)
 
         # Print name of cloud we're connected to
-        print "Note: Connected to '" + self.getCloudName() + "'"
+        print("Note: Connected to '" + self.getCloudName() + "'")
 
     # Call the CloudStack API
     def _callAPI(self, apicall):
@@ -301,23 +301,23 @@ class CloudStackOps(CloudStackOpsBase):
         try:
             data = self.cloudstack.marvin_request(apicall)
             if data is None and self.DEBUG == 1:
-                print "Warning: Received None object from CloudStack API"
+                print("Warning: Received None object from CloudStack API")
 
             if self.DEBUG == 1:
-                print "DEBUG: received data:"
-                print data
+                print("DEBUG: received data:")
+                print(data)
 
         except Exception as err:
             # org.apache.cloudstack.api.ApiErrorCode Enum Reference
             if "errorCode: 432" in str(err):
-                print "Error: Please try again with --non-admin-credentials argument, or use admin API credentials."
-                print "Error: Unsupported API call: %s" % str(apicall)[1:str(apicall).index(" object at ")]
+                print("Error: Please try again with --non-admin-credentials argument, or use admin API credentials.")
+                print("Error: Unsupported API call: %s" % str(apicall)[1:str(apicall).index(" object at ")])
                 sys.exit()
             else:
-                print "Error: " + str(err)
+                print("Error: " + str(err))
             return 1
-        except urllib2.HTTPError as e:
-            print "Error: Command failed: " + str(e.msg)
+        except urllib.error.HTTPError as e:
+            print("Error: Command failed: " + str(e.msg))
             return 1
 
         return data
@@ -328,7 +328,7 @@ class CloudStackOps(CloudStackOpsBase):
             return dict(
                 (k,
                  self.remove_empty_values(v)) for k,
-                                                  v in d.iteritems() if v and self.remove_empty_values(v))
+                                                  v in d.items() if v and self.remove_empty_values(v))
         else:
             return d
 
@@ -382,7 +382,7 @@ class CloudStackOps(CloudStackOpsBase):
         elif csApiCall == "listDiskOfferings":
             apicall = listDiskOfferings.listDiskOfferingsCmd()
         else:
-            print "No API command to call"
+            print("No API command to call")
             sys.exit(1)
 
         if isProjectVm == 'true':
@@ -406,11 +406,11 @@ class CloudStackOps(CloudStackOpsBase):
         try:
             data = self.cloudstack.marvin_request(apicall)
             if (data is None or len(data) == 0) and self.DEBUG == 1:
-                print "Warning: Received None object from CloudStack API"
+                print("Warning: Received None object from CloudStack API")
 
             if self.DEBUG == 1:
-                print "DEBUG: received data:"
-                print data
+                print("DEBUG: received data:")
+                print(data)
 
             # Check for a result
             if data:
@@ -419,37 +419,37 @@ class CloudStackOps(CloudStackOpsBase):
                     if csname == d.name or csname == d.instancename:
                         found_counter += 1
                         if self.DEBUG == 1:
-                            print "Found in loop " + str(d.name) + " counter = " + str(found_counter)
+                            print("Found in loop " + str(d.name) + " counter = " + str(found_counter))
 
                         csnameID = d.id
                     elif self.DEBUG == 1:
-                        print "Not found in loop " + str(d.name) + " counter = " + str(found_counter)
+                        print("Not found in loop " + str(d.name) + " counter = " + str(found_counter))
 
                 if len(csnameID) < 1:
-                    print "Warning: '%s' could not be located in CloudStack database using '%s' -- Exit." % (
-                        csname, csApiCall)
+                    print("Warning: '%s' could not be located in CloudStack database using '%s' -- Exit." % (
+                        csname, csApiCall))
                     sys.exit(1)
 
                 if found_counter > 1:
-                    print "Error: '%s' could not be located in CloudStack database using '%s' because it is not unique -- Exit." % (
-                        csname, csApiCall)
+                    print("Error: '%s' could not be located in CloudStack database using '%s' because it is not unique -- Exit." % (
+                        csname, csApiCall))
                     sys.exit(1)
 
             else:
-                print "Error: '%s' could not be located in CloudStack database using '%s' -- exit!" % (
-                    csname, csApiCall)
+                print("Error: '%s' could not be located in CloudStack database using '%s' -- exit!" % (
+                    csname, csApiCall))
                 # Exit if not found
                 sys.exit(1)
 
         except Exception as err:
-            print "Error: " + str(err)
+            print("Error: " + str(err))
             return 1
-        except urllib2.HTTPError as e:
-            print "Error: Command failed: " + str(e.msg)
+        except urllib.error.HTTPError as e:
+            print("Error: Command failed: " + str(e.msg))
             return 1
 
         if self.DEBUG == 1:
-            print "DEBUG: Found: '%s' with ID %s." % (csname, csnameID)
+            print("DEBUG: Found: '%s' with ID %s." % (csname, csnameID))
 
         return csnameID
 
@@ -466,7 +466,7 @@ class CloudStackOps(CloudStackOpsBase):
         toStorageData = choice(data)
         targetStorageID = toStorageData.id
         if self.DEBUG == 1:
-            print "DEBUG: Selected storage pool: " + targetStorageID + " (" + toStorageData.name + ")" + " for cluster " + clusterID
+            print("DEBUG: Selected storage pool: " + targetStorageID + " (" + toStorageData.name + ")" + " for cluster " + clusterID)
 
         return targetStorageID
 
@@ -504,12 +504,12 @@ class CloudStackOps(CloudStackOpsBase):
             if pool_utilisation < lowest_pool_utilisation:
                 lowest_pool_utilisation = pool_utilisation
                 if self.DEBUG == 1:
-                    print "Debug: Pool %s has utilisation of %s %%, currently lowest. Checking others" % (
-                        pool_data.name, str(pool_utilisation_display))
+                    print("Debug: Pool %s has utilisation of %s %%, currently lowest. Checking others" % (
+                        pool_data.name, str(pool_utilisation_display)))
                 data = pool_data
 
         if data is not None:
-            print "Note: Selected Pool %s" % data.name
+            print("Note: Selected Pool %s" % data.name)
             return data
         else:
             return False
@@ -567,7 +567,7 @@ class CloudStackOps(CloudStackOpsBase):
                 for d in dedicatedhosts:
                     if h.name == d.name:
                         if self.DEBUG == 1:
-                            print "Remove dedicated host from the list: " + str(d.name)
+                            print("Remove dedicated host from the list: " + str(d.name))
                         clusterhostdetails.remove(h)
         return clusterhostdetails
 
@@ -705,19 +705,19 @@ class CloudStackOps(CloudStackOpsBase):
                     {'networkid': nic.networkid, 'state': 'Running'})
                 if routersOfNetwork is None or len(routersOfNetwork) != 2:
                     if silent == 'True':
-                        print "Error: Cannot find the redundant peer of this router. Please make sure it is running before continuing."
+                        print("Error: Cannot find the redundant peer of this router. Please make sure it is running before continuing.")
                     return 1
                 for redundantRouter in routersOfNetwork:
                     if routername == redundantRouter.name:
                         if silent == 'True':
-                            print "Note: Double check OK for router " + routername + ": Found myself."
+                            print("Note: Double check OK for router " + routername + ": Found myself.")
                     else:
                         routerPeerData = redundantRouter
                         peerHostData = self.getHostData(
                             {'hostname': routerPeerData.hostname})
                         if silent == 'True':
-                            print "Note: The redundant peer of router " + routername + " is " + routerPeerData.name + " running on " + routerPeerData.hostname + " (" + \
-                                  peerHostData[0].clustername + " / " + peerHostData[0].podname + ")."
+                            print("Note: The redundant peer of router " + routername + " is " + routerPeerData.name + " running on " + routerPeerData.hostname + " (" + \
+                                  peerHostData[0].clustername + " / " + peerHostData[0].podname + ").")
                         returnData = {
                             "guestnetworkid": router.guestnetworkid,
                             "router": router,
@@ -805,7 +805,7 @@ class CloudStackOps(CloudStackOpsBase):
                 # Call CloudStack API
                 return self._callAPI(apicall)
         except Timeout.Timeout:
-            print "Timeout!"
+            print("Timeout!")
             return 1
 
     # Start virtualvirtualmachine
@@ -821,7 +821,7 @@ class CloudStackOps(CloudStackOpsBase):
                 # Call CloudStack API
                 return self._callAPI(apicall)
         except Timeout.Timeout:
-            print "Timeout!"
+            print("Timeout!")
             return 1
 
     # migrateVirtualMachine
@@ -853,14 +853,14 @@ class CloudStackOps(CloudStackOpsBase):
         if not 'hostid' in args:
             systemvm = self.getRouterData({'id': args['vmid'], 'isProjectVm': args['projectParam']})[0]
             if self.DEBUG:
-                print "Received systemvm:"
-                print systemvm
+                print("Received systemvm:")
+                print(systemvm)
 
             requested_memory = self.get_needed_memory(systemvm)
             host_data = self.getHostData({'hostid': systemvm.hostid})[0]
             if self.DEBUG:
-                print "Received host_data:"
-                print host_data
+                print("Received host_data:")
+                print(host_data)
             migration_host = self.findBestMigrationHost(
                 host_data.clusterid,
                 host_data.name,
@@ -1029,17 +1029,17 @@ class CloudStackOps(CloudStackOpsBase):
         try:
             data = self.cloudstack.marvin_request(apicall)
             if (data is None) and self.DEBUG == 1:
-                print "Warning: Received None object from CloudStack API"
+                print("Warning: Received None object from CloudStack API")
 
             if self.DEBUG == 1:
-                print "DEBUG: received data:"
-                print data
+                print("DEBUG: received data:")
+                print(data)
 
         except Exception as err:
-            print "Error: " + str(err)
+            print("Error: " + str(err))
             return 1
-        except urllib2.HTTPError as e:
-            print "Error: Command failed: " + str(e.msg)
+        except urllib.error.HTTPError as e:
+            print("Error: Command failed: " + str(e.msg))
             return 1
 
         return data
@@ -1154,10 +1154,10 @@ class CloudStackOps(CloudStackOpsBase):
             str(args['projectParam'])) if 'projectParam' in args else 'false'
 
         if routername is None:
-            print "Error: required field 'routername' not supplied."
+            print("Error: required field 'routername' not supplied.")
             return 1
         if toClusterID is None:
-            print "Error: required field 'toClusterID' not supplied."
+            print("Error: required field 'toClusterID' not supplied.")
             return 1
 
         # get router data
@@ -1174,21 +1174,21 @@ class CloudStackOps(CloudStackOpsBase):
         storagepooltags = self.getStoragePoolTags(toClusterID)
 
         if self.DEBUG == 1:
-            print "Debug: storage tags of service offering: " + storagetags
-            print "Debug: storage tags of storage pool: " + storagepooltags
+            print("Debug: storage tags of service offering: " + storagetags)
+            print("Debug: storage tags of storage pool: " + storagepooltags)
 
         if storagetags == '':
-            print "Warning: router service offering has empty storage tags."
+            print("Warning: router service offering has empty storage tags.")
 
         if storagetags != '' and storagepooltags != storagetags and self.FORCE == 0:
             if self.DEBUG == 1:
-                print "Error: cannot do this: storage tags from provided storage pool '" + storagepooltags + "' do not match your vm's service offering '" + storagetags + "'"
+                print("Error: cannot do this: storage tags from provided storage pool '" + storagepooltags + "' do not match your vm's service offering '" + storagetags + "'")
             return 1
         elif storagetags != '' and storagepooltags != storagetags and self.FORCE == 1:
             if self.DEBUG == 1:
-                print "Warning: storage tags from provided storage pool '" + storagepooltags + "' do not match your vm's service offering '" + storagetags + "'. Since you used --FORCE you probably know what you manually need to edit in the database."
+                print("Warning: storage tags from provided storage pool '" + storagepooltags + "' do not match your vm's service offering '" + storagetags + "'. Since you used --FORCE you probably know what you manually need to edit in the database.")
         elif self.DEBUG == 1:
-            print "Note: Storage tags look OK."
+            print("Note: Storage tags look OK.")
 
         return 0
 
@@ -1204,10 +1204,10 @@ class CloudStackOps(CloudStackOpsBase):
             str(args['projectParam'])) if 'projectParam' in args else 'false'
 
         if routername is None:
-            print "Error: required field 'routername' not supplied."
+            print("Error: required field 'routername' not supplied.")
             return 1
         if toClusterID is None:
-            print "Error: required field 'toClusterID' not supplied."
+            print("Error: required field 'toClusterID' not supplied.")
             return 1
 
         # get router data
@@ -1221,7 +1221,7 @@ class CloudStackOps(CloudStackOpsBase):
             "host")
 
         if self.DEBUG == 1:
-            print "Debug: host tags of router: " + hosttags
+            print("Debug: host tags of router: " + hosttags)
 
         # Search for hosttags on the selected cluster
         toClusterHostsData = self.getHostsFromCluster(toClusterID)
@@ -1229,19 +1229,19 @@ class CloudStackOps(CloudStackOpsBase):
         if toClusterHostsData is not None:
             for host in toClusterHostsData:
                 if self.DEBUG == 1:
-                    print "Debug: Checking host tags of host " + host.name
+                    print("Debug: Checking host tags of host " + host.name)
                 if host.hosttags is not None:
                     if hosttags in host.hosttags:
                         foundHostTag = True
 
         if hosttags != '' and foundHostTag == False and self.FORCE == 0:
             if self.DEBUG == 1:
-                print "Error: cannot do this: the hosts in your selected cluster do not have the tags '" + hosttags + "' that are required by your router's service offering."
+                print("Error: cannot do this: the hosts in your selected cluster do not have the tags '" + hosttags + "' that are required by your router's service offering.")
             return 1
         elif self.FORCE == 1 and self.DEBUG == 1:
-            print "Warning: the hosts in your selected cluster do not have your vm's service offering '" + hosttags + "', so this will not work. Since you used --FORCE you probably know what you're doing."
+            print("Warning: the hosts in your selected cluster do not have your vm's service offering '" + hosttags + "', so this will not work. Since you used --FORCE you probably know what you're doing.")
         elif self.DEBUG == 1:
-            print "Note: At least one of the hosts in the cluster has the required host tag '" + hosttags + "' set, so we can continue."
+            print("Note: At least one of the hosts in the cluster has the required host tag '" + hosttags + "' set, so we can continue.")
 
         return 0
 
@@ -1288,7 +1288,7 @@ class CloudStackOps(CloudStackOpsBase):
     def checkZone(self, routerClusterID, toClusterID):
         routerClusterData = self.listClusters({'clusterid': routerClusterID})
         if routerClusterData is None:
-            print "Error: could not find cluster with id " + routerClusterID
+            print("Error: could not find cluster with id " + routerClusterID)
             return 1
 
         targetStorageID = self.getStoragePool(toClusterID)[0].id
@@ -1296,12 +1296,12 @@ class CloudStackOps(CloudStackOpsBase):
         targetStoragePoolData = self.getStoragePoolData(targetStorageID)
 
         if self.DEBUG == 1:
-            print "Debug: You selected a storage pool with tags '" + storagepooltags + "'"
+            print("Debug: You selected a storage pool with tags '" + storagepooltags + "'")
 
         # Check zone of current and destination clusters
         if targetStoragePoolData[0].zonename != routerClusterData[0].zonename:
-            print "Error: cannot do this: Router is currently in zone " + routerClusterData[
-                0].zonename + " and you selected a cluster in zone " + targetStoragePoolData[0].zonename + "."
+            print("Error: cannot do this: Router is currently in zone " + routerClusterData[
+                0].zonename + " and you selected a cluster in zone " + targetStoragePoolData[0].zonename + ".")
             return 1
 
         # All OK
@@ -1314,7 +1314,7 @@ class CloudStackOps(CloudStackOpsBase):
         if clusterHostsData is not None:
             for host in clusterHostsData:
                 if self.DEBUG == 1:
-                    print "Debug: Checking host tags of host " + host.name
+                    print("Debug: Checking host tags of host " + host.name)
                 if host.hosttags is not None:
                     if hosttags in host.hosttags:
                         foundHostTag = True
@@ -1462,7 +1462,7 @@ class CloudStackOps(CloudStackOpsBase):
                 continue
 
             if self.DEBUG == 1:
-                print str(accountType) + " " + domain.id + " " + listAll
+                print(str(accountType) + " " + domain.id + " " + listAll)
 
             domainUsers = self.listUsers(accountType, domain.id, listAll)
             domainData[domain.id] = []
@@ -1488,7 +1488,7 @@ class CloudStackOps(CloudStackOpsBase):
                 foundHostData = host
 
         if self.DRYRUN == 1:
-            print "\nNote: Would have prepared host '" + hostname + "' for maintenance"
+            print("\nNote: Would have prepared host '" + hostname + "' for maintenance")
             return False
         else:
             # Get vm count
@@ -1498,23 +1498,23 @@ class CloudStackOps(CloudStackOpsBase):
             if foundHostData.hypervisor == "KVM":
                 vmcount = self.kvm.host_get_vms(
                     foundHostData)
-            print "Note: Preparing host '" + hostname + "' for maintenance, " + str(vmcount) + " VMs to migrate.."
+            print("Note: Preparing host '" + hostname + "' for maintenance, " + str(vmcount) + " VMs to migrate..")
 
             # Maintenance
             maintenanceResult = self.prepareHostForMaintenance(hostID)
 
         # Did it work?
         if maintenanceResult is None or maintenanceResult == 1:
-            print "Error: Got an empty result from prepareForMaintenance call"
-            print "Error: Please investigate manually. Halting."
+            print("Error: Got an empty result from prepareForMaintenance call")
+            print("Error: Please investigate manually. Halting.")
             return False
 
         if self.DEBUG == 1:
-            print maintenanceResult
+            print(maintenanceResult)
 
         if maintenanceResult.resourcestate == "PrepareForMaintenance":
-            print "Note: Host '" + hostname + "' is in state '" + maintenanceResult.resourcestate + "'"
-            print "Note: Waiting for it to migrate all vm's..."
+            print("Note: Host '" + hostname + "' is in state '" + maintenanceResult.resourcestate + "'")
+            print("Note: Waiting for it to migrate all vm's...")
 
         # Defaults
         vmcount = 0
@@ -1540,21 +1540,21 @@ class CloudStackOps(CloudStackOpsBase):
                     pass
 
             if foundHostData.resourcestate == "PrepareForMaintenance":
-                print "Note: Resource state currently is '" + foundHostData.resourcestate + \
-                      "'. Number of VMs still to be migrated: " + str(vmcount) + "    "
+                print("Note: Resource state currently is '" + foundHostData.resourcestate + \
+                      "'. Number of VMs still to be migrated: " + str(vmcount) + "    ")
                 sys.stdout.write("\033[F")
 
                 # Wait before checking again
                 time.sleep(6)
 
             elif foundHostData.resourcestate == "Enabled":
-                print "Note: Resource state currently is '" + foundHostData.resourcestate + \
-                      "', maintenance must have been cancelled, returning"
+                print("Note: Resource state currently is '" + foundHostData.resourcestate + \
+                      "', maintenance must have been cancelled, returning")
                 break
             else:
                 # lots of spaces to clear previous line
-                print "Note: Resource state currently is '" + foundHostData.resourcestate + \
-                      "', that's looking good! Returning..                "
+                print("Note: Resource state currently is '" + foundHostData.resourcestate + \
+                      "', that's looking good! Returning..                ")
                 break
 
             # Return if the same for 100x6 sec
@@ -1563,30 +1563,30 @@ class CloudStackOps(CloudStackOpsBase):
             else:
                 vmcount_same_counter = 0
             if vmcount_same_counter >= 100:
-                print "Warning: The number of vm's still to migrate is still " + vmcount + \
-                      " for 600s, returning and trying manual migration instead"
+                print("Warning: The number of vm's still to migrate is still " + vmcount + \
+                      " for 600s, returning and trying manual migration instead")
                 break
 
             if self.DEBUG == 1:
-                print "vmcount: " + str(vmcount) + " vmcount_previous: " + str(vmcount_previous)
+                print("vmcount: " + str(vmcount) + " vmcount_previous: " + str(vmcount_previous))
 
             # Remember vmcount
             vmcount_previous = vmcount
 
         # Final result
         if foundHostData.resourcestate == "Maintenance":
-            print "Note: Host '" + hostname + "' is in state Maintenance!"
+            print("Note: Host '" + hostname + "' is in state Maintenance!")
             return True
         elif foundHostData.resourcestate == "ErrorInMaintenance":
-            print "Note: Host '" + hostname + "' did not yet enter Maintenance.. will try to migrate vm's manually"
+            print("Note: Host '" + hostname + "' did not yet enter Maintenance.. will try to migrate vm's manually")
             return False
         elif foundHostData.resourcestate == "Enabled":
-            print "Note: Host '" + hostname + "' maintenance was cancelled outside of script.. " \
-                                              "will try to migrate vm's manually"
+            print("Note: Host '" + hostname + "' maintenance was cancelled outside of script.. " \
+                                              "will try to migrate vm's manually")
             return False
         else:
-            print "Note: Host '" + hostname + "' did not yet enter Maintenance. Cancel maintenance and trying " \
-                                              "to migrate vm's manually"
+            print("Note: Host '" + hostname + "' did not yet enter Maintenance. Cancel maintenance and trying " \
+                                              "to migrate vm's manually")
             self.cancelHostMaintenance(hostID)
             return False
 
@@ -1610,7 +1610,7 @@ class CloudStackOps(CloudStackOpsBase):
     # print hypervisor table
     def printHypervisors(self, clusterid, poolmaster=False, checkBonds=False, hypervisor="XenServer"):
 
-        print "Note: Checking.."
+        print("Note: Checking..")
         clusterHostsData = self.getAllHostsFromCluster(clusterid)
 
         # Start table
@@ -1630,7 +1630,7 @@ class CloudStackOps(CloudStackOpsBase):
             pm = "n/a"
             if hypervisor == "XenServer" and not poolmaster:
                 if self.DEBUG == 1:
-                    print "Debug: Looking for poolmaster"
+                    print("Debug: Looking for poolmaster")
                 poolmaster = self.xenserver.get_poolmaster(clusterhost)
 
             if hypervisor == "XenServer":
@@ -1681,7 +1681,7 @@ class CloudStackOps(CloudStackOpsBase):
         # Remove progress indication
         sys.stdout.write("\033[F")
         # Print table
-        print t.get_string(sortby="Hostname")
+        print(t.get_string(sortby="Hostname"))
 
     # Print cluster table
     def printCluster(self, clusterID, hypervisor="XenServer"):
@@ -1725,7 +1725,7 @@ class CloudStackOps(CloudStackOpsBase):
                        cluster.podname,
                        cluster.zonename])
         # Print table
-        print t
+        print(t)
 
     # Check vm's still running on this host
     def getVirtualMachinesRunningOnHost(self, hostID):
@@ -1747,7 +1747,7 @@ class CloudStackOps(CloudStackOpsBase):
         all_vmdata += svms
 
         if self.DEBUG:
-            print all_vmdata
+            print(all_vmdata)
 
         return all_vmdata
 
@@ -1788,33 +1788,33 @@ class CloudStackOps(CloudStackOpsBase):
                 # Available memory in Bytes
                 memoryavailable = h.memorytotal - h.memoryallocated
                 if self.DEBUG == 1:
-                    print "Note: host " + h.name + " has free mem: " + str(
+                    print("Note: host " + h.name + " has free mem: " + str(
                         memoryavailable / 1024 / 1024) + "MB and we need " + \
-                          str(requestedMemory / 1024 / 1024) + " MB"
+                          str(requestedMemory / 1024 / 1024) + " MB")
 
                 # vm.memory is in Mega Bytes
                 if requestedMemory is not None:
                     if memoryavailable < requestedMemory:
                         if self.DEBUG == 1:
-                            print "Warning: Skipping " + h.name + " as it has not enough memory."
+                            print("Warning: Skipping " + h.name + " as it has not enough memory.")
                         continue
 
                 # Find host with most memory free
                 if bestAvailableMemory == 0:
                     if self.DEBUG == 1:
-                        print "Note: Found possible migration host '" + h.name + "' with free memory: " + str(
-                            memoryavailable)
+                        print("Note: Found possible migration host '" + h.name + "' with free memory: " + str(
+                            memoryavailable))
                     migrationHost = h
                     bestAvailableMemory = memoryavailable
                 elif memoryavailable > bestAvailableMemory:
                     if self.DEBUG == 1:
-                        print "Note: Found better migration host '" + h.name + "' with free memory: " + str(
-                            memoryavailable)
+                        print("Note: Found better migration host '" + h.name + "' with free memory: " + str(
+                            memoryavailable))
                     migrationHost = h
                     bestAvailableMemory = memoryavailable
                 elif self.DEBUG == 1:
-                    print "Note: Found migration host '" + h.name + "' with free memory: " + str(
-                        memoryavailable) + " but there are already better (or equal) candidates so skipping this one"
+                    print("Note: Found migration host '" + h.name + "' with free memory: " + str(
+                        memoryavailable) + " but there are already better (or equal) candidates so skipping this one")
 
         return migrationHost
 
@@ -1826,21 +1826,21 @@ class CloudStackOps(CloudStackOpsBase):
         hostname = foundHostData.name
         to_slack = True
         if self.DEBUG == 1:
-            print hostData
-            print foundHostData
-            print hostname
+            print(hostData)
+            print(foundHostData)
+            print(hostname)
             to_slack = False
 
         # Check vm's still running on this host
         all_vmdata = self.getVirtualMachinesRunningOnHost(hostID)
 
         if all_vmdata is None:
-            print "Warning: No vm's to be moved found on '" + hostname + "'.."
+            print("Warning: No vm's to be moved found on '" + hostname + "'..")
         else:
             if self.DRYRUN == 1:
-                print "Note: Testing if we would be able to migrate the vm's on hypervisor '" + hostname + "':"
+                print("Note: Testing if we would be able to migrate the vm's on hypervisor '" + hostname + "':")
             else:
-                print "Note: Migrating the vm's on hypervisor '" + hostname + "':"
+                print("Note: Migrating the vm's on hypervisor '" + hostname + "':")
 
             for vmdata in all_vmdata:
                 if vmdata is None:
@@ -1868,7 +1868,7 @@ class CloudStackOps(CloudStackOpsBase):
                             hostname,
                             requested_memory)
                         if not migrationHost:
-                            print "\nError: No hosts with enough capacity to migrate vm's to. Please migrate manually to another cluster."
+                            print("\nError: No hosts with enough capacity to migrate vm's to. Please migrate manually to another cluster.")
                             sys.exit(1)
                         try:
                             message = "Live migrating vm %s to host %s" % (vm.name, migrationHost.name)
@@ -1904,11 +1904,11 @@ class CloudStackOps(CloudStackOpsBase):
                                     xapiresult, xapioutput = self.ssh.migrateVirtualMachineViaXapi(
                                         {'hostname': hostname, 'desthostname': migrationHost.name, 'vmname': instance})
                                     if self.DEBUG == 1:
-                                        print "Debug: Output: " + str(xapioutput) + " code " + str(xapiresult)
+                                        print("Debug: Output: " + str(xapioutput) + " code " + str(xapiresult))
                                 if foundHostData.hypervisor == "KVM":
                                     pass
                             elif self.DEBUG == 1:
-                                print "Debug: VM " + vm.name + " migrated OK"
+                                print("Debug: VM " + vm.name + " migrated OK")
                         except:
                             vmresult = 1
                         if vmresult == 1:
@@ -1925,7 +1925,7 @@ class CloudStackOps(CloudStackOpsBase):
         if self.DEBUG == 1:
             to_slack = False
 
-        for i, vm in self.vmshutpolicy.iteritems():
+        for i, vm in self.vmshutpolicy.items():
             if 'status' in self.vmshutpolicy[i]:
                 continue
             message = "Starting vm %s with ShutdownAndStart policy on host %s" % (vm['name'], vm['hostname'])
@@ -1974,10 +1974,10 @@ class CloudStackOps(CloudStackOpsBase):
         result = self._callAPI(apicall)
 
         if not result:
-            print "Error: Could not export vdi %s" % uuid
+            print("Error: Could not export vdi %s" % uuid)
             return False
         if self.DEBUG == 1:
-            print "DEBUG: received this result:" + str(result)
+            print("DEBUG: received this result:" + str(result))
         return result.volume.url
 
     def detach_iso(self, virtualmachineid):
@@ -2001,8 +2001,8 @@ class CloudStackOps(CloudStackOpsBase):
                     {'serviceofferingid': system_vm.serviceofferingid, 'issystem': 'true'})
                 system_vm.memory = serviceOfferingData[0].memory
                 if self.DEBUG == 1:
-                    print "DEBUG: Set memory to the value in the service offering: %s" % str(
-                        serviceOfferingData[0].memory)
+                    print("DEBUG: Set memory to the value in the service offering: %s" % str(
+                        serviceOfferingData[0].memory))
                     # Else, fail back to a 1GB default
             else:
                 system_vm.memory = 1024

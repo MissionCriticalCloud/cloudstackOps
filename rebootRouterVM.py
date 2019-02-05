@@ -63,11 +63,11 @@ def handleArguments(argv):
             argv, "hc:r:p", [
                 "config-profile=", "routerinstance-name=", "debug", "exec", "cleanup", "is-projectrouter", "only-when-required"])
     except getopt.GetoptError:
-        print help
+        print(help)
         sys.exit(2)
     for opt, arg in opts:
         if opt == '-h':
-            print help
+            print(help)
             sys.exit()
         elif opt in ("-c", "--config-profile"):
             configProfileName = arg
@@ -90,7 +90,7 @@ def handleArguments(argv):
 
     # We need at least these vars
     if len(vmname) == 0:
-        print help
+        print(help)
         sys.exit()
 
 # Parse arguments
@@ -102,10 +102,10 @@ c = cloudstackops.CloudStackOps(DEBUG, DRYRUN)
 c.instance_name = "N/A"
 
 if DEBUG == 1:
-    print "Warning: Debug mode is enabled!"
+    print("Warning: Debug mode is enabled!")
 
 if DRYRUN == 1:
-    print "Warning: dry-run mode is enabled, not running any commands!"
+    print("Warning: dry-run mode is enabled, not running any commands!")
 
 # make credentials file known to our class
 c.configProfileName = configProfileName
@@ -114,13 +114,13 @@ c.configProfileName = configProfileName
 c.initCloudStackAPI()
 
 if DEBUG == 1:
-    print "DEBUG: API address: " + c.apiurl
-    print "DEBUG: ApiKey: " + c.apikey
-    print "DEBUG: SecretKey: " + c.secretkey
+    print("DEBUG: API address: " + c.apiurl)
+    print("DEBUG: ApiKey: " + c.apikey)
+    print("DEBUG: SecretKey: " + c.secretkey)
 
 # Check cloudstack IDs
 if DEBUG == 1:
-    print "DEBUG: Checking CloudStack IDs of provided input.."
+    print("DEBUG: Checking CloudStack IDs of provided input..")
 
 if isProjectVm == 1:
     projectParam = "true"
@@ -138,10 +138,10 @@ routerData = c.getRouterData({'name': vmname, 'isProjectVm': projectParam})
 router = routerData[0]
 
 if DEBUG == 1:
-    print routerData
+    print(routerData)
 
-print "Note: Found router " + router.name + " that belongs to account " + str(router.account) + " with router ID " + router.id
-print "Note: This router has " + str(len(router.nic)) + " nics."
+print("Note: Found router " + router.name + " that belongs to account " + str(router.account) + " with router ID " + router.id)
+print("Note: This router has " + str(len(router.nic)) + " nics.")
 
 # Pretty Slack messages
 c.instance_name = router.name
@@ -153,10 +153,10 @@ c.cluster = clusterData[0].name
 
 # Does this router need an upgrade?
 if onlyRequired == 1 and router.requiresupgrade == 0:
-    print "Note: This router does not need to be upgraded. Won't reboot because of --only-when-required flag. When you remove the flag and run the script again it will reboot anyway."
+    print("Note: This router does not need to be upgraded. Won't reboot because of --only-when-required flag. When you remove the flag and run the script again it will reboot anyway.")
     sys.exit(0)
 
-print "Note: Let's reboot the router VM.."
+print("Note: Let's reboot the router VM..")
 
 # Get user data to e-mail
 adminData = c.getDomainAdminUserData(router.domainid)
@@ -164,7 +164,7 @@ adminData = c.getDomainAdminUserData(router.domainid)
 if adminData is not 1:
 
     if DRYRUN == 1:
-        print "Note: Not sending notification e-mails due to DRYRUN setting. Would have e-mailed " + adminData.email
+        print("Note: Not sending notification e-mails due to DRYRUN setting. Would have e-mailed " + adminData.email)
 
     # Sends e-mail to account/user:"
     templatefile = open("email_template/rebootRouterVM.txt", "r")
@@ -187,13 +187,13 @@ if adminData is not 1:
     c.sendMail(c.mail_from, c.errors_to, msgSubject, emailbody)
 
     if DEBUG == 1:
-        print emailbody
+        print(emailbody)
 
 else:
-    print "Warning: No admin user found this domain (" + router.domain + ")"
+    print("Warning: No admin user found this domain (" + router.domain + ")")
 
 if DRYRUN == 1:
-    print "Note: Would have rebooted router " + router.name + " (" + router.id + ")"
+    print("Note: Would have rebooted router " + router.name + " (" + router.id + ")")
 else:
     # Restart network with clean up
     if CLEANUP == 1:
@@ -204,7 +204,7 @@ else:
             c.print_message(message=message, message_type="Note", to_slack=True)
             result = c.restartVPC(router.vpcid)
             if result == 1:
-                print "Restarting failed, will try again!"
+                print("Restarting failed, will try again!")
                 result = c.restartVPC(router.vpcid)
                 if result == 1:
                     message = "Restarting (" + router.id + ") with clean up failed.\nError: investigate manually!"
@@ -228,7 +228,7 @@ else:
             c.print_message(message=message, message_type="Note", to_slack=True)
             result = c.restartNetwork(router.guestnetworkid)
             if result == 1:
-                print "Restarting failed, will try again!"
+                print("Restarting failed, will try again!")
                 result = c.restartNetwork(router.guestnetworkid)
                 if result == 1:
                     message = "Restarting (" + router.id + ") with clean up failed.\nError: investigate manually!"
@@ -252,7 +252,7 @@ else:
         c.print_message(message=message, message_type="Note", to_slack=True)
         result = c.rebootRouter(router.id)
         if result == 1:
-            print "Rebooting failed, will try again!"
+            print("Rebooting failed, will try again!")
             result = c.rebootRouter(router.id)
             if result == 1:
                 message = "Rebooting (" + router.id + ") failed.\nError: Investigate manually!"
@@ -271,11 +271,11 @@ else:
 if adminData is not 1:
 
     if DRYRUN == 1:
-            print "Note: Not sending notification e-mails due to DRYRUN setting. Would have e-mailed " + adminData.email
+            print("Note: Not sending notification e-mails due to DRYRUN setting. Would have e-mailed " + adminData.email)
     else:
 
         if not adminData.email:
-            print "Warning: Skipping mailing due to missing e-mail address."
+            print("Warning: Skipping mailing due to missing e-mail address.")
 
         templatefile = open("email_template/rebootRouterVM_done.txt", "r")
         emailbody = templatefile.read()
@@ -296,9 +296,9 @@ if adminData is not 1:
         c.sendMail(c.mail_from, c.errors_to, msgSubject, emailbody)
 
         if DEBUG == 1:
-            print "DEBUG: email body:"
-            print emailbody
+            print("DEBUG: email body:")
+            print(emailbody)
 else:
-    print "Warning: No admin user found this domain (" + router.domain + ")"
+    print("Warning: No admin user found this domain (" + router.domain + ")")
 
-print "Note: We're done!"
+print("Note: We're done!")

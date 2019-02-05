@@ -66,12 +66,12 @@ def handleArguments(argv):
                 "debug",
                 "exec"])
     except getopt.GetoptError as e:
-        print "Error: " + str(e)
-        print help
+        print("Error: " + str(e))
+        print(help)
         sys.exit(2)
     for opt, arg in opts:
         if opt == '-h':
-            print help
+            print(help)
             sys.exit()
         elif opt in ("-s", "--mysqlserver"):
             mysqlHost = arg
@@ -86,7 +86,7 @@ def handleArguments(argv):
 
     # We need at least these vars
     if len(mysqlHost) == 0 or len(ipaddress) == 0:
-        print help
+        print(help)
         sys.exit()
 
 # Parse arguments
@@ -97,10 +97,10 @@ if __name__ == "__main__":
 s = cloudstacksql.CloudStackSQL(DEBUG, DRYRUN)
 
 if DEBUG == 1:
-    print "# Warning: Debug mode is enabled!"
+    print("# Warning: Debug mode is enabled!")
 
 if DRYRUN == 1:
-    print "# Warning: dry-run mode is enabled, not running any commands!"
+    print("# Warning: dry-run mode is enabled, not running any commands!")
 
 db = []
 dbHost = ''
@@ -108,17 +108,17 @@ if mysqlHost == 'any':
     db = s.getAllDB()
 else:
     db.append(mysqlHost)
-print "\nConnecting to the following DB's: " + str(db) + "\n"
+print("\nConnecting to the following DB's: " + str(db) + "\n")
 
 for mysqlHost in db:
     # Connect MySQL
     result = s.connectMySQL(mysqlHost, mysqlPasswd)
     if result > 0:
-        print "Error: MySQL connection failed"
+        print("Error: MySQL connection failed")
         sys.exit(1)
     elif DEBUG == 1:
-        print "DEBUG: MySQL connection successful"
-        print s.conn
+        print("DEBUG: MySQL connection successful")
+        print(s.conn)
 
     ipaddresses = s.getIpAddressData(ipaddress)
     counter = 0
@@ -240,17 +240,17 @@ for mysqlHost in db:
     # Disconnect MySQL
     s.disconnectMySQL()
    
-    if counter <> 0:
-        print "Results: " + dbHost + "\n"
-        print t
-        print "Note: Found " + str(counter) + " results."
-    elif countera <> 0:
-        print "Results: " + dbHost + "\n"
-        print r
-        print "Note: Found " + str(countera) + " results."
-    elif counterb <> 0:
-        print "Results:"  + dbHost + "\n"
-        print u
-        print "Note: Found " + str(counterb) + " results."
+    if counter != 0:
+        print("Results: " + dbHost + "\n")
+        print(t)
+        print("Note: Found " + str(counter) + " results.")
+    elif countera != 0:
+        print("Results: " + dbHost + "\n")
+        print(r)
+        print("Note: Found " + str(countera) + " results.")
+    elif counterb != 0:
+        print("Results:"  + dbHost + "\n")
+        print(u)
+        print("Note: Found " + str(counterb) + " results.")
 
 

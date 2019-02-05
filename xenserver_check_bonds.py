@@ -34,14 +34,14 @@ DEBUG = False
 
 def log(s):
     if DEBUG:
-        print s
+        print(s)
 
 
 def get_bonds(session, host):
     bonds = {}
     slaves = {}
 
-    for (b, brec) in session.xenapi.PIF.get_all_records().items():
+    for (b, brec) in list(session.xenapi.PIF.get_all_records().items()):
         # only local interfaces
         if brec['host'] != host:
             continue
@@ -51,14 +51,14 @@ def get_bonds(session, host):
         if brec['bond_slave_of']:
             slaves[b] = brec
 
-    for (m, mrec) in session.xenapi.PIF_metrics.get_all_records().items():
-        for srec in slaves.values():
+    for (m, mrec) in list(session.xenapi.PIF_metrics.get_all_records().items()):
+        for srec in list(slaves.values()):
             if srec['metrics'] != m:
                 continue
             srec['carrier'] = mrec['carrier']
 
-    for (n, nrec) in session.xenapi.network.get_all_records().items():
-        for brec in bonds.values():
+    for (n, nrec) in list(session.xenapi.network.get_all_records().items()):
+        for brec in list(bonds.values()):
             if brec['network'] != n:
                 continue
             brec['name_label'] = nrec['name_label']
@@ -68,7 +68,7 @@ def get_bonds(session, host):
 
 def get_bond_status(session, host):
     status = {}
-    for (b, brec) in session.xenapi.Bond.get_all_records().items():
+    for (b, brec) in list(session.xenapi.Bond.get_all_records().items()):
         status[b] = brec
 
     return status
@@ -85,7 +85,7 @@ def main():
 
     # warning when host not found...
     if not host:
-        print "failed to detect XAPI host for '%s'" % hostname
+        print("failed to detect XAPI host for '%s'" % hostname)
         sys.exit(1)
 
     bonds, slaves = get_bonds(session, host)
@@ -116,13 +116,13 @@ def main():
             olist.append("%s %s links up" % (net, status['links_up']))
 
     if len(clist):
-        print "CRITICAL:", ", ".join(clist)
+        print("CRITICAL:", ", ".join(clist))
         return 2
     elif len(olist):
-        print "OK:", ", ".join(olist)
+        print("OK:", ", ".join(olist))
         return 0
     else:
-        print "OK: no bonds found"
+        print("OK: no bonds found")
         return 0
 
 if __name__ == "__main__":

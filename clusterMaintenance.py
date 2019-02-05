@@ -68,12 +68,12 @@ def handleArguments(argv):
             argv, "hc:n:a:m:", [
                 "credentials-file=", "clustername=", "managedstate=", "allocationstate=", "no-bond-check", "debug", "exec", "force"])
     except getopt.GetoptError as e:
-        print "Error: " + str(e)
-        print help
+        print("Error: " + str(e))
+        print(help)
         sys.exit(2)
     for opt, arg in opts:
         if opt == '-h':
-            print help
+            print(help)
             sys.exit()
         elif opt in ("-c", "--config-profile"):
             configProfileName = arg
@@ -100,24 +100,24 @@ def handleArguments(argv):
 
     # We need at least these vars
     if len(clustername) == 0:
-        print help
+        print(help)
         sys.exit()
     if len(managedstate) > 0 and len(allocationstate) > 0:
-        print "Error: please specify either 'allocationstate' or 'managedstate' and not both."
-        print help
+        print("Error: please specify either 'allocationstate' or 'managedstate' and not both.")
+        print(help)
         sys.exit()
 
     # Check argument sanity
     allocationstate_set = ('Enabled', 'Disabled')
     if len(allocationstate) > 0 and allocationstate not in allocationstate_set:
-        print "Error: 'allocationstate' can only contain " + str(allocationstate_set)
-        print help
+        print("Error: 'allocationstate' can only contain " + str(allocationstate_set))
+        print(help)
         sys.exit(1)
 
     managedstate_set = ('Managed', 'Unmanaged')
     if len(managedstate) > 0 and managedstate not in managedstate_set:
-        print "Error: 'managedstate' can only contain " + str(managedstate_set)
-        print help
+        print("Error: 'managedstate' can only contain " + str(managedstate_set))
+        print(help)
         sys.exit(1)
 
 # Parse arguments
@@ -132,10 +132,10 @@ x = xenserver.xenserver()
 c.xenserver = x
 
 if DEBUG == 1:
-    print "Warning: Debug mode is enabled!"
+    print("Warning: Debug mode is enabled!")
 
 if DRYRUN == 1:
-    print "Warning: dry-run mode is enabled, not running any commands!"
+    print("Warning: dry-run mode is enabled, not running any commands!")
 
 # make credentials file known to our class
 c.configProfileName = configProfileName
@@ -144,41 +144,41 @@ c.configProfileName = configProfileName
 c.initCloudStackAPI()
 
 if DEBUG == 1:
-    print "API address: " + c.apiurl
-    print "ApiKey: " + c.apikey
-    print "SecretKey: " + c.secretkey
+    print("API address: " + c.apiurl)
+    print("ApiKey: " + c.apikey)
+    print("SecretKey: " + c.secretkey)
 
 # Check cloudstack IDs
 if DEBUG == 1:
-    print "Note: Checking CloudStack IDs of provided input.."
+    print("Note: Checking CloudStack IDs of provided input..")
 clusterID = c.checkCloudStackName(
     {'csname': clustername, 'csApiCall': 'listClusters'})
 if clusterID == 1:
-    print "Error: Could not find cluster '" + clustername + "'."
+    print("Error: Could not find cluster '" + clustername + "'.")
     sys.exit(1)
 
-print "Note: Looking for other hosts in this cluster and checking their health.."
+print("Note: Looking for other hosts in this cluster and checking their health..")
 
 # Print cluster info
-print "Note: Some info about cluster '" + clustername + "':"
+print("Note: Some info about cluster '" + clustername + "':")
 c.printCluster(clusterID)
 
 # Update Cluster
 if DRYRUN == 1 and len(managedstate) > 0:
-    print "Note: Would have set the 'Managed State' of cluster '" + clustername + "' to '" + managedstate + "'"
+    print("Note: Would have set the 'Managed State' of cluster '" + clustername + "' to '" + managedstate + "'")
 elif DRYRUN == 1 and len(allocationstate) > 0:
-    print "Note: Would have set the 'Allocation State' of cluster '" + clustername + "' to '" + allocationstate + "'"
+    print("Note: Would have set the 'Allocation State' of cluster '" + clustername + "' to '" + allocationstate + "'")
 elif DRYRUN == 1:
-    print "Warning: no command specified, just listing info"
+    print("Warning: no command specified, just listing info")
 else:
     clusterUpdateReturn = c.updateCluster(
         {'clusterid': clusterID, 'managedstate': managedstate, 'allocationstate': allocationstate})
 
     if clusterUpdateReturn == 1 or clusterUpdateReturn is None:
-        print "Error: update failed."
+        print("Error: update failed.")
     else:
         cluster = clusterUpdateReturn.cluster
-        print "Note: Updated OK!"
+        print("Note: Updated OK!")
         t = PrettyTable(["Cluster name",
                          "Allocation state",
                          "Managed state",
@@ -192,6 +192,6 @@ else:
                    cluster.hypervisortype,
                    cluster.podname,
                    cluster.zonename])
-        print t
-        print "Note: Displaying the hosts of this cluster:"
+        print(t)
+        print("Note: Displaying the hosts of this cluster:")
         c.printHypervisors(clusterID, False, checkBonds)

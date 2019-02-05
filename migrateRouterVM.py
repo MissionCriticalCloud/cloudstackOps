@@ -69,11 +69,11 @@ def handleArguments(argv):
             argv, "hc:r:s:t:p", [
                 "config-profile=", "routerinstance-name=", "mysqlserver=", "tocluster=", "debug", "exec", "is-projectrouter", "force"])
     except getopt.GetoptError as e:
-        print "Error: " + str(e)
+        print("Error: " + str(e))
         sys.exit(2)
     for opt, arg in opts:
         if opt == '-h':
-            print help
+            print(help)
             sys.exit()
         elif opt in ("-c", "--config-profile"):
             configProfileName = arg
@@ -100,7 +100,7 @@ def handleArguments(argv):
 
     # We need at least these vars
     if len(vmname) == 0 or len(mysqlHost) == 0:
-        print help
+        print(help)
         sys.exit()
 
 # Parse arguments
@@ -114,17 +114,17 @@ s = cloudstacksql.CloudStackSQL(DEBUG, DRYRUN)
 # Connect MySQL
 result = s.connectMySQL(mysqlHost, mysqlPasswd)
 if result > 0:
-    print "Error: MySQL connection failed"
+    print("Error: MySQL connection failed")
     sys.exit(1)
 elif DEBUG == 1:
-    print "DEBUG: MySQL connection successful"
-    print s.conn
+    print("DEBUG: MySQL connection successful")
+    print(s.conn)
 
 if DEBUG == 1:
-    print "Warning: Debug mode is enabled!"
+    print("Warning: Debug mode is enabled!")
 
 if DRYRUN == 1:
-    print "Warning: dry-run mode is enabled, not running any commands!"
+    print("Warning: dry-run mode is enabled, not running any commands!")
 
 # make credentials file known to our class
 c.configProfileName = configProfileName
@@ -133,13 +133,13 @@ c.configProfileName = configProfileName
 c.initCloudStackAPI()
 
 if DEBUG == 1:
-    print "DEBUG: API address: " + c.apiurl
-    print "DEBUG: ApiKey: " + c.apikey
-    print "DEBUG: SecretKey: " + c.secretkey
+    print("DEBUG: API address: " + c.apiurl)
+    print("DEBUG: ApiKey: " + c.apikey)
+    print("DEBUG: SecretKey: " + c.secretkey)
 
 # Check cloudstack IDs
 if DEBUG == 1:
-    print "DEBUG: Checking CloudStack IDs of provided input.."
+    print("DEBUG: Checking CloudStack IDs of provided input..")
 
 if isProjectVm == 1:
     projectParam = "true"
@@ -160,17 +160,17 @@ routerData = c.getRouterData({'name': vmname, 'isProjectVm': projectParam})
 router = routerData[0]
 
 if DEBUG == 1:
-    print routerData
+    print(routerData)
 
-print "Note: Found router " + router.name + " that belongs to account " + router.account + " with router ID " + router.id
-print "Note: This router has " + str(len(router.nic)) + " nics."
+print("Note: Found router " + router.name + " that belongs to account " + router.account + " with router ID " + router.id)
+print("Note: This router has " + str(len(router.nic)) + " nics.")
 
 # Find the current host and cluster of this router
 routerHostData = c.getHostData({'hostid': router.hostid})
 if routerHostData is not None:
     routerClusterID = routerHostData[0].clusterid
 else:
-    print "Error: could not find host with id " + router.hostid
+    print("Error: could not find host with id " + router.hostid)
     sys.exit(1)
 
 # Get data from vm
@@ -178,9 +178,9 @@ if router.state == "Running":
     needToStop = "true"
     autoStartVM = "true"
     routerHostData = c.getHostData({'hostname': router.hostname})
-    print "Note: Router " + router.name + " is running on " + router.hostname + " (" + routerHostData[0].clustername + " / " + routerHostData[0].podname + ")"
+    print("Note: Router " + router.name + " is running on " + router.hostname + " (" + routerHostData[0].clustername + " / " + routerHostData[0].podname + ")")
 else:
-    print "Note: Router " + router.name + " has state " + router.state
+    print("Note: Router " + router.name + " has state " + router.state)
     needToStop = "false"
     autoStartVM = "false"
 
@@ -188,13 +188,13 @@ else:
 hosttags = c.getServiceOfferingTags(router.serviceofferingid, "host")
 foundHostTag = c.checkClusterHostTags(routerClusterID, hosttags)
 if foundHostTag:
-    print "Error: your current cluster has hosts with tags '" + hosttags + "'. Migration will only work when current cluster is in Disabled state and has the host tag '" + hosttags + "' removed."
+    print("Error: your current cluster has hosts with tags '" + hosttags + "'. Migration will only work when current cluster is in Disabled state and has the host tag '" + hosttags + "' removed.")
     sys.exit(1)
 
 # Check current cluster state
 routerClusterData = c.listClusters({'clusterid': routerClusterID})
 if routerClusterData[0].allocationstate != "Disabled":
-    print "Error: migrating a Router only works when the current cluster is in Disabled state and has the host tag '" + hosttags + "' removed."
+    print("Error: migrating a Router only works when the current cluster is in Disabled state and has the host tag '" + hosttags + "' removed.")
     sys.exit(1)
 
 # If no destination cluster is provided we should select one
@@ -202,23 +202,23 @@ if routerClusterData[0].allocationstate != "Disabled":
 if router.isredundantrouter:
     peerRouterData = c.getRouterPeerData(vmname)
     if peerRouterData is None or peerRouterData == 1:
-        print "Error: cannot get router peer data."
+        print("Error: cannot get router peer data.")
         sys.exit(1)
     if peerRouterData["routerPeer"].redundantstate == "FAULT":
-        print "Error: The peer router is in " + peerRouterData["routerPeer"].redundantstate + " state. Failover will not work and cause downtime. Please fix this first!"
+        print("Error: The peer router is in " + peerRouterData["routerPeer"].redundantstate + " state. Failover will not work and cause downtime. Please fix this first!")
         sys.exit(1)
     else:
-        print "Note: The peer router is in " + peerRouterData["routerPeer"].redundantstate + " state."
+        print("Note: The peer router is in " + peerRouterData["routerPeer"].redundantstate + " state.")
 
     if peerRouterData["clustername"] == toCluster:
-        print "Error: the redundant peer is also running on cluster " + toCluster + ". Please choose another cluster for this router."
+        print("Error: the redundant peer is also running on cluster " + toCluster + ". Please choose another cluster for this router.")
         sys.exit(1)
 else:
-    print "Note: This is not a redundant router pair. Skipping redundant checks."
+    print("Note: This is not a redundant router pair. Skipping redundant checks.")
 
 if len(toCluster) == 0:
     toClusterList = []
-    print "Note: No destination cluster provided, selecting one to migrate to"
+    print("Note: No destination cluster provided, selecting one to migrate to")
     clustersInZone = c.listClusters({'zoneid': router.zoneid})
     for cluster in clustersInZone:
         # Only select enabled clusters
@@ -227,82 +227,82 @@ if len(toCluster) == 0:
                 # If redundant router, make sure we ignore the peer's cluster
                 if cluster.name == peerRouterData["clustername"]:
                     if DEBUG == 1:
-                        print "Debug: ignorning cluster " + cluster.id + " because it is the same cluster as peer."
+                        print("Debug: ignorning cluster " + cluster.id + " because it is the same cluster as peer.")
                     continue
                 # Also, select a cluster in a different pod
                 elif cluster.podname == peerRouterData["podname"]:
                     if DEBUG == 1:
-                        print "Debug: ignorning cluster " + cluster.id + " because it is on the same pod as peer is."
+                        print("Debug: ignorning cluster " + cluster.id + " because it is on the same pod as peer is.")
                     continue
                 else:
                     if DEBUG == 1:
-                        print "Debug: adding cluster " + cluster.id + " to the list."
+                        print("Debug: adding cluster " + cluster.id + " to the list.")
                     toClusterList.append(cluster.id)
             # Check Storagetags
             if c.checkStorageTags({'toClusterID': cluster.id,
                                    'routername': router.name,
                                    'projectParam': projectParam}) > 0:
 
-                print "Warning: Storage tags not OK, skipping " + cluster.name
+                print("Warning: Storage tags not OK, skipping " + cluster.name)
                 continue
 
             # Check Hosttags
             if c.checkHostTags({'toClusterID': cluster.id,
                                 'routername': router.name,
                                 'projectParam': projectParam}) > 0:
-                print "Warning: Host tags not OK, skipping " + cluster.name
+                print("Warning: Host tags not OK, skipping " + cluster.name)
                 continue
             # Add
             if DEBUG == 1:
-                print "Debug: adding cluster " + cluster.id + " to the list."
+                print("Debug: adding cluster " + cluster.id + " to the list.")
             toClusterList.append(cluster.id)
 
     # Finally, select a randon cluster from the list
     toClusterID = choice(toClusterList)
 
 if len(toClusterID) == 0:
-    print "Error: Could not automatically select a cluster to migrate to. Please specify using --tocluster."
+    print("Error: Could not automatically select a cluster to migrate to. Please specify using --tocluster.")
     sys.exit(1)
 
 if DEBUG == 1:
-    print "DEBUG: Selected cluster ID " + toClusterID
+    print("DEBUG: Selected cluster ID " + toClusterID)
 
 toClusterData = c.listClusters({'clusterid': toClusterID})
-print "Note: Migrating to " + toClusterData[0].name
+print("Note: Migrating to " + toClusterData[0].name)
 
 # Check zone
 if c.checkZone(routerClusterID, toClusterID) > 0:
-    print "Error: Zone not OK."
+    print("Error: Zone not OK.")
     sys.exit(1)
 
 # Storagetags
 if c.checkStorageTags({'toClusterID': toClusterID,
                        'routername': router.name,
                        'projectParam': projectParam}) > 0:
-    print "Error: Storage tags not OK."
+    print("Error: Storage tags not OK.")
     sys.exit(1)
 
 # Hosttags
 if c.checkHostTags({'toClusterID': toClusterID,
                     'routername': router.name,
                     'projectParam': projectParam}) > 0:
-    print "Error: Host tags not OK."
+    print("Error: Host tags not OK.")
     sys.exit(1)
 
 # Check router cluster
 routerClusterData = c.listClusters({'clusterid': routerClusterID})
 if routerClusterData is None:
-    print "Error: could not find cluster with id " + routerClusterID
+    print("Error: could not find cluster with id " + routerClusterID)
     sys.exit(1)
 
 # Get user data to e-mail
 adminData = c.getDomainAdminUserData(router.domainid)
 if DRYRUN == 1:
-    print "Note: Not sending notification e-mails due to DRYRUN setting. Would have e-mailed " + adminData.email
+    print("Note: Not sending notification e-mails due to DRYRUN setting. Would have e-mailed " + adminData.email)
 else:
 
     if not adminData.email:
-        print "Warning: Skipping mailing due to missing e-mail address."
+        print("Warning: Skipping mailing due to missing e-mail address.")
 
     templatefile = open("email_template/migrateRouterVM.txt", "r")
     emailbody = templatefile.read()
@@ -321,20 +321,20 @@ else:
     c.sendMail(c.mail_from, c.errors_to, msgSubject, emailbody)
 
     if DEBUG == 1:
-        print emailbody
+        print(emailbody)
 
 # Stop router
 if DRYRUN == 1:
-    print "Note: Would have stopped router " + router.name + " (" + router.id + ")"
+    print("Note: Would have stopped router " + router.name + " (" + router.id + ")")
 else:
-    print "Executing: stop router " + router.name + " (" + router.id + ")"
+    print("Executing: stop router " + router.name + " (" + router.id + ")")
     result = c.stopRouter(router.id)
     if result == 1:
-        print "Stopping failed, will try again!"
+        print("Stopping failed, will try again!")
         result = c.stopRouter(router.id)
         if result == 1:
-            print "Stop failed again -- exiting."
-            print "Error: investegate manually!"
+            print("Stop failed again -- exiting.")
+            print("Error: investegate manually!")
 
             # Notify admin
             msgSubject = 'Warning: problem with maintenance for domain ' + \
@@ -346,21 +346,21 @@ else:
 # Get this router's root volume uuid
 mysqlResult = s.getRouterRootVolumeUUID(router.id)
 if DEBUG == 1:
-    print mysqlResult
+    print(mysqlResult)
 
 targetStorageID = c.getRandomStoragePool(toClusterID)
 
 for (volid, volumename, vm_instancename) in mysqlResult:
-    print "Note: router " + router.name + " has ROOT volume with name " + volumename + " and uuid " + volid
+    print("Note: router " + router.name + " has ROOT volume with name " + volumename + " and uuid " + volid)
 
     if DRYRUN == 1:
-        print "Note: Would have migrated volume " + volid + " (" + volumename + ") to storage " + targetStorageID
+        print("Note: Would have migrated volume " + volid + " (" + volumename + ") to storage " + targetStorageID)
     else:
-        print "Executing: migrate volume " + volid + " to storage " + targetStorageID
+        print("Executing: migrate volume " + volid + " to storage " + targetStorageID)
         result = c.migrateVolume(volid, targetStorageID)
         if result == 1:
-            print "Migrate failed -- exiting."
-            print "Error: investegate manually!"
+            print("Migrate failed -- exiting.")
+            print("Error: investegate manually!")
 
             # Notify admin
             msgSubject = 'Warning: problem with maintenance for router ' + \
@@ -370,20 +370,20 @@ for (volid, volumename, vm_instancename) in mysqlResult:
             sys.exit(1)
 
         if result.volume.state == "Ready":
-            print "Note: " + result.volume.name + " is migrated successfully "
+            print("Note: " + result.volume.name + " is migrated successfully ")
 
 # Start router
 if DRYRUN == 1:
-    print "Note: Would have started router " + router.name + " (" + router.id + ")"
+    print("Note: Would have started router " + router.name + " (" + router.id + ")")
 else:
-    print "Executing: start router " + router.name + " (" + router.id + ")"
+    print("Executing: start router " + router.name + " (" + router.id + ")")
     result = c.startRouter(router.id)
     if result == 1:
-        print "Start failed, will try again!"
+        print("Start failed, will try again!")
         result = c.stopRouter(router.id)
         if result == 1:
-            print "Start failed again -- exiting."
-            print "Error: investegate manually!"
+            print("Start failed again -- exiting.")
+            print("Error: investegate manually!")
 
             # Notify admin
             msgSubject = 'Warning: problem with maintenance for domain ' + \
@@ -400,11 +400,11 @@ else:
 
 # Get user data to e-mail
 if DRYRUN == 1:
-    print "Note: Not sending notification e-mails due to DRYRUN setting. Would have e-mailed " + adminData.email
+    print("Note: Not sending notification e-mails due to DRYRUN setting. Would have e-mailed " + adminData.email)
 else:
 
     if not adminData.email:
-        print "Warning: Skipping mailing due to missing e-mail address."
+        print("Warning: Skipping mailing due to missing e-mail address.")
 
     templatefile = open("email_template/migrateRouterVM_done.txt", "r")
     emailbody = templatefile.read()
@@ -423,7 +423,7 @@ else:
     c.sendMail(c.mail_from, c.errors_to, msgSubject, emailbody)
 
     if DEBUG == 1:
-        print "DEBUG: email body:"
-        print emailbody
+        print("DEBUG: email body:")
+        print(emailbody)
 
-print "Note: We're done!"
+print("Note: We're done!")

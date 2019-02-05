@@ -60,12 +60,12 @@ def handleArguments(argv):
             argv, "hc:n:t:r", [
                 "config-profile=", "hostname=", "tags=", "debug", "exec", "replace"])
     except getopt.GetoptError as e:
-        print "Error: " + str(e)
-        print help
+        print("Error: " + str(e))
+        print(help)
         sys.exit(2)
     for opt, arg in opts:
         if opt == '-h':
-            print help
+            print(help)
             sys.exit()
         elif opt in ("-c", "--config-profile"):
             configProfileName = arg
@@ -86,7 +86,7 @@ def handleArguments(argv):
 
     # We need at least these vars
     if len(hostname) == 0 or len(newTags) == 0:
-        print help
+        print(help)
         sys.exit()
 
 # Parse arguments
@@ -97,10 +97,10 @@ if __name__ == "__main__":
 c = cloudstackops.CloudStackOps(DEBUG, DRYRUN)
 
 if DEBUG == 1:
-    print "Warning: Debug mode is enabled!"
+    print("Warning: Debug mode is enabled!")
 
 if DRYRUN == 1:
-    print "Warning: dry-run mode is enabled, not running any commands!"
+    print("Warning: dry-run mode is enabled, not running any commands!")
 
 # make credentials file known to our class
 c.configProfileName = configProfileName
@@ -109,38 +109,38 @@ c.configProfileName = configProfileName
 c.initCloudStackAPI()
 
 if DEBUG == 1:
-    print "DEBUG: API address: " + c.apiurl
-    print "DEBUG: ApiKey: " + c.apikey
-    print "DEBUG: SecretKey: " + c.secretkey
+    print("DEBUG: API address: " + c.apiurl)
+    print("DEBUG: ApiKey: " + c.apikey)
+    print("DEBUG: SecretKey: " + c.secretkey)
 
 # Check cloudstack IDs
 if DEBUG == 1:
-    print "DEBUG: Checking CloudStack IDs of provided input.."
+    print("DEBUG: Checking CloudStack IDs of provided input..")
 
 # check hostID
 hostID = c.checkCloudStackName({'csname': hostname, 'csApiCall': 'listHosts'})
 
 # get router data
 if hostID == 1 or hostID is None:
-    print "Error: could not locate ID."
+    print("Error: could not locate ID.")
     sys.exit()
 if DEBUG == 1:
-    print "DEBUG: Found host with id " + str(hostID)
+    print("DEBUG: Found host with id " + str(hostID))
 
 hostData = c.getHostData({'hostid': hostID})
 
 if DEBUG == 1:
-    print hostData
+    print(hostData)
 
 # current tags
 if hostData[0].hosttags is None:
     currentTags = ''
     comma = ''
-    print "Note: Hosttags are currently set to '" + currentTags + "'"
+    print("Note: Hosttags are currently set to '" + currentTags + "'")
 else:
     currentTags = hostData[0].hosttags
     comma = ', '
-    print "Note: Hosttags are currently set to '" + currentTags + "'"
+    print("Note: Hosttags are currently set to '" + currentTags + "'")
 
 # Construct new tags
 if replace == 1:
@@ -148,14 +148,14 @@ if replace == 1:
 else:
     updatedTags = currentTags + comma + newTags
 
-print "Note: Hosttags will be set to '" + updatedTags + "'"
+print("Note: Hosttags will be set to '" + updatedTags + "'")
 
 # Update host tags
 if DRYRUN == 1:
-    print "Note: Would have updated tags to '" + updatedTags + "'"
+    print("Note: Would have updated tags to '" + updatedTags + "'")
 else:
     result = c.updateHostTags(hostID, updatedTags)
     if result == 1:
-        print "Error: updating failed"
+        print("Error: updating failed")
     else:
-        print "Note: updating was succesful"
+        print("Note: updating was succesful")

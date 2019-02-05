@@ -93,13 +93,13 @@ def handleArguments(argv):
                 "credentials-file=", "clustername=", "ignore-hosts=", "threads=", "pre-empty-script=",
                 "post-empty-script=", "patch-list-file=", "preserve-downloads", "halt", "debug", "exec", "prepare"])
     except getopt.GetoptError as e:
-        print "Error: " + str(e)
-        print help
+        print("Error: " + str(e))
+        print(help)
         sys.exit(2)
     for opt, arg in opts:
         if opt == '-h':
 
-            print help
+            print(help)
             sys.exit()
         elif opt in ("-c", "--config-profile"):
             configProfileName = arg
@@ -138,7 +138,7 @@ def handleArguments(argv):
 
     # We need at least a cluster name
     if len(clustername) == 0:
-        print help
+        print(help)
         sys.exit(1)
 
 
@@ -164,9 +164,9 @@ c.configProfileName = configProfileName
 c.initCloudStackAPI()
 
 if DEBUG == 1:
-    print "API address: " + c.apiurl
-    print "ApiKey: " + c.apikey
-    print "SecretKey: " + c.secretkey
+    print("API address: " + c.apiurl)
+    print("ApiKey: " + c.apikey)
+    print("SecretKey: " + c.secretkey)
 
 to_slack = True
 if DRYRUN == 1:
@@ -174,11 +174,11 @@ if DRYRUN == 1:
 
 # Check cloudstack IDs
 if DEBUG == 1:
-    print "Note: Checking IDs of provided input.."
+    print("Note: Checking IDs of provided input..")
 clusterID = c.checkCloudStackName(
     {'csname': clustername, 'csApiCall': 'listClusters'})
 if clusterID == 1:
-    print "Error: Could not find cluster '" + clustername + "'."
+    print("Error: Could not find cluster '" + clustername + "'.")
     disconnect_all()
     sys.exit(1)
 
@@ -233,30 +233,30 @@ if halt_hypervisor:
     c.print_message(message=message, message_type="Warning", to_slack=False)
 
 if DRYRUN == 1:
-    print
-    print "Warning: We are running in DRYRUN mode."
-    print
-    print "This script will: "
-    print "  - Set cluster " + clustername + " to Unmanage"
-    print "  - Turn OFF XenServer poolHA for " + clustername
-    print "  - For any hypervisor it will do this (poolmaster " + poolmaster.name + " first):"
-    print "      - put it to Disabled aka Maintenance in XenServer"
-    print "      - download the patches in file --patch-list-file '" + patch_list_file + "'"
-    print "         (preserve downloads is set to " + str(preserve_downloads) + ")"
-    print "      - execute the --pre-empty-script script '" + pre_empty_script + "' on the hypervisor"
-    print "      - live migrate all VMs off of it using XenServer evacuate command"
-    print "      - execute the --post-empty-script script '" + post_empty_script + "' on the hypervisor"
-    print "      - when empty, it will reboot the hypervisor (halting is " + str(halt_hypervisor) + ")"
-    print "      - will wait for it to come back online (checks SSH connection)"
-    print "      - set the hypervisor to Enabled in XenServer"
-    print "      - continues to the next hypervisor"
-    print "  - When the rebooting is done, it enables XenServer poolHA again for " + clustername
-    print "  - Finally, it sets the " + clustername + " to Managed again"
-    print "  - Database will be updated according to the new situation"
-    print "Then the reboot cyclus for " + clustername + " is done!"
-    print
-    print "To kick it off, run with the --exec flag."
-    print
+    print()
+    print("Warning: We are running in DRYRUN mode.")
+    print()
+    print("This script will: ")
+    print("  - Set cluster " + clustername + " to Unmanage")
+    print("  - Turn OFF XenServer poolHA for " + clustername)
+    print("  - For any hypervisor it will do this (poolmaster " + poolmaster.name + " first):")
+    print("      - put it to Disabled aka Maintenance in XenServer")
+    print("      - download the patches in file --patch-list-file '" + patch_list_file + "'")
+    print("         (preserve downloads is set to " + str(preserve_downloads) + ")")
+    print("      - execute the --pre-empty-script script '" + pre_empty_script + "' on the hypervisor")
+    print("      - live migrate all VMs off of it using XenServer evacuate command")
+    print("      - execute the --post-empty-script script '" + post_empty_script + "' on the hypervisor")
+    print("      - when empty, it will reboot the hypervisor (halting is " + str(halt_hypervisor) + ")")
+    print("      - will wait for it to come back online (checks SSH connection)")
+    print("      - set the hypervisor to Enabled in XenServer")
+    print("      - continues to the next hypervisor")
+    print("  - When the rebooting is done, it enables XenServer poolHA again for " + clustername)
+    print("  - Finally, it sets the " + clustername + " to Managed again")
+    print("  - Database will be updated according to the new situation")
+    print("Then the reboot cyclus for " + clustername + " is done!")
+    print()
+    print("To kick it off, run with the --exec flag.")
+    print()
     disconnect_all()
     sys.exit(1)
 

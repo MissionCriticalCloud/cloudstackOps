@@ -63,12 +63,12 @@ def handleArguments(argv):
             argv, "hc:n:i:t:p", [
                 "config-profile=", "vmname=", "instance-name=", "tocluster=", "debug", "exec", "is-projectvm", "force"])
     except getopt.GetoptError as e:
-        print "Error: " + str(e)
-        print help
+        print("Error: " + str(e))
+        print(help)
         sys.exit(2)
     for opt, arg in opts:
         if opt == '-h':
-            print help
+            print(help)
             sys.exit()
         elif opt in ("-c", "--config-profile"):
             configProfileName = arg
@@ -93,7 +93,7 @@ def handleArguments(argv):
 
     # We need at least these vars
     if len(vmname) == 0 or len(toCluster) == 0:
-        print help
+        print(help)
         sys.exit()
 
 # Parse arguments
@@ -107,14 +107,14 @@ c.slack_custom_title = "Domain"
 c.slack_custom_value = ""
 
 # Start time
-print "Note: Starting @ %s" % time.strftime("%Y-%m-%d %H:%M")
+print("Note: Starting @ %s" % time.strftime("%Y-%m-%d %H:%M"))
 start_time = datetime.now()
 
 if DEBUG == 1:
-    print "Warning: Debug mode is enabled!"
+    print("Warning: Debug mode is enabled!")
 
 if DRYRUN == 1:
-    print "Warning: dry-run mode is enabled, not running any commands!"
+    print("Warning: dry-run mode is enabled, not running any commands!")
 
 # make credentials file known to our class
 c.configProfileName = configProfileName
@@ -123,13 +123,13 @@ c.configProfileName = configProfileName
 c.initCloudStackAPI()
 
 if DEBUG == 1:
-    print "API address: " + c.apiurl
-    print "ApiKey: " + c.apikey
-    print "SecretKey: " + c.secretkey
+    print("API address: " + c.apiurl)
+    print("ApiKey: " + c.apikey)
+    print("SecretKey: " + c.secretkey)
 
 # Check cloudstack IDs
 if DEBUG == 1:
-    print "Note: Checking CloudStack IDs of provided input.."
+    print("Note: Checking CloudStack IDs of provided input..")
 
 if isProjectVm == 1:
     projectParam = "true"
@@ -149,13 +149,13 @@ toClusterID = c.checkCloudStackName(
     {'csname': toCluster, 'csApiCall': 'listClusters'})
 
 if toClusterID == 1 or toClusterID is None:
-    print "Error: Cluster with name '" + toCluster + "' can not be found! Halting!"
+    print("Error: Cluster with name '" + toCluster + "' can not be found! Halting!")
     sys.exit(1)
 
 # Get data from vm
 vmdata = c.getVirtualmachineData(vmID)
 if vmdata is None:
-    print "Error: Could not find vm " + vmname + "!"
+    print("Error: Could not find vm " + vmname + "!")
     sys.exit(1)
 vm = vmdata[0]
 c.instance_name = vm.name
@@ -164,12 +164,12 @@ c.slack_custom_value = vm.domain
 snapshotData = c.listVMSnapshot(vm.id)
 snapshot_found = False
 if snapshotData == 1:
-    print "Error: Could not list VM snapshots"
+    print("Error: Could not list VM snapshots")
 elif snapshotData is None:
-    print "Note: No VM snapshots found for this vm."
+    print("Note: No VM snapshots found for this vm.")
 else:
     for snapshot in snapshotData:
-        print "Note: Found VM snapshot %s, unable to live migrate. Please remove VM snapshots first. " % snapshot.displayname
+        print("Note: Found VM snapshot %s, unable to live migrate. Please remove VM snapshots first. " % snapshot.displayname)
         snapshot_found = True
 
 if snapshot_found:

@@ -58,12 +58,12 @@ def handleArguments(argv):
             argv, "hc:n:i:p", [
                 "config-profile=", "vmname=", "instance-name=", "debug", "exec", "is-projectvm", "force"])
     except getopt.GetoptError as e:
-        print "Error: " + str(e)
-        print help
+        print("Error: " + str(e))
+        print(help)
         sys.exit(2)
     for opt, arg in opts:
         if opt == '-h':
-            print help
+            print(help)
             sys.exit()
         elif opt in ("-c", "--config-profile"):
             configProfileName = arg
@@ -86,7 +86,7 @@ def handleArguments(argv):
 
     # We need at least these vars
     if len(vmname) == 0:
-        print help
+        print(help)
         sys.exit()
 
 # Parse arguments
@@ -100,10 +100,10 @@ c.slack_custom_title = "Domain"
 c.slack_custom_value = ""
 
 if DEBUG == 1:
-    print "Warning: Debug mode is enabled!"
+    print("Warning: Debug mode is enabled!")
 
 if DRYRUN == 1:
-    print "Warning: dry-run mode is enabled, not running any commands!"
+    print("Warning: dry-run mode is enabled, not running any commands!")
 
 # make credentials file known to our class
 c.configProfileName = configProfileName
@@ -112,13 +112,13 @@ c.configProfileName = configProfileName
 c.initCloudStackAPI()
 
 if DEBUG == 1:
-    print "API address: " + c.apiurl
-    print "ApiKey: " + c.apikey
-    print "SecretKey: " + c.secretkey
+    print("API address: " + c.apiurl)
+    print("ApiKey: " + c.apikey)
+    print("SecretKey: " + c.secretkey)
 
 # Check cloudstack IDs
 if DEBUG == 1:
-    print "Note: Checking CloudStack IDs of provided input.."
+    print("Note: Checking CloudStack IDs of provided input..")
 
 if isProjectVm == 1:
     projectParam = "true"
@@ -136,7 +136,7 @@ vmID = c.checkCloudStackName({'csname': vmname,
 # Get data from vm
 vmdata = c.getVirtualmachineData(vmID)
 if vmdata is None:
-    print "Error: Could not find vm " + vmname + "!"
+    print("Error: Could not find vm " + vmname + "!")
     sys.exit(1)
 vm = vmdata[0]
 c.instance_name = vm.name
@@ -155,11 +155,11 @@ c.cluster = clusterData[0].name
 # Get user data to e-mail
 adminData = c.getDomainAdminUserData(vm.domainid)
 if DRYRUN == 1:
-    print "Note: Not sending notification e-mails due to DRYRUN setting. Would have e-mailed " + adminData.email
+    print("Note: Not sending notification e-mails due to DRYRUN setting. Would have e-mailed " + adminData.email)
 else:
 
     if not adminData.email:
-        print "Warning: Skipping mailing due to missing e-mail address."
+        print("Warning: Skipping mailing due to missing e-mail address.")
 
     templatefile = open(
         "email_template/stopStartVirtualMachine_start.txt",
@@ -183,11 +183,11 @@ else:
     c.sendMail(c.mail_from, c.errors_to, msgSubject, emailbody)
 
     if DEBUG == 1:
-        print emailbody
+        print(emailbody)
 
 # Stop this vm if it was running
 if DRYRUN == 1:
-    print "Would have stopped vm " + vm.name + " with id " + vm.id
+    print("Would have stopped vm " + vm.name + " with id " + vm.id)
 else:
     message = "Executing: stop virtualmachine " + vm.name + " with id " + vm.id
     c.print_message(message=message, message_type="Note", to_slack=to_slack)
@@ -220,7 +220,7 @@ else:
 
 # Start the VM again
 if DRYRUN == 1:
-    print "Would have started vm " + vm.name + " with id " + vm.id
+    print("Would have started vm " + vm.name + " with id " + vm.id)
 else:
     message = "Executing: start virtualmachine " + vm.name + " with id " + vm.id
     c.print_message(message=message, message_type="Note", to_slack=to_slack)
@@ -242,11 +242,11 @@ else:
         # Get user data to e-mail
         adminData = c.getDomainAdminUserData(vm.domainid)
         if DRYRUN == 1:
-            print "Note: Not sending notification e-mails due to DRYRUN setting. Would have e-mailed " + adminData.email
+            print("Note: Not sending notification e-mails due to DRYRUN setting. Would have e-mailed " + adminData.email)
         else:
 
             if not adminData.email:
-                print "Warning: Skipping mailing due to missing e-mail address."
+                print("Warning: Skipping mailing due to missing e-mail address.")
 
             templatefile = open(
                 "email_template/stopStartVirtualMachine_done.txt",
@@ -282,7 +282,7 @@ else:
             c.sendMail(c.mail_from, c.errors_to, msgSubject, emailbody)
 
             if DEBUG == 1:
-                print emailbody
+                print(emailbody)
 
     else:
         message = "Warning: " + result.virtualmachine.name + " is in state " + \
@@ -295,4 +295,4 @@ else:
         emailbody = message
         c.sendMail(c.mail_from, c.errors_to, msgSubject, emailbody)
 
-print "Note: We're done!"
+print("Note: We're done!")

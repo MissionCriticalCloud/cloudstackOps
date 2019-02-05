@@ -65,12 +65,12 @@ def handleArguments(argv):
             argv, "hc:n:i:t:p", [
                 "config-profile=", "vmname=", "instance-name=", "tocluster=", "debug", "exec", "is-projectvm", "force"])
     except getopt.GetoptError as e:
-        print "Error: " + str(e)
-        print help
+        print("Error: " + str(e))
+        print(help)
         sys.exit(2)
     for opt, arg in opts:
         if opt == '-h':
-            print help
+            print(help)
             sys.exit()
         elif opt in ("-c", "--config-profile"):
             configProfileName = arg
@@ -95,7 +95,7 @@ def handleArguments(argv):
 
     # We need at least these vars
     if len(vmname) == 0 or len(toCluster) == 0:
-        print help
+        print(help)
         sys.exit()
 
 # Parse arguments
@@ -106,10 +106,10 @@ if __name__ == "__main__":
 c = cloudstackops.CloudStackOps(DEBUG, DRYRUN)
 
 if DEBUG == 1:
-    print "Warning: Debug mode is enabled!"
+    print("Warning: Debug mode is enabled!")
 
 if DRYRUN == 1:
-    print "Warning: dry-run mode is enabled, not running any commands!"
+    print("Warning: dry-run mode is enabled, not running any commands!")
 
 # make credentials file known to our class
 c.configProfileName = configProfileName
@@ -118,13 +118,13 @@ c.configProfileName = configProfileName
 c.initCloudStackAPI()
 
 if DEBUG == 1:
-    print "API address: " + c.apiurl
-    print "ApiKey: " + c.apikey
-    print "SecretKey: " + c.secretkey
+    print("API address: " + c.apiurl)
+    print("ApiKey: " + c.apikey)
+    print("SecretKey: " + c.secretkey)
 
 # Check cloudstack IDs
 if DEBUG == 1:
-    print "Note: Checking CloudStack IDs of provided input.."
+    print("Note: Checking CloudStack IDs of provided input..")
 
 if isProjectVm == 1:
     projectParam = "true"
@@ -139,7 +139,7 @@ toClusterID = c.checkCloudStackName(
     {'csname': toCluster, 'csApiCall': 'listClusters'})
 
 if toClusterID == 1 or toClusterID is None:
-    print "Error: Cluster with name '" + toCluster + "' can not be found! Halting!"
+    print("Error: Cluster with name '" + toCluster + "' can not be found! Halting!")
     sys.exit(1)
 
 # Select storage pool
@@ -150,21 +150,21 @@ storagepooltags = targetStoragePoolData[0].tags
 # Get hosts that belong to toCluster
 toClusterHostsData = c.getHostsFromCluster(toClusterID)
 if DEBUG == 1:
-    print "Note: You selected a storage pool with tags '" + storagepooltags + "'"
+    print("Note: You selected a storage pool with tags '" + storagepooltags + "'")
 
 # Get data from vm
 vmdata = c.getVirtualmachineData(vmID)
 if vmdata is None:
-    print "Error: Could not find vm " + vmname + "!"
+    print("Error: Could not find vm " + vmname + "!")
     sys.exit(1)
 
 vm = vmdata[0]
 if vm.state == "Running":
     needToStop = "true"
     autoStartVM = "true"
-    print "Note: Found vm " + vm.name + " running on " + vm.hostname
+    print("Note: Found vm " + vm.name + " running on " + vm.hostname)
 else:
-    print "Note: Found vm " + vm.name + " with state " + vm.state
+    print("Note: Found vm " + vm.name + " with state " + vm.state)
     needToStop = "false"
     autoStartVM = "false"
 
@@ -175,17 +175,17 @@ if sodata is not None:
     storagetags = (sodata[0].tags) if sodata[0].tags is not None else ''
 
     if storagetags == '':
-        print "Warning: router service offering has empty storage tags."
+        print("Warning: router service offering has empty storage tags.")
 
     if storagetags != '' and storagepooltags != storagetags and c.FORCE == 0:
         if DEBUG == 1:
-            print "Error: cannot do this: storage tags from provided storage pool '" + storagepooltags + "' do not match your vm's service offering '" + storagetags + "'"
+            print("Error: cannot do this: storage tags from provided storage pool '" + storagepooltags + "' do not match your vm's service offering '" + storagetags + "'")
             sys.exit(1)
     elif storagetags != '' and storagepooltags != storagetags and c.FORCE == 1:
         if DEBUG == 1:
-            print "Warning: storage tags from provided storage pool '" + storagepooltags + "' do not match your vm's service offering '" + storagetags + "'. Since you used --FORCE you probably know what you manually need to edit in the database."
+            print("Warning: storage tags from provided storage pool '" + storagepooltags + "' do not match your vm's service offering '" + storagetags + "'. Since you used --FORCE you probably know what you manually need to edit in the database.")
     elif DEBUG == 1:
-        print "Note: Storage tags look OK."
+        print("Note: Storage tags look OK.")
 
 # Volumes
 voldata = c.getVirtualmachineVolumes(vm.id, projectParam)
@@ -199,12 +199,12 @@ for vol in voldata:
         {'csname': vol.storage, 'csApiCall': 'listStoragePools'})
 
     if currentStorageID == targetStorageID:
-        print "Warning: No need to migrate volume " + vol.name + " -- already on the desired storage pool. Skipping."
+        print("Warning: No need to migrate volume " + vol.name + " -- already on the desired storage pool. Skipping.")
         continue
 
     currentStorageData = c.getStoragePoolData(currentStorageID)[0]
     if currentStorageData.scope == "ZONE":
-        print "Note: No need to migrate volume " + vol.name + " -- scope of this volume is ZONE. Skipping."
+        print("Note: No need to migrate volume " + vol.name + " -- scope of this volume is ZONE. Skipping.")
         continue
 
     # Save ids for later -- we first need to find out if it's worth stopping
@@ -216,11 +216,11 @@ if volcount > 0:
     # Get user data to e-mail
     adminData = c.getDomainAdminUserData(vm.domainid)
     if DRYRUN == 1:
-        print "Note: Not sending notification e-mails due to DRYRUN setting. Would have e-mailed " + adminData.email
+        print("Note: Not sending notification e-mails due to DRYRUN setting. Would have e-mailed " + adminData.email)
     else:
 
         if not adminData.email:
-            print "Warning: Skipping mailing due to missing e-mail address."
+            print("Warning: Skipping mailing due to missing e-mail address.")
 
         templatefile = open(
             "email_template/migrateVirtualMachine_start.txt",
@@ -245,18 +245,18 @@ if volcount > 0:
         c.sendMail(c.mail_from, c.errors_to, msgSubject, emailbody)
 
         if DEBUG == 1:
-            print emailbody
+            print(emailbody)
 
     # Stop this vm if it was running
     if needToStop == "true":
         if DRYRUN == 1:
-            print "Would have stopped vm " + vm.name + " with id " + vm.id
+            print("Would have stopped vm " + vm.name + " with id " + vm.id)
         else:
-            print "Executing: stop virtualmachine " + vm.name + " with id " + vm.id
+            print("Executing: stop virtualmachine " + vm.name + " with id " + vm.id)
             result = c.stopVirtualMachine(vm.id)
             if result == 1:
-                print "Stop vm failed -- exiting."
-                print "Error: investegate manually!"
+                print("Stop vm failed -- exiting.")
+                print("Error: investegate manually!")
 
                 # Notify admin
                 msgSubject = 'Warning: problem with maintenance for vm ' + \
@@ -266,9 +266,9 @@ if volcount > 0:
                 sys.exit(1)
 
             if result.virtualmachine.state == "Stopped":
-                print "Note: " + result.virtualmachine.name + " is stopped successfully "
+                print("Note: " + result.virtualmachine.name + " is stopped successfully ")
             else:
-                print "Error: " + result.virtualmachine.name + " is in state " + result.virtualmachine.state + " instead of Stopped. VM need to be stopped to continue. Re-run script to try again -- exit."
+                print("Error: " + result.virtualmachine.name + " is in state " + result.virtualmachine.state + " instead of Stopped. VM need to be stopped to continue. Re-run script to try again -- exit.")
 
                 # Notify admin
                 msgSubject = 'Warning: problem with maintenance for VM ' + \
@@ -282,25 +282,25 @@ if volcount > 0:
         # Check for snapshots
         snapshotData = c.listSnapshots(volid, projectParam)
         if snapshotData == 1:
-            print "Error: Could not list snapshots"
+            print("Error: Could not list snapshots")
         elif snapshotData is None:
-            print "Note: No snapshots found for this volume."
+            print("Note: No snapshots found for this volume.")
         else:
             for snapshot in snapshotData:
-                print "Note: Found snapshot '" + snapshot.name + "' with state " + snapshot.state + ". Looks OK."
+                print("Note: Found snapshot '" + snapshot.name + "' with state " + snapshot.state + ". Looks OK.")
                 if snapshot.state != 'BackedUp':
-                    print "Error: migration of '" + snapshot.volumename + "' will fail because of non 'BackedUp' state of snapshot. Fix manually first."
+                    print("Error: migration of '" + snapshot.volumename + "' will fail because of non 'BackedUp' state of snapshot. Fix manually first.")
                     sys.exit(1)
-            print "Warning: Snapshots will be lost after migration due to bug CLOUDSTACK-6538."
+            print("Warning: Snapshots will be lost after migration due to bug CLOUDSTACK-6538.")
 
         if DRYRUN == 1:
-            print "Note: Would have migrated volume " + volid + " to storage " + targetStorageID
+            print("Note: Would have migrated volume " + volid + " to storage " + targetStorageID)
         else:
-            print "Executing: migrate volume " + volid + " to storage " + targetStorageID
+            print("Executing: migrate volume " + volid + " to storage " + targetStorageID)
             result = c.migrateVolume(volid, targetStorageID)
             if result == 1:
-                print "Migrate failed -- exiting."
-                print "Error: investegate manually!"
+                print("Migrate failed -- exiting.")
+                print("Error: investegate manually!")
 
                 # Notify admin
                 msgSubject = 'Warning: problem with maintenance for vm ' + \
@@ -310,11 +310,11 @@ if volcount > 0:
                 sys.exit(1)
 
             if result.volume.state == "Ready":
-                print "Note: " + result.volume.name + " is migrated successfully "
+                print("Note: " + result.volume.name + " is migrated successfully ")
             else:
                 warningMsg = "Warning: " + result.volume.name + " is in state " + \
                     result.volume.state + " instead of Ready. Please investigate before starting VM again!"
-                print warningMsg
+                print(warningMsg)
                 autoStartVM = "false"
 
                 # Notify admin
@@ -326,18 +326,18 @@ if volcount > 0:
     # Select a random node from the toCluster
     toHostData = choice(toClusterHostsData)
     if DEBUG == 1:
-        print "Note: Selected node " + toHostData.name + " with ID " + toHostData.id + " to start this VMs on"
+        print("Note: Selected node " + toHostData.name + " with ID " + toHostData.id + " to start this VMs on")
 
     # Start the VM again
     if autoStartVM == "true":
         if DRYRUN == 1:
-            print "Would have started vm " + vm.name + " with id " + vm.id + " on host " + toHostData.id
+            print("Would have started vm " + vm.name + " with id " + vm.id + " on host " + toHostData.id)
         else:
-            print "Executing: start virtualmachine " + vm.name + " with id " + vm.id + " on host " + toHostData.id
+            print("Executing: start virtualmachine " + vm.name + " with id " + vm.id + " on host " + toHostData.id)
             result = c.startVirtualMachine(vm.id, toHostData.id)
             if result == 1:
-                print "Start vm failed -- exiting."
-                print "Error: investegate manually!"
+                print("Start vm failed -- exiting.")
+                print("Error: investegate manually!")
 
                 # Notify admin
                 msgSubject = 'Warning: problem with maintenance for vm ' + \
@@ -347,15 +347,15 @@ if volcount > 0:
                 sys.exit(1)
 
             if result.virtualmachine.state == "Running":
-                print "Note: " + result.virtualmachine.name + " is started successfully "
+                print("Note: " + result.virtualmachine.name + " is started successfully ")
                 # Get user data to e-mail
                 adminData = c.getDomainAdminUserData(vm.domainid)
                 if DRYRUN == 1:
-                    print "Note: Not sending notification e-mails due to DRYRUN setting. Would have e-mailed " + adminData.email
+                    print("Note: Not sending notification e-mails due to DRYRUN setting. Would have e-mailed " + adminData.email)
                 else:
 
                     if not adminData.email:
-                        print "Warning: Skipping mailing due to missing e-mail address."
+                        print("Warning: Skipping mailing due to missing e-mail address.")
 
                     templatefile = open(
                         "email_template/migrateVirtualMachine_done.txt",
@@ -392,12 +392,12 @@ if volcount > 0:
                     c.sendMail(c.mail_from, c.errors_to, msgSubject, emailbody)
 
                     if DEBUG == 1:
-                        print emailbody
+                        print(emailbody)
 
             else:
                 warningMsg = "Warning: " + result.virtualmachine.name + " is in state " + \
                     result.virtualmachine.state + " instead of Started. Please investigate (could just take some time)."
-                print warningMsg
+                print(warningMsg)
                 autoStartVM = "false"
 
                 # Notify admin
@@ -407,15 +407,15 @@ if volcount > 0:
                 c.sendMail(c.mail_from, c.errors_to, msgSubject, emailbody)
 
     else:
-        print "Warning: Not starting " + vm.name + " automatically!"
+        print("Warning: Not starting " + vm.name + " automatically!")
         # Get user data to e-mail
         adminData = c.getDomainAdminUserData(vm.domainid)
         if DRYRUN == 1:
-            print "Note: Not sending notification e-mails due to DRYRUN setting. Would have e-mailed " + adminData.email
+            print("Note: Not sending notification e-mails due to DRYRUN setting. Would have e-mailed " + adminData.email)
         else:
 
             if not adminData.email:
-                print "Warning: Skipping mailing due to missing e-mail address."
+                print("Warning: Skipping mailing due to missing e-mail address.")
 
             # Tell the user how to start the VM manually
             cloudmonkeyCmd = "cloudmonkey start virtualmachine id=" + \
@@ -445,11 +445,11 @@ if volcount > 0:
             c.sendMail(c.mail_from, c.errors_to, msgSubject, emailbody)
 
             if DEBUG == 1:
-                print emailbody
+                print(emailbody)
 
 elif vm.state == "Running":
-    print "Note: Nothing to do at all. Volumes are already on the desired storage pool."
+    print("Note: Nothing to do at all. Volumes are already on the desired storage pool.")
 else:
-    print "Note: All volumes are already on the desired storage pool. Just start the VM!"
+    print("Note: All volumes are already on the desired storage pool. Just start the VM!")
 
-print "Note: We're done!"
+print("Note: We're done!")

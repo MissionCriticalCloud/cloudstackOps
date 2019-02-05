@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from __future__ import print_function
+
 
 import operator
 import os
@@ -15,7 +15,7 @@ from cloudstackops import cloudstackops
 try:
     import configparser as ConfigParser
 except ImportError:
-    import ConfigParser
+    import configparser
 
 try:
     import cs
@@ -315,7 +315,7 @@ def main():
     excdomain = args['excdomain']
     slack = args['slack']
 
-    config = ConfigParser.ConfigParser()
+    config = configparser.ConfigParser()
     config.read(os.path.expanduser(configfile))
     cosmic = Cosmic(endpoint=config.get(zone, 'url'), apikey=config.get(zone, 'apikey'),
                     secretkey=config.get(zone, 'secretkey'), verify=False)

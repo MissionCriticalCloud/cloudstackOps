@@ -134,16 +134,16 @@ def handleArguments(argv):
             ]
         )
     except getopt.GetoptError as e:
-        print "Error: " + str(e)
-        print help
+        print("Error: " + str(e))
+        print(help)
         sys.exit(2)
     if len(opts) == 0:
-        print help
+        print(help)
         sys.exit(2)
 
     for opt, arg in opts:
         if opt == '-h':
-            print help
+            print(help)
             sys.exit()
         elif opt in ("-c", "--config-profile"):
             configProfileName = arg
@@ -204,9 +204,9 @@ def handleArguments(argv):
 
     # Domain and project not together
     if len(projectname) > 0 and len(domainname) > 0:
-        print "Error: Please specify either domainname \
-            or projectname, not both."
-        print help
+        print("Error: Please specify either domainname \
+            or projectname, not both.")
+        print(help)
         sys.exit()
 
 
@@ -297,10 +297,10 @@ if __name__ == "__main__":
 c = cloudstackops.CloudStackOps(DEBUG, DRYRUN)
 
 if DEBUG == 1:
-    print "Warning: Debug mode is enabled!"
+    print("Warning: Debug mode is enabled!")
 
 if DRYRUN == 1:
-    print "Warning: dry-run mode is enabled, not running any commands!"
+    print("Warning: dry-run mode is enabled, not running any commands!")
 
 # make credentials file known to our class
 c.configProfileName = configProfileName
@@ -309,13 +309,13 @@ c.configProfileName = configProfileName
 c.initCloudStackAPI()
 
 if DEBUG == 1:
-    print "API address: " + c.apiurl
-    print "ApiKey: " + c.apikey
-    print "SecretKey: " + c.secretkey
+    print("API address: " + c.apiurl)
+    print("ApiKey: " + c.apikey)
+    print("SecretKey: " + c.secretkey)
 
 # Check cloudstack IDs
 if DEBUG == 1:
-    print "Checking CloudStack IDs of provided input.."
+    print("Checking CloudStack IDs of provided input..")
 if len(fromCluster) > 1:
     fromClusterID = c.checkCloudStackName({
         'csname': fromCluster,
@@ -343,7 +343,7 @@ if len(domainname) > 0:
         'csApiCall': 'listDomains'
     })
     if domainnameID == 1:
-        print "Error: domain " + domainname + " does not exist."
+        print("Error: domain " + domainname + " does not exist.")
         sys.exit(1)
 else:
     domainnameID = ''
@@ -366,7 +366,7 @@ else:
 
 # Domains to ignore
 if len(ignoreDomains) > 0:
-    print "Note: Ignoring these domains: " + str(ignoreDomains)
+    print("Note: Ignoring these domains: " + str(ignoreDomains))
 
 if nonAdminCredentials == 1:
     # Result table
@@ -387,8 +387,8 @@ if nonAdminCredentials == 1:
 
     vmdata = c.listVirtualmachines({'listAll': 'false'})
     printVirtualmachine({'vmdata': vmdata, 'ignoreDomains': ignoreDomains})
-    print
-    print t
+    print()
+    print(t)
     sys.exit()
 
 clusters = {}
@@ -406,11 +406,11 @@ else:
             clusters[cluster.id] = cluster.name
 
 if DEBUG == 1:
-    print clusters
-    print "Debug: display mode = " + display
+    print(clusters)
+    print("Debug: display mode = " + display)
 
 # Empty line
-print
+print()
 
 # Look at each cluster
 grandCounter = 0
@@ -420,15 +420,15 @@ grandMemoryTotal = 0
 grandCoresTotal = 0
 grandHostMemoryTotal = 0
 
-for clusterid, clustername in clusters.items():
+for clusterid, clustername in list(clusters.items()):
 
     # Get hosts that belong to fromCluster
     fromClusterHostsData = c.getHostsFromCluster(clusterid)
 
     if fromClusterHostsData == 1 or fromClusterHostsData is None:
-        print
+        print()
         sys.stdout.write("\033[F")
-        print "No (enabled) hosts found on cluster " + str(clustername)
+        print("No (enabled) hosts found on cluster " + str(clustername))
         continue
 
     # Look for VMs on each of the cluster hosts
@@ -462,11 +462,11 @@ for clusterid, clustername in clusters.items():
         grandHostCounter = grandHostCounter + 1
 
         if DEBUG == 1:
-            print "# Looking for VMS on node " + fromHostData.name
-            print "# Memory of this host: " + str(fromHostData.memorytotal)
+            print("# Looking for VMS on node " + fromHostData.name)
+            print("# Memory of this host: " + str(fromHostData.memorytotal))
 
         # Reset progress indication
-        print
+        print()
         sys.stdout.write("\033[F")
         sys.stdout.write("\033[2K")
         sys.stdout.write(fromHostData.name + ":")
@@ -682,15 +682,15 @@ for clusterid, clustername in clusters.items():
         sys.stdout.write("\033[F")
 
         # Print result table
-        print
-        print t
+        print()
+        print(t)
 
     if counter > 0 and display != "plain":
         memoryUtilisation = round((memoryTotal / float(
             hostMemoryTotal)) * 100, 2)
-        print ""
-        print "Summary '" + clustername + "':"
-        print " Total number of VMs: " + str(counter)
+        print("")
+        print("Summary '" + clustername + "':")
+        print(" Total number of VMs: " + str(counter))
 
         if not len(domainname) > 0 \
             and not len(filterKeyword) > 0 \
@@ -700,17 +700,17 @@ for clusterid, clustername in clusters.items():
                      displayRouters < 1 or
                      onlyDisplayRouters == 1
                      ):
-            print " Total number hypervisors: " + str(hostCounter)
-            print " Total allocated RAM: " + str(memoryTotal) + " / " + \
-                str(hostMemoryTotal) + " GB (" + str(memoryUtilisation) + " %)"
-            print " Total allocated cores: " + str(hostCoresTotal)
-            print " Total allocated storage: " + str(storageSizeTotal) + " GB"
+            print(" Total number hypervisors: " + str(hostCounter))
+            print(" Total allocated RAM: " + str(memoryTotal) + " / " + \
+                str(hostMemoryTotal) + " GB (" + str(memoryUtilisation) + " %)")
+            print(" Total allocated cores: " + str(hostCoresTotal))
+            print(" Total allocated storage: " + str(storageSizeTotal) + " GB")
         else:
-            print " Total allocated RAM: " + str(memoryTotal) + " GB"
-            print " Total allocated cores: " + str(hostCoresTotal)
-            print " Total allocated storage: " + str(storageSizeTotal) + " GB"
+            print(" Total allocated RAM: " + str(memoryTotal) + " GB")
+            print(" Total allocated cores: " + str(hostCoresTotal))
+            print(" Total allocated storage: " + str(storageSizeTotal) + " GB")
 
-        print ""
+        print("")
         grandCounter = grandCounter + counter
         grandStorageSizeTotal = grandStorageSizeTotal + storageSizeTotal
         grandMemoryTotal = grandMemoryTotal + memoryTotal
@@ -720,31 +720,31 @@ for clusterid, clustername in clusters.items():
 if len(clusters) > 1 and display == "onlySummary":
     grandMemoryUtilisation = round((grandMemoryTotal / float(
         grandHostMemoryTotal)) * 100, 2)
-    print ""
-    print "==================  Grand Totals ==============="
-    print " Total number of VMs: " + str(grandCounter)
+    print("")
+    print("==================  Grand Totals ===============")
+    print(" Total number of VMs: " + str(grandCounter))
 
     if not len(domainname) > 0 \
             and not len(filterKeyword) > 0 \
             and not len(projectname) > 0 \
             and projectParam == 'false':
-        print " Total number hypervisors: " + str(grandHostCounter)
-        print " Total allocated RAM: " + str(grandMemoryTotal) + " / " + \
+        print(" Total number hypervisors: " + str(grandHostCounter))
+        print(" Total allocated RAM: " + str(grandMemoryTotal) + " / " + \
             str(grandHostMemoryTotal) + " GB (" + \
-            str(grandMemoryUtilisation) + " %)"
-        print " Total allocated cores: " + str(grandCoresTotal)
-        print " Total allocated storage: " + str(grandStorageSizeTotal) + " GB"
+            str(grandMemoryUtilisation) + " %)")
+        print(" Total allocated cores: " + str(grandCoresTotal))
+        print(" Total allocated storage: " + str(grandStorageSizeTotal) + " GB")
     else:
-        print " Total allocated RAM: " + str(grandMemoryTotal) + " GB"
-        print " Total allocated cores: " + str(grandCoresTotal)
-        print " Total allocated storage: " + str(grandStorageSizeTotal) + " GB"
+        print(" Total allocated RAM: " + str(grandMemoryTotal) + " GB")
+        print(" Total allocated cores: " + str(grandCoresTotal))
+        print(" Total allocated storage: " + str(grandStorageSizeTotal) + " GB")
 
-    print "================================================"
-    print ""
+    print("================================================")
+    print("")
 
 if DEBUG == 1:
-    print "Note: We're done!"
+    print("Note: We're done!")
 
 # Remove progress indication
 sys.stdout.write("\033[F")
-print
+print()

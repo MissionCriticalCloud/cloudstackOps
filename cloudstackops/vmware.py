@@ -3,7 +3,7 @@
 from fabric import api as fab
 from fabric.api import *
 
-import hypervisor
+from . import hypervisor
 
 # Set user/passwd for fabric ssh
 env.user = 'root'
@@ -35,7 +35,7 @@ class vmware(hypervisor.hypervisor):
     # Execute script on hypervisor
     def exec_script_on_hypervisor(self, host, script):
         script = script.split('/')[-1]
-        print "Note: Executing script '%s' on host %s.." % (script, host.name)
+        print("Note: Executing script '%s' on host %s.." % (script, host.name))
         try:
             with settings(show('output'), host_string=self.ssh_user + "@" + host.ipaddress):
                 return fab.run("bash /tmp/" + script)
@@ -43,15 +43,15 @@ class vmware(hypervisor.hypervisor):
             return False
 
     def find_nfs_mountpoint(self, host):
-        print "Note: Looking for Datastores on VMware host %s" % host.name
+        print("Note: Looking for Datastores on VMware host %s" % host.name)
         if self.mountpoint is not None:
-            print "Note: Found " + str(self.mountpoint)
+            print("Note: Found " + str(self.mountpoint))
             return self.mountpoint
         try:
             with settings(host_string=self.ssh_user + "@" + host.ipaddress):
                 command = "mount | grep sr-mount | grep \"type nfs\" | awk {'print $3'}"
                 self.mountpoint = fab.run(command)
-                print "Note: Found " + str(self.mountpoint)
+                print("Note: Found " + str(self.mountpoint))
                 return self.mountpoint
         except:
             return False

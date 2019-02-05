@@ -23,7 +23,7 @@
 # Import the class we depend on
 import uuid
 
-from cloudstackopsbase import *
+from .cloudstackopsbase import *
 # Import our dependencies
 import mysql.connector
 from mysql.connector import errorcode
@@ -48,7 +48,7 @@ class CloudStackSQL(CloudStackOpsBase):
                     if item == 'mysqlhostname':
                         db.append(each_section)
         except:
-            print "Error: Tried to read username and password from config file 'config', but failed."
+            print("Error: Tried to read username and password from config file 'config', but failed.")
             sys.exit(1)
         return db
 
@@ -66,9 +66,9 @@ class CloudStackSQL(CloudStackOpsBase):
                 mysqlhostname = config.get(mysqlhost, 'mysqlhostname')
                 mysqluser = config.get(mysqlhost, 'mysqluser')
             except:
-                print "Error: Tried to read username and password from config file 'config', but failed."
-                print "Error: Make sure there is a section [" + mysqlhost + "] with mysqlpassword=password and " \
-                                                                            "mysqluser=user or specify password on the command line."
+                print("Error: Tried to read username and password from config file 'config', but failed.")
+                print("Error: Make sure there is a section [" + mysqlhost + "] with mysqlpassword=password and " \
+                                                                            "mysqluser=user or specify password on the command line.")
                 sys.exit(1)
 
             try:
@@ -314,7 +314,7 @@ class CloudStackSQL(CloudStackOpsBase):
                        " AND instance_name='" + instancename + "' ORDER by `voltype` DESC;")
         result = cursor.fetchall()
         if self.DEBUG == 1:
-            print "DEBUG: Executed SQL: " + cursor.statement
+            print("DEBUG: Executed SQL: " + cursor.statement)
 
         cursor.close()
 
@@ -348,7 +348,7 @@ class CloudStackSQL(CloudStackOpsBase):
         )
         result = cursor.fetchall()
         if self.DEBUG == 1:
-            print "DEBUG: Executed SQL: " + cursor.statement
+            print("DEBUG: Executed SQL: " + cursor.statement)
 
         cursor.close()
 
@@ -368,7 +368,7 @@ class CloudStackSQL(CloudStackOpsBase):
                        " AND name='" + volumename + "';")
         result = cursor.fetchall()
         if self.DEBUG == 1:
-            print "DEBUG: Executed SQL: " + cursor.statement
+            print("DEBUG: Executed SQL: " + cursor.statement)
 
         cursor.close()
 
@@ -385,7 +385,7 @@ class CloudStackSQL(CloudStackOpsBase):
         cursor.execute("SELECT id FROM vm_template WHERE name = '" + template_name + "' AND removed IS NULL LIMIT 1;")
         result = cursor.fetchall()
         if self.DEBUG == 1:
-            print cursor.statement
+            print(cursor.statement)
         cursor.close()
 
         try:
@@ -405,7 +405,7 @@ class CloudStackSQL(CloudStackOpsBase):
                        + guest_os_name + "' AND removed IS NULL LIMIT 1;")
         result = cursor.fetchall()
         if self.DEBUG == 1:
-            print "DEBUG: Executed SQL: " + cursor.statement
+            print("DEBUG: Executed SQL: " + cursor.statement)
         cursor.close()
 
         try:
@@ -426,7 +426,7 @@ class CloudStackSQL(CloudStackOpsBase):
                        " AND cluster.removed IS NULL" +
                        " AND storage_pool.removed IS NULL LIMIT 1;")
         if self.DEBUG == 1:
-            print "DEBUG: Executed SQL: " + cursor.statement
+            print("DEBUG: Executed SQL: " + cursor.statement)
 
         result = cursor.fetchall()
         cursor.close()
@@ -447,7 +447,7 @@ class CloudStackSQL(CloudStackOpsBase):
         cursor.execute("SELECT id FROM vm_instance WHERE instance_name ='"
                        + instance_name + "' AND removed IS NULL LIMIT 1;")
         if self.DEBUG == 1:
-            print "DEBUG: Executed SQL: " + cursor.statement
+            print("DEBUG: Executed SQL: " + cursor.statement)
 
         result = cursor.fetchall()
         cursor.close()
@@ -464,11 +464,11 @@ class CloudStackSQL(CloudStackOpsBase):
             return True
         if not self.update_instance_from_xenserver_cluster_to_kvm_cluster(instance_name, vm_template_name,
                                                                           guest_os_name):
-            print "Error: vm_instance query failed"
+            print("Error: vm_instance query failed")
             return False
         if not self.update_all_volumes_of_instance_from_xenserver_cluster_to_kvm_cluster(instance_name,
                                                                                          to_storage_pool_name):
-            print "Error: volumes query failed"
+            print("Error: volumes query failed")
             return False
         return True
 
@@ -483,7 +483,7 @@ class CloudStackSQL(CloudStackOpsBase):
         guest_os_id = self.get_guest_os_id_from_name(guest_os_name)
 
         if not vm_template_id or not guest_os_id:
-            print "Error: Template or GuestOS not found."
+            print("Error: Template or GuestOS not found.")
             return False
 
         cursor = self.conn.cursor()
@@ -498,14 +498,14 @@ class CloudStackSQL(CloudStackOpsBase):
             if self.DRYRUN == 0:
                 self.conn.commit()
             else:
-                print "Note: Would have executed: %s" % cursor.statement
+                print("Note: Would have executed: %s" % cursor.statement)
 
             if self.DEBUG == 1:
-                print "DEBUG: Executed SQL: " + cursor.statement
+                print("DEBUG: Executed SQL: " + cursor.statement)
 
         except mysql.connector.Error as err:
-            print("Error: MySQL: {}".format(err))
-            print cursor.statement
+            print(("Error: MySQL: {}".format(err)))
+            print(cursor.statement)
             cursor.close()
             return False
 
@@ -534,14 +534,14 @@ class CloudStackSQL(CloudStackOpsBase):
             if self.DRYRUN == 0:
                 self.conn.commit()
             else:
-                print "Note: Would have executed: %s" % cursor.statement
+                print("Note: Would have executed: %s" % cursor.statement)
 
             if self.DEBUG == 1:
-                print "DEBUG: Executed SQL: " + cursor.statement
+                print("DEBUG: Executed SQL: " + cursor.statement)
 
         except mysql.connector.Error as err:
-            print("Error: MySQL: {}".format(err))
-            print cursor.statement
+            print(("Error: MySQL: {}".format(err)))
+            print(cursor.statement)
             cursor.close()
             return False
 
@@ -569,14 +569,14 @@ class CloudStackSQL(CloudStackOpsBase):
             if self.DRYRUN == 0:
                 self.conn.commit()
             else:
-                print "Note: Would have executed: %s" % cursor.statement
+                print("Note: Would have executed: %s" % cursor.statement)
 
             if self.DEBUG == 1:
-                print "DEBUG: Executed SQL: " + cursor.statement
+                print("DEBUG: Executed SQL: " + cursor.statement)
 
         except mysql.connector.Error as err:
-            print("Error: MySQL: {}".format(err))
-            print cursor.statement
+            print(("Error: MySQL: {}".format(err)))
+            print(cursor.statement)
             cursor.close()
             return False
 
@@ -601,7 +601,7 @@ class CloudStackSQL(CloudStackOpsBase):
                        "AND vm_instance.removed is NULL LIMIT 1;")
 
         if self.DEBUG == 1:
-            print "DEBUG: Executed SQL: " + cursor.statement
+            print("DEBUG: Executed SQL: " + cursor.statement)
 
         result = cursor.fetchall()
         cursor.close()
@@ -627,7 +627,7 @@ class CloudStackSQL(CloudStackOpsBase):
                        "LIMIT 1;")
 
         if self.DEBUG == 1:
-            print "DEBUG: Executed SQL: " + cursor.statement
+            print("DEBUG: Executed SQL: " + cursor.statement)
 
         result = cursor.fetchall()
         cursor.close()
@@ -651,7 +651,7 @@ class CloudStackSQL(CloudStackOpsBase):
 
         revert_sql = revert_sql_instance
         revert_sql += "\n" + revert_sql_volume
-        print revert_sql
+        print(revert_sql)
         return revert_sql
 
     # Generate revert query
@@ -661,7 +661,7 @@ class CloudStackSQL(CloudStackOpsBase):
         revert_sql_volume = "UPDATE volumes SET template_id=NULL, last_pool_id=NULL, format='VHD', " \
                             "pool_id=" + str(pool_id) + " WHERE id='" + str(volume_id) + "';"
 
-        print revert_sql_volume
+        print(revert_sql_volume)
         return revert_sql_volume
 
     def get_network_db_id(self, network_uuid):
@@ -674,7 +674,7 @@ class CloudStackSQL(CloudStackOpsBase):
         cursor.execute('SELECT `id` FROM `networks` WHERE `uuid` = "%s";' % network_uuid)
 
         if self.DEBUG == 1:
-            print "DEBUG: Executed SQL: " + cursor.statement
+            print("DEBUG: Executed SQL: " + cursor.statement)
 
         result = cursor.fetchall()
         cursor.close()
@@ -738,7 +738,7 @@ VALUES
         vpc_db_id = cursor.getlastrowid()
 
         if self.DEBUG == 1:
-            print "DEBUG: Executed SQL: " + cursor.statement
+            print("DEBUG: Executed SQL: " + cursor.statement)
 
         cursor.close()
 
@@ -766,7 +766,7 @@ WHERE `vpc_offering_id` = (SELECT `vpc_offering_id` FROM `vpc` WHERE `id` = %(vp
         cursor.execute(fill_vpc_service_map_query)
 
         if self.DEBUG == 1:
-            print "DEBUG: Executed SQL: " + cursor.statement
+            print("DEBUG: Executed SQL: " + cursor.statement)
 
         cursor.close()
 
@@ -796,7 +796,7 @@ VALUES
         network_acl_db_id = cursor.getlastrowid()
 
         if self.DEBUG == 1:
-            print "DEBUG: Executed SQL: " + cursor.statement
+            print("DEBUG: Executed SQL: " + cursor.statement)
 
         cursor.close()
 
@@ -823,7 +823,7 @@ WHERE
         cursor.execute(query)
 
         if self.DEBUG == 1:
-            print "DEBUG: Executed SQL: " + cursor.statement
+            print("DEBUG: Executed SQL: " + cursor.statement)
 
         isolated_network_egress_firewall_rules = cursor.fetchall()
         cursor.close()
@@ -851,7 +851,7 @@ WHERE
         cursor.execute(query)
 
         if self.DEBUG == 1:
-            print "DEBUG: Executed SQL: " + cursor.statement
+            print("DEBUG: Executed SQL: " + cursor.statement)
 
         public_ip_ingress_firewall_rules = cursor.fetchall()
         cursor.close()
@@ -874,7 +874,7 @@ WHERE
         cursor = self.conn.cursor()
         cursor.execute(query)
         if self.DEBUG == 1:
-            print "DEBUG: Executed SQL: " + cursor.statement
+            print("DEBUG: Executed SQL: " + cursor.statement)
 
         rule_counter = 0
 
@@ -930,7 +930,7 @@ WHERE
             cursor.execute(query)
 
             if self.DEBUG == 1:
-                print "DEBUG: Executed SQL: " + cursor.statement
+                print("DEBUG: Executed SQL: " + cursor.statement)
 
             network_acl_item_db_id = cursor.getlastrowid()
 
@@ -956,7 +956,7 @@ WHERE
             cursor.execute(query)
 
             if self.DEBUG == 1:
-                print "DEBUG: Executed SQL: " + cursor.statement
+                print("DEBUG: Executed SQL: " + cursor.statement)
 
             cursor.close()
 
@@ -977,7 +977,7 @@ WHERE
         cursor.execute(query)
 
         if self.DEBUG == 1:
-            print "DEBUG: Executed SQL: " + cursor.statement
+            print("DEBUG: Executed SQL: " + cursor.statement)
 
         cursor.close()
 
@@ -995,7 +995,7 @@ WHERE
         cursor.execute(query)
 
         if self.DEBUG == 1:
-            print "DEBUG: Executed SQL: " + cursor.statement
+            print("DEBUG: Executed SQL: " + cursor.statement)
 
         ids = cursor.fetchall()
 
@@ -1019,7 +1019,7 @@ WHERE
         cursor.execute(query)
 
         if self.DEBUG == 1:
-            print "DEBUG: Executed SQL: " + cursor.statement
+            print("DEBUG: Executed SQL: " + cursor.statement)
 
         result = cursor.fetchall()
         cursor.close()
@@ -1052,7 +1052,7 @@ WHERE
         cursor.execute(query)
 
         if self.DEBUG == 1:
-            print "DEBUG: Executed SQL: " + cursor.statement
+            print("DEBUG: Executed SQL: " + cursor.statement)
 
         cursor.close()
 
@@ -1080,7 +1080,7 @@ WHERE
         cursor.execute(query)
 
         if self.DEBUG == 1:
-            print "DEBUG: Executed SQL: " + cursor.statement
+            print("DEBUG: Executed SQL: " + cursor.statement)
 
         cursor.close()
 
@@ -1101,7 +1101,7 @@ WHERE
         cursor.execute(query)
 
         if self.DEBUG == 1:
-            print "DEBUG: Executed SQL: " + cursor.statement
+            print("DEBUG: Executed SQL: " + cursor.statement)
 
         cursor.close()
 
@@ -1121,7 +1121,7 @@ WHERE
         cursor.execute(query)
 
         if self.DEBUG == 1:
-            print "DEBUG: Executed SQL: " + cursor.statement
+            print("DEBUG: Executed SQL: " + cursor.statement)
 
         cursor.close()
 
@@ -1150,7 +1150,7 @@ WHERE
         cursor.execute(query)
 
         if self.DEBUG == 1:
-            print "DEBUG: Executed SQL: " + cursor.statement
+            print("DEBUG: Executed SQL: " + cursor.statement)
 
         cursor.close()
 
@@ -1168,7 +1168,7 @@ WHERE
         cursor.execute(query)
 
         if self.DEBUG == 1:
-            print "DEBUG: Executed SQL: " + cursor.statement
+            print("DEBUG: Executed SQL: " + cursor.statement)
 
         result = cursor.fetchone()
 
@@ -1195,13 +1195,13 @@ WHERE
         cursor.execute(query)
 
         if self.DEBUG == 1:
-            print "DEBUG: Executed SQL: " + cursor.statement
+            print("DEBUG: Executed SQL: " + cursor.statement)
 
         result = cursor.fetchall()
 
         if len(result) is not 1:
-            print "Couldn't find vpc offering!"
-            print result
+            print("Couldn't find vpc offering!")
+            print(result)
             exit(1)
 
         cursor.close()
@@ -1224,13 +1224,13 @@ WHERE
         cursor.execute(query)
 
         if self.DEBUG == 1:
-            print "DEBUG: Executed SQL: " + cursor.statement
+            print("DEBUG: Executed SQL: " + cursor.statement)
 
         result = cursor.fetchall()
 
         if len(result) is not 1:
-            print "Couldn't find network offering!"
-            print result
+            print("Couldn't find network offering!")
+            print(result)
             exit(1)
 
         cursor.close()
@@ -1242,7 +1242,7 @@ WHERE
         if not self.conn:
             return False
         if len(instance_id) == 0:
-            print "Error: We have no instance_id passed: %s" % instance_id
+            print("Error: We have no instance_id passed: %s" % instance_id)
             return False
 
         cursor = self.conn.cursor()
@@ -1255,14 +1255,14 @@ WHERE
             if self.DRYRUN == 0:
                 self.conn.commit()
             else:
-                print "Note: Would have executed: %s" % cursor.statement
+                print("Note: Would have executed: %s" % cursor.statement)
 
             if self.DEBUG == 1:
-                print "DEBUG: Executed SQL: " + cursor.statement
+                print("DEBUG: Executed SQL: " + cursor.statement)
 
         except mysql.connector.Error as err:
-            print("Error: MySQL: {}".format(err))
-            print cursor.statement
+            print(("Error: MySQL: {}".format(err)))
+            print(cursor.statement)
             cursor.close()
             return False
 
@@ -1273,14 +1273,14 @@ WHERE
             if self.DRYRUN == 0:
                 self.conn.commit()
             else:
-                print "Note: Would have executed: %s" % cursor.statement
+                print("Note: Would have executed: %s" % cursor.statement)
 
             if self.DEBUG == 1:
-                print "DEBUG: Executed SQL: " + cursor.statement
+                print("DEBUG: Executed SQL: " + cursor.statement)
 
         except mysql.connector.Error as err:
-            print("Error: MySQL: {}".format(err))
-            print cursor.statement
+            print(("Error: MySQL: {}".format(err)))
+            print(cursor.statement)
             cursor.close()
             return False
 
@@ -1291,14 +1291,14 @@ WHERE
             if self.DRYRUN == 0:
                 self.conn.commit()
             else:
-                print "Note: Would have executed: %s" % cursor.statement
+                print("Note: Would have executed: %s" % cursor.statement)
 
             if self.DEBUG == 1:
-                print "DEBUG: Executed SQL: " + cursor.statement
+                print("DEBUG: Executed SQL: " + cursor.statement)
 
         except mysql.connector.Error as err:
-            print("Error: MySQL: {}".format(err))
-            print cursor.statement
+            print(("Error: MySQL: {}".format(err)))
+            print(cursor.statement)
             cursor.close()
             return False
 

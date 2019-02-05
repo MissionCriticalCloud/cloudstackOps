@@ -25,7 +25,7 @@ import sys
 import time
 import os
 import requests
-import hypervisor
+from . import hypervisor
 import uuid
 
 # Fabric
@@ -67,7 +67,7 @@ class xenserver(hypervisor.hypervisor):
     # Wait for hypervisor to become alive again
     def check_connect(self, host):
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        print "Note: Waiting for " + host.name + "(" + host.ipaddress + ") to return"
+        print("Note: Waiting for " + host.name + "(" + host.ipaddress + ") to return")
         while s.connect_ex((host.ipaddress, 22)) > 0:
             # Progress indication
             sys.stdout.write(".")
@@ -75,8 +75,8 @@ class xenserver(hypervisor.hypervisor):
             time.sleep(5)
         # Remove progress indication
         sys.stdout.write("\033[F")
-        print "Note: Host " + host.name + " responds to SSH again!                           "
-        print "Note: Waiting until we can successfully run a XE command against the cluster.."
+        print("Note: Host " + host.name + " responds to SSH again!                           ")
+        print("Note: Waiting until we can successfully run a XE command against the cluster..")
         while self.check_xapi(host) is False:
             # Progress indication
             sys.stdout.write(".")
@@ -84,8 +84,8 @@ class xenserver(hypervisor.hypervisor):
             time.sleep(5)
         # Remove progress indication
         sys.stdout.write("\033[F")
-        print "Note: Host " + host.name + " is able to do XE stuff again!                                  "
-        print "Note: Waiting 60s to allow the hypervisor to connect.."
+        print("Note: Host " + host.name + " is able to do XE stuff again!                                  ")
+        print("Note: Waiting 60s to allow the hypervisor to connect..")
         time.sleep(60)
         return True
 
@@ -127,7 +127,7 @@ class xenserver(hypervisor.hypervisor):
 
     # Put a host to service in XenServer
     def host_enable(self, host):
-        print "Note: Enabling host " + host.name
+        print("Note: Enabling host " + host.name)
         try:
             with settings(host_string=self.ssh_user + "@" + host.ipaddress):
                 return fab.run("xe host-enable host=" + host.name)
@@ -136,18 +136,18 @@ class xenserver(hypervisor.hypervisor):
 
     # Put a host to maintenance in XenServer
     def host_disable(self, host):
-        print "Note: Disabling host " + host.name
+        print("Note: Disabling host " + host.name)
         try:
             with settings(host_string=self.ssh_user + "@" + host.ipaddress):
                 return fab.run("xe host-disable host=" + host.name)
         except:
-            print "Warning: host_disable returned false for " + host.name
+            print("Warning: host_disable returned false for " + host.name)
             return False
 
     # Live migrate all VMS off of a hypervisor
     def host_evacuate(self, host):
-        print "Note: Evacuating host " + host.name + " @ " + time.strftime("%Y-%m-%d %H:%M")
-        print "Note: Migration progress will appear here.."
+        print("Note: Evacuating host " + host.name + " @ " + time.strftime("%Y-%m-%d %H:%M"))
+        print("Note: Migration progress will appear here..")
         try:
             with settings(host_string=self.ssh_user + "@" + host.ipaddress):
                 fab.run("nohup python /tmp/xenserver_parallel_evacuate.py --exec --threads " + str(self.threads) + " >& /dev/null < /dev/null &", pty=False)
@@ -156,12 +156,12 @@ class xenserver(hypervisor.hypervisor):
                 numer_of_vms = self.host_get_vms(host)
                 # Overwrite previous lin_
                 sys.stdout.write("\033[F")
-                print "Progress: On host " + host.name + " there are " + numer_of_vms + " VMs left to be migrated.."
+                print("Progress: On host " + host.name + " there are " + numer_of_vms + " VMs left to be migrated..")
                 if int(numer_of_vms) == 0:
                     break
                 time.sleep(5)
-            print "Note: Done evacuating host " + host.name + " @ " + time.strftime("%Y-%m-%d %H:%M")
-            print "Note: Sleeping 2 minutes to allow Cosmic to sync the state of VMs.."
+            print("Note: Done evacuating host " + host.name + " @ " + time.strftime("%Y-%m-%d %H:%M"))
+            print("Note: Sleeping 2 minutes to allow Cosmic to sync the state of VMs..")
             time.sleep(120)
             return True
         except:
@@ -171,41 +171,41 @@ class xenserver(hypervisor.hypervisor):
     def host_reboot(self, host, halt_hypervisor=False):
         # Disable host
         if self.host_disable(host) is False:
-            print "Error: Disabling host " + host.name + " failed."
+            print("Error: Disabling host " + host.name + " failed.")
             return False
 
         # Execute pre-empty-script
         if self.exec_script_on_hypervisor(host, self.pre_empty_script) is False:
-            print "Error: Executing script '" + self.pre_empty_script + "' on host " + host.name + " failed."
+            print("Error: Executing script '" + self.pre_empty_script + "' on host " + host.name + " failed.")
             return False
 
         # Then evacuate it
         if self.host_evacuate(host) is False:
-            print "Error: Evacuating host " + host.name + " failed."
+            print("Error: Evacuating host " + host.name + " failed.")
             return False
 
         # Count VMs to be sure
         if self.host_get_vms(host) != "0":
-            print "Error: Host " + host.name + " not empty, cannot reboot!"
+            print("Error: Host " + host.name + " not empty, cannot reboot!")
             return False
-        print "Note: Host " + host.name + " has no VMs running, continuing"
+        print("Note: Host " + host.name + " has no VMs running, continuing")
 
         # Execute post-empty-script
         if self.exec_script_on_hypervisor(host, self.post_empty_script) is False:
-            print "Error: Executing script '" + self.post_empty_script + "' on host " + host.name + " failed."
+            print("Error: Executing script '" + self.post_empty_script + "' on host " + host.name + " failed.")
             return False
 
         # Finally reboot it
         try:
             with settings(host_string=self.ssh_user + "@" + host.ipaddress):
                 if halt_hypervisor:
-                    print "Note: Halting host " + host.name
+                    print("Note: Halting host " + host.name)
                     fab.run("xe host-shutdown host=" + host.name)
                 else:
-                    print "Note: Rebooting host " + host.name
+                    print("Note: Rebooting host " + host.name)
                     fab.run("xe host-reboot host=" + host.name)
         except:
-            print "Error: Rebooting host " + host.name + " failed."
+            print("Error: Rebooting host " + host.name + " failed.")
             return False
 
         # Check the host is really offline
@@ -216,13 +216,13 @@ class xenserver(hypervisor.hypervisor):
 
         # Enable host
         if self.host_enable(host) is False:
-            print "Error: Enabling host " + host.name + " failed."
+            print("Error: Enabling host " + host.name + " failed.")
             return False
 
     # Execute script on hypervisor
     def exec_script_on_hypervisor(self, host, script):
         script = script.split('/')[-1]
-        print "Note: Executing script '%s' on host %s.." % (script, host.name)
+        print("Note: Executing script '%s' on host %s.." % (script, host.name))
         try:
             with settings(show('output'), host_string=self.ssh_user + "@" + host.ipaddress):
                 return fab.run("bash /tmp/" + script)
@@ -243,7 +243,7 @@ class xenserver(hypervisor.hypervisor):
 
     # Enable XenServer poolHA
     def pool_ha_enable(self, host):
-        print "Note: Enabling HA"
+        print("Note: Enabling HA")
         try:
             with settings(host_string=self.ssh_user + "@" + host.ipaddress):
                 if fab.run("cat /etc/redhat-release | awk '{ $3 = substr($3,1,3); print $3 }'") == "6.2":
@@ -255,7 +255,7 @@ class xenserver(hypervisor.hypervisor):
 
     # Disable XenServer poolHA
     def pool_ha_disable(self, host):
-        print "Note: Disabling HA"
+        print("Note: Disabling HA")
         if self.pool_ha_check(host):
             try:
                 with settings(host_string=self.ssh_user + "@" + host.ipaddress):
@@ -278,11 +278,11 @@ class xenserver(hypervisor.hypervisor):
 
     # Make sure hosts are put to Enabled again
     def roll_back(self, host):
-        print "Note: Problem detected, rolling back."
+        print("Note: Problem detected, rolling back.")
 
         # Enable host
         if self.host_enable(host) is False:
-            print "Error: Enabling host " + host.name + " failed."
+            print("Error: Enabling host " + host.name + " failed.")
             return False
 
     # Upload check scripts
@@ -290,27 +290,27 @@ class xenserver(hypervisor.hypervisor):
         try:
             with settings(host_string=self.ssh_user + "@" + host.ipaddress):
                 put('xenserver_check_bonds.py',
-                    '/tmp/xenserver_check_bonds.py', mode=0755)
+                    '/tmp/xenserver_check_bonds.py', mode=0o755)
                 put('xenserver_fake_pvtools.sh',
-                    '/tmp/xenserver_fake_pvtools.sh', mode=0755)
+                    '/tmp/xenserver_fake_pvtools.sh', mode=0o755)
                 put('xenserver_create_vlans.sh',
-                    '/tmp/xenserver_create_vlans.sh', mode=0755)
+                    '/tmp/xenserver_create_vlans.sh', mode=0o755)
                 put('xenserver_parallel_evacuate.py',
-                    '/tmp/xenserver_parallel_evacuate.py', mode=0755)
+                    '/tmp/xenserver_parallel_evacuate.py', mode=0o755)
                 if len(self.pre_empty_script) > 0:
                     put(self.pre_empty_script,
-                        '/tmp/' + self.pre_empty_script.split('/')[-1], mode=0755)
+                        '/tmp/' + self.pre_empty_script.split('/')[-1], mode=0o755)
                 if len(self.post_empty_script) > 0:
                     put(self.post_empty_script,
-                        '/tmp/' + self.post_empty_script.split('/')[-1], mode=0755)
+                        '/tmp/' + self.post_empty_script.split('/')[-1], mode=0o755)
             return True
         except:
-            print "Warning: Could not upload check scripts to host " + host.name + ". Continuing anyway."
+            print("Warning: Could not upload check scripts to host " + host.name + ". Continuing anyway.")
             return False
 
     # Eject CDs
     def eject_cds(self, host):
-        print "Note: We're ejecting all mounted CDs on this cluster."
+        print("Note: We're ejecting all mounted CDs on this cluster.")
         try:
             with settings(host_string=self.ssh_user + "@" + host.ipaddress):
                 return fab.run("for vm in $(xe vbd-list type=CD empty=false params=vm-uuid --minimal |\
@@ -320,7 +320,7 @@ class xenserver(hypervisor.hypervisor):
 
     # Fake PV tools
     def fake_pv_tools(self, host):
-        print "Note: We're faking the presence of PV tools of all vm's reporting no tools on hypervisor " + host.name
+        print("Note: We're faking the presence of PV tools of all vm's reporting no tools on hypervisor " + host.name)
         try:
             with settings(host_string=self.ssh_user + "@" + host.ipaddress):
                 return fab.run("xe vm-list PV-drivers-up-to-date='<not in database>' is-control-domain=false\
@@ -331,7 +331,7 @@ class xenserver(hypervisor.hypervisor):
 
     # Create VLANs
     def create_vlans(self, host):
-        print "Note: We're creating the missing VLAN's on hypervisor " + host.name
+        print("Note: We're creating the missing VLAN's on hypervisor " + host.name)
         try:
             with settings(host_string=self.ssh_user + "@" + host.ipaddress):
                 return fab.run("/tmp/xenserver_create_vlans.sh")
@@ -360,7 +360,7 @@ class xenserver(hypervisor.hypervisor):
         except:
             local_length = 0
 
-        print "Note: Executing request.."
+        print("Note: Executing request..")
         try:
             response = requests.get(url, stream=True)
             remote_length = int(response.headers.get('Content-Length', 0))
@@ -370,15 +370,15 @@ class xenserver(hypervisor.hypervisor):
             return False
 
         # Do we need to download?
-        print "Note: The remote length is %s, local length is %s" % (remote_length, local_length)
+        print("Note: The remote length is %s, local length is %s" % (remote_length, local_length))
 
         if remote_length == local_length:
-            print "Note: Skipping download because file is already downloaded."
+            print("Note: Skipping download because file is already downloaded.")
             return True
 
         with open(destination_file, 'wb') as handle:
             # Download file
-            print "Note: Downloading file.."
+            print("Note: Downloading file..")
 
             for block in response.iter_content(1024):
                 handle.write(block)
@@ -386,22 +386,22 @@ class xenserver(hypervisor.hypervisor):
 
     # Upload patches to poolmaster
     def put_patches_to_poolmaster(self, host):
-        print "Note: Uploading patches to poolmaster.."
+        print("Note: Uploading patches to poolmaster..")
         try:
             with settings(host_string=self.ssh_user + "@" + host.ipaddress):
                 run('rm -rf /root/xenserver_patches/')
                 run('mkdir -p /root/xenserver_patches')
                 put('xenserver_patches/*', '/root/xenserver_patches')
                 put('xenserver_upload_patches_to_poolmaster.sh',
-                    '/root/xenserver_patches/xenserver_upload_patches_to_poolmaster.sh', mode=0755)
+                    '/root/xenserver_patches/xenserver_upload_patches_to_poolmaster.sh', mode=0o755)
             return True
         except:
-            print "Warning: Could not upload patches to host " + host.name + "."
+            print("Warning: Could not upload patches to host " + host.name + ".")
             return False
 
     # Upload patches to XenServer
     def upload_patches_to_xenserver(self, host):
-        print "Note: We're uploading the patches to XenServer"
+        print("Note: We're uploading the patches to XenServer")
         try:
             with settings(show('output'), host_string=self.ssh_user + "@" + host.ipaddress):
                 return fab.run("/usr/bin/test -f /root/xenserver_patches/xenserver_upload_patches_to_poolmaster.sh && bash /root/xenserver_patches/xenserver_upload_patches_to_poolmaster.sh")
@@ -410,13 +410,13 @@ class xenserver(hypervisor.hypervisor):
 
     def prepare_xenserver(self, host):
         if self.DRYRUN:
-            print "Note: Would have created migration folder on %s" % host.name
+            print("Note: Would have created migration folder on %s" % host.name)
             return True
         result = self.create_migration_nfs_dir(host)
         if self.DEBUG == 1:
-            print "DEBUG: received this result:" + str(result)
+            print("DEBUG: received this result:" + str(result))
         if result is False:
-            print "Error: Could not prepare the migration folder on XenServer host " + host.name
+            print("Error: Could not prepare the migration folder on XenServer host " + host.name)
             return False
         return True
 
@@ -425,9 +425,9 @@ class xenserver(hypervisor.hypervisor):
         if mountpoint is False:
             return False
         if len(mountpoint) == 0:
-            print "Error: mountpoint cannot be empty"
+            print("Error: mountpoint cannot be empty")
             return False
-        print "Note: Creating migration folder %s" % self.get_migration_path()
+        print("Note: Creating migration folder %s" % self.get_migration_path())
         try:
             with settings(host_string=self.ssh_user + "@" + host.ipaddress):
                 command = "mkdir -p " + self.get_migration_path()
@@ -436,15 +436,15 @@ class xenserver(hypervisor.hypervisor):
             return False
 
     def find_nfs_mountpoint(self, host):
-        print "Note: Looking for NFS mount on XenServer host %s" % host.name
+        print("Note: Looking for NFS mount on XenServer host %s" % host.name)
         if self.mountpoint is not None:
-            print "Note: Found " + str(self.mountpoint)
+            print("Note: Found " + str(self.mountpoint))
             return self.mountpoint
         try:
             with settings(host_string=self.ssh_user + "@" + host.ipaddress):
                 command = "mount | grep sr-mount | grep \"type nfs\" | awk {'print $3'}"
                 self.mountpoint = fab.run(command)
-                print "Note: Found " + str(self.mountpoint)
+                print("Note: Found " + str(self.mountpoint))
                 return self.mountpoint
         except:
             return False
@@ -458,15 +458,15 @@ class xenserver(hypervisor.hypervisor):
     def extract_volume_wrapper(self, path, host):
         extract_result = self.extract_volume(host, path)
         if extract_result is False:
-            print "Error: Extracting the volume went wrong"
+            print("Error: Extracting the volume went wrong")
             return False
         uuid_folder = self.get_migration_path().split("/migration/")[-1]
         file_location = uuid_folder + path
-        print "Note: File location is %s" % file_location
+        print("Note: File location is %s" % file_location)
         return file_location
 
     def extract_volume(self, host, path):
-        print "Note: We're exporting disk with name (on disk) '%s' and make it available for rsync download" % path
+        print("Note: We're exporting disk with name (on disk) '%s' and make it available for rsync download" % path)
         try:
             with settings(show('output'), host_string=self.ssh_user + "@" + host.ipaddress):
                 return fab.run("DISKPATH=" + path + "; DISKUUID=$(xe vdi-list location=${DISKPATH} "
@@ -475,5 +475,5 @@ class xenserver(hypervisor.hypervisor):
                                + self.get_migration_path() + "${DISKPATH} format=vhd; chmod 644 "
                                + self.get_migration_path() + "${DISKPATH}")
         except:
-            print "Error: extract_folume failed!"
+            print("Error: extract_folume failed!")
             return False

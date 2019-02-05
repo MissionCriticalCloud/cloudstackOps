@@ -60,17 +60,17 @@ def handleArguments(argv):
             argv, "hc:p:", [
                 "config-profile=", "storagepoolname=", "debug", "exec", "is-projectvm"])
     except getopt.GetoptError as e:
-        print "Error: " + str(e)
-        print help
+        print("Error: " + str(e))
+        print(help)
         sys.exit(2)
 
     if len(opts) == 0:
-        print help
+        print(help)
         sys.exit(2)
 
     for opt, arg in opts:
         if opt == '-h':
-            print help
+            print(help)
             sys.exit()
         elif opt in ("-c", "--config-profile"):
             configProfileName = arg
@@ -89,7 +89,7 @@ def handleArguments(argv):
 
     # We need at least these vars
     if len(storagepoolname) == 0:
-        print help
+        print(help)
         sys.exit()
 
 # Parse arguments
@@ -106,10 +106,10 @@ else:
 c = cloudstackops.CloudStackOps(DEBUG, DRYRUN)
 
 if DEBUG == 1:
-    print "# Warning: Debug mode is enabled!"
+    print("# Warning: Debug mode is enabled!")
 
 if DRYRUN == 1:
-    print "# Warning: dry-run mode is enabled, not running any commands!"
+    print("# Warning: dry-run mode is enabled, not running any commands!")
 
 # make credentials file known to our class
 c.configProfileName = configProfileName
@@ -118,13 +118,13 @@ c.configProfileName = configProfileName
 c.initCloudStackAPI()
 
 if DEBUG == 1:
-    print "API address: " + c.apiurl
-    print "ApiKey: " + c.apikey
-    print "SecretKey: " + c.secretkey
+    print("API address: " + c.apiurl)
+    print("ApiKey: " + c.apikey)
+    print("SecretKey: " + c.secretkey)
 
 # Check cloudstack IDs
 if DEBUG == 1:
-    print "Checking CloudStack IDs of provided input.."
+    print("Checking CloudStack IDs of provided input..")
 if len(storagepoolname) > 1:
     storagepoolID = c.checkCloudStackName(
         {'csname': storagepoolname, 'csApiCall': 'listStoragePools'})
@@ -133,7 +133,7 @@ if len(storagepoolname) > 1:
 volumesData = c.listVolumes(storagepoolID, projectParam)
 
 # Empty line
-print
+print()
 t = PrettyTable(["VM name", "Volume name", "Instance name", "Volume path"])
 t.align["VM"] = "l"
 
@@ -158,7 +158,7 @@ for volume in volumesData:
     t.add_row([vmname, volume.name, instancename, volume.path + ".vhd"])
 
 # Display table
-print t
+print(t)
 
 if DEBUG == 1:
-    print "Note: We're done!"
+    print("Note: We're done!")

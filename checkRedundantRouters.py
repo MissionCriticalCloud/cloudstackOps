@@ -54,17 +54,17 @@ def handleArguments(argv):
             argv, "hc:d:p:", [
                 "config-profile=", "debug", "exec", "is-projectvm"])
     except getopt.GetoptError as e:
-        print "Error: " + str(e)
-        print help
+        print("Error: " + str(e))
+        print(help)
         sys.exit(2)
 
     if len(opts) == 0:
-        print help
+        print(help)
         sys.exit(2)
 
     for opt, arg in opts:
         if opt == '-h':
-            print help
+            print(help)
             sys.exit()
         elif opt in ("-c", "--config-profile"):
             configProfileName = arg
@@ -85,10 +85,10 @@ if __name__ == "__main__":
 c = cloudstackops.CloudStackOps(DEBUG, DRYRUN)
 
 if DEBUG == 1:
-    print "Warning: Debug mode is enabled!"
+    print("Warning: Debug mode is enabled!")
 
 if DRYRUN == 1:
-    print "Warning: dry-run mode is enabled, not running any commands!"
+    print("Warning: dry-run mode is enabled, not running any commands!")
 
 # make credentials file known to our class
 c.configProfileName = configProfileName
@@ -97,19 +97,19 @@ c.configProfileName = configProfileName
 c.initCloudStackAPI()
 
 if DEBUG == 1:
-    print "API address: " + c.apiurl
-    print "ApiKey: " + c.apikey
-    print "SecretKey: " + c.secretkey
+    print("API address: " + c.apiurl)
+    print("ApiKey: " + c.apikey)
+    print("SecretKey: " + c.secretkey)
 
 # Get the redundant routers
 redRouters = c.getRedundantRouters('{}')
 
 # Look for routers on the same POD
 if redRouters is not None and redRouters is not 1:
-    for routerData in redRouters.itervalues():
+    for routerData in redRouters.values():
         if routerData is None or routerData == 1:
             continue
         if routerData['router'].podid == routerData['routerPeer'].podid:
-            print "Warning: Router pair " + routerData['router'].name + " and " + routerData['routerPeer'].name + " run on same POD!" + " (" + routerData['router'].podid + " / " + routerData['routerPeer'].podid + ")"
+            print("Warning: Router pair " + routerData['router'].name + " and " + routerData['routerPeer'].name + " run on same POD!" + " (" + routerData['router'].podid + " / " + routerData['routerPeer'].podid + ")")
         if DEBUG == 1:
-            print "DEBUG: " + routerData['router'].name + " has peer " + routerData['routerPeer'].name
+            print("DEBUG: " + routerData['router'].name + " has peer " + routerData['routerPeer'].name)

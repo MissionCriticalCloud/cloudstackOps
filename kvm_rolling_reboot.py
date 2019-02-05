@@ -113,13 +113,13 @@ def handleArguments(argv):
                 "no-bond-check", "skip-os-version=", "halt", "debug", "exec",
                 "post-reboot-script=", "prepare"])
     except getopt.GetoptError as e:
-        print "Error: " + str(e)
-        print help
+        print("Error: " + str(e))
+        print(help)
         sys.exit(2)
     for opt, arg in opts:
         if opt == '-h':
 
-            print help
+            print(help)
             sys.exit()
         elif opt in ("-c", "--config-profile"):
             configProfileName = arg
@@ -174,7 +174,7 @@ def handleArguments(argv):
 
     # We need at least a cluster name
     if len(clustername) == 0:
-        print help
+        print(help)
         sys.exit(1)
 
 
@@ -206,17 +206,17 @@ c.initCloudStackAPI()
 poolmaster = "n/a"
 
 if DEBUG == 1:
-    print "API address: " + c.apiurl
-    print "ApiKey: " + c.apikey
-    print "SecretKey: " + c.secretkey
+    print("API address: " + c.apiurl)
+    print("ApiKey: " + c.apikey)
+    print("SecretKey: " + c.secretkey)
 
 # Check cloudstack IDs
 if DEBUG == 1:
-    print "Note: Checking IDs of provided input.."
+    print("Note: Checking IDs of provided input..")
 clusterID = c.checkCloudStackName(
     {'csname': clustername, 'csApiCall': 'listClusters'})
 if clusterID == 1:
-    print "Error: Could not find cluster '" + clustername + "'."
+    print("Error: Could not find cluster '" + clustername + "'.")
     disconnect_all()
     sys.exit(1)
 
@@ -224,7 +224,7 @@ if clusterID == 1:
 cluster_hosts = sorted(c.getAllHostsFromCluster(clusterID), key=lambda h: h.name)
 
 # Print cluster info
-print "Note: Gathering some info about cluster '" + clustername + "':"
+print("Note: Gathering some info about cluster '" + clustername + "':")
 c.printCluster(clusterID, "KVM")
 
 # Put the scripts we need
@@ -232,7 +232,7 @@ for host in cluster_hosts:
     k.put_scripts(host)
 
 # Print cluster info
-print "Note: Gathering some info about hypervisors in cluster '" + clustername + "':"
+print("Note: Gathering some info about hypervisors in cluster '" + clustername + "':")
 c.printHypervisors(clusterID, False, checkBonds, "KVM")
 
 to_slack = True
@@ -257,42 +257,42 @@ if firmware_reboot_hypervisor:
     c.print_message(message=message, message_type="Warning", to_slack=to_slack)
 
 if DRYRUN == 1:
-    print
-    print "Warning: We are running in DRYRUN mode."
-    print
-    print "This script will: "
-    print "  - For any hypervisor it will do this:"
-    print "      - execute the --pre-empty-script script '" + pre_empty_script + "' on the hypervisor"
-    print "      - disable the host in Cosmic"
-    print "      - live migrate all VMs off of it"
-    print "      - execute the --post-empty-script script '" + post_empty_script + "' on the hypervisor"
-    print "      - when empty, it will reboot the hypervisor"
-    print "        (halting is " + str(halt_hypervisor) + ") and (force_reset is " + str(force_reset_hypervisor) + ")  and (skip_reboot is " + str(skip_reboot_hypervisor) + ") and (firmware_reboot is " + str(firmware_reboot_hypervisor) + ")"
-    print "      - will wait for it to come back online (checks SSH connection)"
-    print "      - execute the --post-reboot-script script '" + post_reboot_script + "' on the hypervisor"
-    print "      - enable the host in Cosmic"
-    print "      - waits until host is Connected & Up in Cosmic"
-    print "      - continues to the next hypervisor"
-    print "Then the reboot cyclus for " + clustername + " is done!"
-    print
+    print()
+    print("Warning: We are running in DRYRUN mode.")
+    print()
+    print("This script will: ")
+    print("  - For any hypervisor it will do this:")
+    print("      - execute the --pre-empty-script script '" + pre_empty_script + "' on the hypervisor")
+    print("      - disable the host in Cosmic")
+    print("      - live migrate all VMs off of it")
+    print("      - execute the --post-empty-script script '" + post_empty_script + "' on the hypervisor")
+    print("      - when empty, it will reboot the hypervisor")
+    print("        (halting is " + str(halt_hypervisor) + ") and (force_reset is " + str(force_reset_hypervisor) + ")  and (skip_reboot is " + str(skip_reboot_hypervisor) + ") and (firmware_reboot is " + str(firmware_reboot_hypervisor) + ")")
+    print("      - will wait for it to come back online (checks SSH connection)")
+    print("      - execute the --post-reboot-script script '" + post_reboot_script + "' on the hypervisor")
+    print("      - enable the host in Cosmic")
+    print("      - waits until host is Connected & Up in Cosmic")
+    print("      - continues to the next hypervisor")
+    print("Then the reboot cyclus for " + clustername + " is done!")
+    print()
 
     # Hosts to ignore
     if len(ignoreHosts) > 0:
-        print "Note: Ignoring these hosts: " + str(ignoreHosts)
+        print("Note: Ignoring these hosts: " + str(ignoreHosts))
 
     if len(onlyHosts) > 0:
-        print "Note: Only processing these hosts: " + str(onlyHosts)
+        print("Note: Only processing these hosts: " + str(onlyHosts))
 
     if len(skip_os_version) > 0:
-        print "Note: Skipping hosts with OS: " + str(skip_os_version)
+        print("Note: Skipping hosts with OS: " + str(skip_os_version))
 
-    print "To kick it off, run with the --exec flag."
-    print
+    print("To kick it off, run with the --exec flag.")
+    print()
     disconnect_all()
     sys.exit(1)
 
 # Start time
-print "Note: Starting @ %s" % time.strftime("%Y-%m-%d %H:%M")
+print("Note: Starting @ %s" % time.strftime("%Y-%m-%d %H:%M"))
 start_time = datetime.now()
 
 # Then the other hypervisors, one-by-one

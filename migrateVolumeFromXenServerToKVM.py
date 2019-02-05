@@ -84,12 +84,12 @@ def handleArguments(argv):
                 "config-profile=", "volume-name=", "tostoragepool=", "mysqlserver=", "mysqlpassword=",
                 "skip-virt-v2v", "helper-scripts-path=", "debug", "exec", "force"])
     except getopt.GetoptError as e:
-        print "Error: " + str(e)
-        print help
+        print("Error: " + str(e))
+        print(help)
         sys.exit(2)
     for opt, arg in opts:
         if opt == '-h':
-            print help
+            print(help)
             sys.exit()
         elif opt in ("-c", "--config-profile"):
             configProfileName = arg
@@ -118,11 +118,11 @@ def handleArguments(argv):
 
     # We need at least these vars
     if len(volumename) == 0 or len(toStoragePool) == 0 or len(mysqlHost) == 0:
-        print help
+        print(help)
         sys.exit()
 
 def exit_script(message):
-    print "Fatal Error: %s" % message
+    print("Fatal Error: %s" % message)
     sys.exit(1)
 
 
@@ -131,14 +131,14 @@ if __name__ == "__main__":
     handleArguments(sys.argv[1:])
 
 # Start time
-print "Note: Starting @ %s" % time.strftime("%Y-%m-%d %H:%M")
+print("Note: Starting @ %s" % time.strftime("%Y-%m-%d %H:%M"))
 start_time = datetime.now()
 
 if DEBUG == 1:
-    print "Warning: Debug mode is enabled!"
+    print("Warning: Debug mode is enabled!")
 
 if DRYRUN == 1:
-    print "Warning: dry-run mode is enabled, not running any commands!"
+    print("Warning: dry-run mode is enabled, not running any commands!")
 
 # Init CloudStackOps class
 c = cloudstackops.CloudStackOps(DEBUG, DRYRUN)
@@ -167,8 +167,8 @@ if result > 0:
     c.print_message(message=message, message_type="Error", to_slack=True)
     sys.exit(1)
 elif DEBUG == 1:
-    print "DEBUG: MySQL connection successful"
-    print s.conn
+    print("DEBUG: MySQL connection successful")
+    print(s.conn)
 
 # make credentials file known to our class
 c.configProfileName = configProfileName
@@ -177,13 +177,13 @@ c.configProfileName = configProfileName
 c.initCloudStackAPI()
 
 if DEBUG == 1:
-    print "API address: " + c.apiurl
-    print "ApiKey: " + c.apikey
-    print "SecretKey: " + c.secretkey
+    print("API address: " + c.apiurl)
+    print("ApiKey: " + c.apikey)
+    print("SecretKey: " + c.secretkey)
 
 # Check cloudstack IDs
 if DEBUG == 1:
-    print "Debug: Checking CloudStack IDs of provided input.."
+    print("Debug: Checking CloudStack IDs of provided input..")
 
 if isProjectVm == 1:
     projectParam = "true"
@@ -234,7 +234,7 @@ if DRYRUN == 1:
     to_slack = False
 
 if DEBUG == 1:
-    print "Note: You selected a storage pool with tags '" + str(storagePoolTags) + "'"
+    print("Note: You selected a storage pool with tags '" + str(storagePoolTags) + "'")
     to_slack = False
 
 if volume.hypervisor == "KVM":
@@ -274,7 +274,7 @@ if currentStorageID == toStoragePoolID:
     c.print_message(message=message, message_type="Note", to_slack=False)
 
 if currentStorageID is None:
-    print "Error: Unable to determine the current storage pool of the volumes."
+    print("Error: Unable to determine the current storage pool of the volumes.")
     sys.exit(1)
 
 # Get hosts that belong to toCluster vm is currently running on
@@ -299,7 +299,7 @@ for (name, path, uuid, voltype) in volumes_result:
     c.print_message(message=message, message_type="Note", to_slack=to_slack)
 
     if DRYRUN == 1:
-        print "Note: Would have extracted, downloaded, converted volume %s " % name
+        print("Note: Would have extracted, downloaded, converted volume %s " % name)
     else:
         if voltype != "DATADISK":
             message = "Volume %s is of type %s (should be DATADISK). Nothing has changed. Halting." % (name, voltype)
@@ -356,8 +356,8 @@ if result > 0:
     c.print_message(message=message, message_type="Error", to_slack=to_slack)
     sys.exit(1)
 elif DEBUG == 1:
-    print "DEBUG: MySQL connection successful"
-    print s.conn
+    print("DEBUG: MySQL connection successful")
+    print(s.conn)
 
 message = "Updating the database to activate the Volume on KVM"
 c.print_message(message=message, message_type="Note", to_slack=False)

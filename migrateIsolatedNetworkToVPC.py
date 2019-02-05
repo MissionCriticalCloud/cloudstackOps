@@ -57,12 +57,12 @@ def handleArguments(argv):
                 "mysqlpassword=", "debug", "exec", "force"
             ])
     except getopt.GetoptError as e:
-        print "Error: " + str(e)
-        print help
+        print("Error: " + str(e))
+        print(help)
         sys.exit(2)
     for opt, arg in opts:
         if opt == '-h':
-            print help
+            print(help)
             sys.exit()
         elif opt in ("-c", "--config-profile"):
             configProfileName = arg
@@ -92,18 +92,18 @@ def handleArguments(argv):
     # We need at least these vars
     if (len(networkname) == 0 and len(networkuuid) == 0) or len(mysqlHost) == 0 or len(vpcofferingname) == 0 or \
                     len(networkofferingname) == 0:
-        print "networkname: " + networkname
-        print "networkuuid: " + networkuuid
-        print "mysqlHost: " + mysqlHost
-        print "vpcofferingname: " + vpcofferingname
-        print "networkofferingname: " + networkofferingname
-        print "Required parameter not passed!"
-        print help
+        print("networkname: " + networkname)
+        print("networkuuid: " + networkuuid)
+        print("mysqlHost: " + mysqlHost)
+        print("vpcofferingname: " + vpcofferingname)
+        print("networkofferingname: " + networkofferingname)
+        print("Required parameter not passed!")
+        print(help)
         sys.exit()
 
 
 def exit_script(message):
-    print "Fatal Error: %s" % message
+    print("Fatal Error: %s" % message)
     sys.exit(1)
 
 
@@ -112,14 +112,14 @@ if __name__ == "__main__":
     handleArguments(sys.argv[1:])
 
 # Start time
-print "Note: Starting @ %s" % time.strftime("%Y-%m-%d %H:%M")
+print("Note: Starting @ %s" % time.strftime("%Y-%m-%d %H:%M"))
 start_time = datetime.now()
 
 if DEBUG == 1:
-    print "Warning: Debug mode is enabled!"
+    print("Warning: Debug mode is enabled!")
 
 if DRYRUN == 1:
-    print "Warning: dry-run mode is enabled, not running any commands!"
+    print("Warning: dry-run mode is enabled, not running any commands!")
 
 # Init CloudStackOps class
 c = cloudstackops.CloudStackOps(DEBUG, DRYRUN)
@@ -136,8 +136,8 @@ if result > 0:
     c.print_message(message=message, message_type="Error", to_slack=True)
     sys.exit(1)
 elif DEBUG == 1:
-    print "DEBUG: MySQL connection successful"
-    print s.conn
+    print("DEBUG: MySQL connection successful")
+    print(s.conn)
 
 # make credentials file known to our class
 c.configProfileName = configProfileName
@@ -154,16 +154,16 @@ if not networkuuid:
     })
 
 if DEBUG == 1:
-    print "API address: " + c.apiurl
-    print "ApiKey: " + c.apikey
-    print "SecretKey: " + c.secretkey
-    print "Username: " + c.username
-    print "Password: " + c.password
+    print("API address: " + c.apiurl)
+    print("ApiKey: " + c.apikey)
+    print("SecretKey: " + c.secretkey)
+    print("Username: " + c.username)
+    print("Password: " + c.password)
 
 # Check cloudstack IDs
 if DEBUG == 1:
-    print "Debug: Checking CloudStack IDs of provided input.."
-    print "Network UUID: %s" % networkuuid
+    print("Debug: Checking CloudStack IDs of provided input..")
+    print("Network UUID: %s" % networkuuid)
 
 # Get Isolated network details
 isolated_network = c.listNetworks(networkuuid)[0]

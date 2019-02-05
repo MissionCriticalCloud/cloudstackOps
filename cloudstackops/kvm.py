@@ -36,7 +36,7 @@ from fabric.api import (
     settings
 )
 
-import hypervisor
+from . import hypervisor
 
 # Set user/passwd for fabric ssh
 env.user = 'root'
@@ -73,13 +73,13 @@ class Kvm(hypervisor.hypervisor):
 
     def prepare_kvm(self, kvmhost, storage_pool_uuid):
         if self.DRYRUN:
-            print "Note: Would have created migration folder on /mnt/%s on random host" % storage_pool_uuid
+            print("Note: Would have created migration folder on /mnt/%s on random host" % storage_pool_uuid)
             return True
         result = self.create_migration_nfs_dir(kvmhost, storage_pool_uuid)
         if self.DEBUG == 1:
-            print "DEBUG: received this result:" + str(result)
+            print("DEBUG: received this result:" + str(result))
         if result is False:
-            print "Error: Could not prepare the migration folder on host " + kvmhost.name
+            print("Error: Could not prepare the migration folder on host " + kvmhost.name)
             return False
         return True
 
@@ -90,10 +90,10 @@ class Kvm(hypervisor.hypervisor):
 
     def create_migration_nfs_dir(self, host, storage_pool_uuid):
         if len(storage_pool_uuid) == 0:
-            print "Error: mountpoint cannot be empty"
+            print("Error: mountpoint cannot be empty")
             return False
         self.mountpoint = "/mnt/" + storage_pool_uuid
-        print "Note: Creating migration folder %s on %s" % (self.get_migration_path(), host.name)
+        print("Note: Creating migration folder %s on %s" % (self.get_migration_path(), host.name))
         try:
             with settings(host_string=self.ssh_user + "@" + host.ipaddress):
                 command = "sudo mkdir -p " + self.get_migration_path()
@@ -102,7 +102,7 @@ class Kvm(hypervisor.hypervisor):
             return False
 
     def download_volume(self, kvmhost, file_location, path):
-        print "Note: Downloading disk from %s to host %s" % (file_location, kvmhost.name)
+        print("Note: Downloading disk from %s to host %s" % (file_location, kvmhost.name))
         try:
             with settings(host_string=self.ssh_user + "@" + kvmhost.ipaddress):
                 command = "sudo rsync -av -P %s %s%s.vhd" % (file_location, self.get_migration_path(), path)
@@ -114,41 +114,41 @@ class Kvm(hypervisor.hypervisor):
     def make_kvm_compatible(self, kvmhost, path, virtvtov=True, partitionfix=True):
         result = self.convert_volume_to_qcow(kvmhost, path)
         if result is False:
-            print "Error: Could not convert volume %s on host %s" % (path, kvmhost.name)
+            print("Error: Could not convert volume %s on host %s" % (path, kvmhost.name))
             return False
         if partitionfix is True:
             result = self.fix_partition_size(kvmhost, path)
             if result is False:
-                print "Error: Could not fix partition of volume %s on host %s" % (path, kvmhost.name)
+                print("Error: Could not fix partition of volume %s on host %s" % (path, kvmhost.name))
                 return False
         if virtvtov is True:
             result = self.inject_drivers(kvmhost, path)
             if result is False:
-                print "Error: Could not inject drivers on volume %s on host %s" % (path, kvmhost.name)
+                print("Error: Could not inject drivers on volume %s on host %s" % (path, kvmhost.name))
                 return False
             if self.get_os_family(kvmhost, path) == "windows":
                 registryresult = self.fix_windows_registry(kvmhost, path)
                 if registryresult is False:
-                    print "Error: Altering the registry failed."
+                    print("Error: Altering the registry failed.")
                     return False
             result = self.modify_os_files(kvmhost, path)
             if result is False:
-                print "Error: Could not modify disk %s on host %s" % (path, kvmhost.name)
+                print("Error: Could not modify disk %s on host %s" % (path, kvmhost.name))
                 return False
             result = self.move_rootdisk_to_pool(kvmhost, path)
             if result is False:
-                print "Error: Could not move rootvolume %s to the storage pool on host %s" % (path, kvmhost.name)
+                print("Error: Could not move rootvolume %s to the storage pool on host %s" % (path, kvmhost.name))
                 return False
         else:
             result = self.move_datadisk_to_pool(kvmhost, path)
             if result is False:
-                print "Error: Could not move datavolume %s to the storage pool on host %s" % (path, kvmhost.name)
+                print("Error: Could not move datavolume %s to the storage pool on host %s" % (path, kvmhost.name))
                 return False
-            print "Note: Skipping virt-v2v step due to --skip-virt-v2v flag"
+            print("Note: Skipping virt-v2v step due to --skip-virt-v2v flag")
         return True
 
     def convert_volume_to_qcow(self, kvmhost, volume_uuid):
-        print "Note: Converting disk %s to QCOW2 on host %s" % (volume_uuid, kvmhost.name)
+        print("Note: Converting disk %s to QCOW2 on host %s" % (volume_uuid, kvmhost.name))
         try:
             with settings(host_string=self.ssh_user + "@" + kvmhost.ipaddress):
                 command = "cd %s; nice -n 19 sudo qemu-img convert %s.vhd -O qcow2 %s" % (self.get_migration_path(),
@@ -158,7 +158,7 @@ class Kvm(hypervisor.hypervisor):
             return False
 
     def fix_partition_size(self, kvmhost, volume_uuid):
-        print "Note: Fixing virtual versus physical disksize %s on host %s" % (volume_uuid, kvmhost.name)
+        print("Note: Fixing virtual versus physical disksize %s on host %s" % (volume_uuid, kvmhost.name))
         try:
             with settings(host_string=self.ssh_user + "@" + kvmhost.ipaddress):
                 command = "cd %s; sudo qemu-img resize %s +2M" % (self.get_migration_path(), volume_uuid)
@@ -167,21 +167,21 @@ class Kvm(hypervisor.hypervisor):
             return False
 
     def inject_drivers(self, kvmhost, volume_uuid):
-        print "Note: Inject drivers into disk %s on host %s" % (volume_uuid, kvmhost.name)
+        print("Note: Inject drivers into disk %s on host %s" % (volume_uuid, kvmhost.name))
         try:
             with settings(host_string=self.ssh_user + "@" + kvmhost.ipaddress, warn_only=True):
                 command = "cd %s; sudo virt-v2v -i disk %s -o local -os ./" % (self.get_migration_path(), volume_uuid)
                 output = fab.run(command)
 
                 if output.failed and "The NTFS partition is in an unsafe state." in output:
-                    print "Note: NTFS is in an unsafe state, trying to fix for disk %s on host %s" % (
+                    print("Note: NTFS is in an unsafe state, trying to fix for disk %s on host %s" % (
                         volume_uuid, kvmhost.name
-                    )
+                    ))
                     if self.ntfsfix(kvmhost, volume_uuid, output):
-                        print "Note: Retrying to inject drivers into disk %s on host %s" % (volume_uuid, kvmhost.name)
+                        print("Note: Retrying to inject drivers into disk %s on host %s" % (volume_uuid, kvmhost.name))
                         output = fab.run(command).succeeded
                 elif output.failed:
-                    print output
+                    print(output)
                     return False
 
                 return output
@@ -189,14 +189,14 @@ class Kvm(hypervisor.hypervisor):
             return False
 
     def ntfsfix(self, kvmhost, volume_uuid, output):
-        print "Note: Trying to fix NTFS on disk %s on host %s" % (volume_uuid, kvmhost.name)
+        print("Note: Trying to fix NTFS on disk %s on host %s" % (volume_uuid, kvmhost.name))
         try:
             with settings(host_string=self.ssh_user + "@" + kvmhost.ipaddress, warn_only=True):
                 for line in output.split('\n'):
                     if "Original error message: mount:" in line:
                         device = line.split(" ")[4]
 
-                        print "Note: Fixing NTFS partition %s disk %s on host %s" % (device, volume_uuid, kvmhost.name)
+                        print("Note: Fixing NTFS partition %s disk %s on host %s" % (device, volume_uuid, kvmhost.name))
                         command = "cd %s; sudo guestfish add %s : run : ntfsfix %s" % \
                                   (self.get_migration_path(), volume_uuid, device)
                         return fab.run(command).succeeded
@@ -204,7 +204,7 @@ class Kvm(hypervisor.hypervisor):
             return False
 
     def fix_windows_registry(self, kvmhost, volume_uuid):
-        print "Note: Setting UTC registry setting on disk %s on host %s" % (volume_uuid, kvmhost.name)
+        print("Note: Setting UTC registry setting on disk %s on host %s" % (volume_uuid, kvmhost.name))
         try:
             with settings(host_string=self.ssh_user + "@" + kvmhost.ipaddress):
                 command = "cd %s; sudo virt-win-reg %s-sda --merge utc.reg" % (self.get_migration_path(), volume_uuid)
@@ -216,7 +216,7 @@ class Kvm(hypervisor.hypervisor):
         if self.os_family is not None:
             return self.os_family
 
-        print "Note: Figuring out what OS Familiy the disk %s has" % volume_uuid
+        print("Note: Figuring out what OS Familiy the disk %s has" % volume_uuid)
 
         try:
             with settings(host_string=self.ssh_user + "@" + kvmhost.ipaddress):
@@ -224,15 +224,15 @@ class Kvm(hypervisor.hypervisor):
                           "\"string(//operatingsystems/operatingsystem/name)\"" % \
                           (self.get_migration_path(), volume_uuid)
                 self.os_family = fab.run(command)
-                print "Note: This is a VM of the %s Family" % self.os_family.title()
+                print("Note: This is a VM of the %s Family" % self.os_family.title())
                 return self.os_family
         except:
             return False
 
     def vmware_virt_v2v(self, kvmhost, esxi_host, vmx_path):
-        print "Note: Virt-v2v from VMware host: %s vmx-path: %s on kvm host: %s" % (
+        print("Note: Virt-v2v from VMware host: %s vmx-path: %s on kvm host: %s" % (
             esxi_host, vmx_path, kvmhost.name
-        )
+        ))
         try:
             vmx_uri = "ssh://root@%s/%s" % (esxi_host, vmx_path)
 
@@ -242,29 +242,29 @@ class Kvm(hypervisor.hypervisor):
                              (kvmhost.ipaddress, self.get_migration_path(), vmx_uri)
             process = os.system(remote_command)
 
-            print process
+            print(process)
         except Exception as e:
-            print e
+            print(e)
             return False
 
     def get_disk_sizes(self, kvmhost):
-        print "Note: Getting disk sizes from host: %s" % kvmhost.ipaddress
+        print("Note: Getting disk sizes from host: %s" % kvmhost.ipaddress)
 
         try:
             with settings(host_string=self.ssh_user + "@" + kvmhost.ipaddress):
                 command = "cd %s; ls | grep \"\-sd\" | xargs -I {} qemu-img info {} | grep \"virtual size\|image\" | awk '!(NR%%2){print$0p}{p=$0}' | awk '{ print substr($4,2) \" \" $6 }'" % self.get_migration_path()
                 return fab.run(command)
         except Exception as e:
-            print e
+            print(e)
             return False
 
     def modify_os_files(self, kvmhost, volume_uuid):
-        print "Note: Getting rid of XenServer legacy for disk %s on host %s" % (volume_uuid, kvmhost.name)
+        print("Note: Getting rid of XenServer legacy for disk %s on host %s" % (volume_uuid, kvmhost.name))
 
         os_family = self.get_os_family(kvmhost, volume_uuid).lower()
-        print "Note: OS_Family var is '%s'" % os_family
+        print("Note: OS_Family var is '%s'" % os_family)
         if os_family != "linux" and os_family != "windows":
-            print "Note: Not Linux nor Windows! Trying to continue."
+            print("Note: Not Linux nor Windows! Trying to continue.")
             return True
         try:
             with settings(host_string=self.ssh_user + "@" + kvmhost.ipaddress):
@@ -275,7 +275,7 @@ class Kvm(hypervisor.hypervisor):
             return False
 
     def move_disk_to_pool(self, kvmhost, volume_name, new_location):
-        print "Note: Moving disk %s to location %s on host %s" % (volume_name, new_location, kvmhost.name)
+        print("Note: Moving disk %s to location %s on host %s" % (volume_name, new_location, kvmhost.name))
         try:
             with settings(host_string=self.ssh_user + "@" + kvmhost.ipaddress):
                 command = "cd %s; sudo mv %s %s" % (self.get_migration_path(), volume_name, new_location)
@@ -284,7 +284,7 @@ class Kvm(hypervisor.hypervisor):
             return False
 
     def move_rootdisk_to_pool(self, kvmhost, volume_uuid):
-        print "Note: Moving disk %s into place on host %s" % (volume_uuid, kvmhost.name)
+        print("Note: Moving disk %s into place on host %s" % (volume_uuid, kvmhost.name))
         try:
             with settings(host_string=self.ssh_user + "@" + kvmhost.ipaddress):
                 command = "cd %s; sudo mv %s-sda %s/%s" % (self.get_migration_path(), volume_uuid, self.mountpoint,
@@ -294,7 +294,7 @@ class Kvm(hypervisor.hypervisor):
             return False
 
     def move_datadisk_to_pool(self, kvmhost, volume_uuid):
-        print "Note: Moving disk %s into place on host %s" % (volume_uuid, kvmhost.name)
+        print("Note: Moving disk %s into place on host %s" % (volume_uuid, kvmhost.name))
         try:
             with settings(host_string=self.ssh_user + "@" + kvmhost.ipaddress):
                 command = "cd %s; sudo mv %s %s/%s" % (self.get_migration_path(), volume_uuid, self.mountpoint,
@@ -305,27 +305,27 @@ class Kvm(hypervisor.hypervisor):
 
     def put_scripts(self, host):
         if self.DRYRUN and not self.PREPARE:
-            print "Note: Would have uploaded scripts to %s" % host.name
+            print("Note: Would have uploaded scripts to %s" % host.name)
             return True
         try:
             with settings(host_string=self.ssh_user + "@" + host.ipaddress):
                 if self.helper_scripts_path is not None:
                     put(self.helper_scripts_path + '/*',
-                        self.get_migration_path(), mode=0755, use_sudo=True)
+                        self.get_migration_path(), mode=0o755, use_sudo=True)
                 if len(self.pre_empty_script) > 0:
                     put(self.pre_empty_script,
-                        '/tmp/' + self.pre_empty_script.split('/')[-1], mode=0755, use_sudo=True)
+                        '/tmp/' + self.pre_empty_script.split('/')[-1], mode=0o755, use_sudo=True)
                 if len(self.post_empty_script) > 0:
                     put(self.post_empty_script,
-                        '/tmp/' + self.post_empty_script.split('/')[-1], mode=0755, use_sudo=True)
+                        '/tmp/' + self.post_empty_script.split('/')[-1], mode=0o755, use_sudo=True)
                 if len(self.post_reboot_script) > 0:
                     put(self.post_reboot_script,
-                        '/tmp/' + self.post_reboot_script.split('/')[-1], mode=0755, use_sudo=True)
+                        '/tmp/' + self.post_reboot_script.split('/')[-1], mode=0o755, use_sudo=True)
                 put('kvm_check_bonds.sh',
-                    '/tmp/kvm_check_bonds.sh', mode=0755, use_sudo=True)
+                    '/tmp/kvm_check_bonds.sh', mode=0o755, use_sudo=True)
             return True
         except:
-            print "Error: Could not upload check scripts to host " + host.name + "."
+            print("Error: Could not upload check scripts to host " + host.name + ".")
             return False
 
     # Get bond status
@@ -346,35 +346,35 @@ class Kvm(hypervisor.hypervisor):
 
         # Count VMs to be sure
         if self.host_get_vms(host) != "0":
-            print "Error: Host " + host.name + " not empty, cannot reboot!"
+            print("Error: Host " + host.name + " not empty, cannot reboot!")
             return False
-        print "Note: Host " + host.name + " has no VMs running, continuing"
+        print("Note: Host " + host.name + " has no VMs running, continuing")
 
         # Execute post-empty-script
         if self.exec_script_on_hypervisor(host, self.post_empty_script) is False:
-            print "Error: Executing script '" + self.post_empty_script + "' on host " + host.name + " failed."
+            print("Error: Executing script '" + self.post_empty_script + "' on host " + host.name + " failed.")
             return False
 
         # Reboot methods: reboot, force-reset, halt
         try:
             with settings(host_string=self.ssh_user + "@" + host.ipaddress, command_timeout=10, use_sudo=True):
                 if halt_hypervisor:
-                    print "Note: Halting host %s in 60s. Undo with 'sudo shutdown -c'" % host.name
+                    print("Note: Halting host %s in 60s. Undo with 'sudo shutdown -c'" % host.name)
                     fab.run("sudo shutdown -h 1")
                 elif force_reset_hypervisor:
-                    print "Note: Immediately force-resetting host %s" % host.name
+                    print("Note: Immediately force-resetting host %s" % host.name)
                     fab.run("sudo sync; sudo echo b > /proc/sysrq-trigger")
                 elif skip_reboot_hypervisor:
-                    print "Note: Skipping reboot on host %s" % host.name
+                    print("Note: Skipping reboot on host %s" % host.name)
                 elif firmware_reboot_hypervisor:
-                    print "Note: Rebooting hypervisor after firmware upgrade on host %s" % host.name
+                    print("Note: Rebooting hypervisor after firmware upgrade on host %s" % host.name)
                     fab.run("tmux new -d 'yes |sudo /usr/sbin/smartupdate upgrade && sudo reboot'")
                 else:
-                    print "Note: Rebooting host %s in 60s. Undo with 'sudo shutdown -c' " % host.name
+                    print("Note: Rebooting host %s in 60s. Undo with 'sudo shutdown -c' " % host.name)
                     fab.run("sudo shutdown -r 1")
         except:
-            print "Warning: Got an exception on reboot/reset/halt, but that's most likely due to the the host " \
-                  "shutting itself down, so ignoring it."
+            print("Warning: Got an exception on reboot/reset/halt, but that's most likely due to the the host " \
+                  "shutting itself down, so ignoring it.")
 
         # Check the host is really offline
         if not skip_reboot_hypervisor:
@@ -385,7 +385,7 @@ class Kvm(hypervisor.hypervisor):
 
         # Execute post-reboot-script
         if self.exec_script_on_hypervisor(host, self.post_reboot_script) is False:
-            print "Error: Executing script '" + self.post_reboot_script + "' on host " + host.name + " failed."
+            print("Error: Executing script '" + self.post_reboot_script + "' on host " + host.name + " failed.")
             return False
 
         return True
@@ -393,7 +393,7 @@ class Kvm(hypervisor.hypervisor):
     # Wait for hypervisor to become alive again
     def check_connect(self, host):
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        print "Note: Waiting for " + host.name + "(" + host.ipaddress + ") to return"
+        print("Note: Waiting for " + host.name + "(" + host.ipaddress + ") to return")
         while s.connect_ex((host.ipaddress, 22)) > 0:
             # Progress indication
             sys.stdout.write(".")
@@ -401,9 +401,9 @@ class Kvm(hypervisor.hypervisor):
             time.sleep(5)
         # Remove progress indication
         sys.stdout.write("\033[F")
-        print "Note: Host " + host.name + " responds to SSH again!                           "
+        print("Note: Host " + host.name + " responds to SSH again!                           ")
         time.sleep(10)
-        print "Note: Waiting until we can successfully run a command against the cluster.."
+        print("Note: Waiting until we can successfully run a command against the cluster..")
         while self.check_libvirt(host) is False:
             # Progress indication
             sys.stdout.write(".")
@@ -411,7 +411,7 @@ class Kvm(hypervisor.hypervisor):
             time.sleep(5)
         # Remove progress indication
         sys.stdout.write("\033[F")
-        print "Note: Host " + host.name + " is able to do libvirt stuff again!                                  "
+        print("Note: Host " + host.name + " is able to do libvirt stuff again!                                  ")
         return True
 
     # Check if we can use libvirt
