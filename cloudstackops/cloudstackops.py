@@ -19,6 +19,7 @@
 
 # Class to support tools used to operate CloudStack
 # Remi Bergsma - rbergsma@schubergphilis.com
+import json
 import logging
 import operator
 import re
@@ -282,7 +283,8 @@ class CloudStackOps(CloudStackOpsBase):
             self.exoCsApi = CloudStack(
                 endpoint=self.apiurl,
                 key=self.apikey,
-                secret=self.secretkey
+                secret=self.secretkey,
+                timeout=60
             )
         except:
             print "Error connecting to Cosmic. Halting."
@@ -1821,13 +1823,13 @@ class CloudStackOps(CloudStackOpsBase):
     # Migrate all vm's and empty hypervisor
     def emptyHypervisor(self, hostID):
         # Host data
-        hostData = self.getHostData({'hostid': hostID})
-        foundHostData = hostData[0]
-        hostname = foundHostData.name
+        host_data = self.exoCsApi.listHosts(id=hostID)
+        current_host = host_data['host'][0]
+        hostname = current_host['name']
         to_slack = True
         if self.DEBUG == 1:
-            print hostData
-            print foundHostData
+            print host_data
+            print current_host
             print hostname
             to_slack = False
 
@@ -1852,7 +1854,7 @@ class CloudStackOps(CloudStackOpsBase):
                     vmresult = 1
                     if self.DRYRUN == 0:
                         if vm.maintenancepolicy == "ShutdownAndStart":
-                            message = "Shutting down vm %s on host %s, has ShutdownAndStart policy" % (vm.name, vm.hostname)
+                            message = "Note: Shutting down vm %s on host %s, has ShutdownAndStart policy" % (vm.name, vm.hostname)
                             self.print_message(message=message, message_type="Note", to_slack=to_slack)
 
                             vmresult = self.exoCsApi.stopVirtualMachine(id=vm.id)
@@ -1862,23 +1864,73 @@ class CloudStackOps(CloudStackOpsBase):
                                 vmresult = 1
                             continue
 
-                        requested_memory = self.get_needed_memory(vm)
-                        migrationHost = self.findBestMigrationHost(
-                            foundHostData.clusterid,
-                            hostname,
-                            requested_memory)
-                        if not migrationHost:
+                        # Affinity
+                        try:
+                            host_affinity = self.exoCsApi.listAffinityGroups(virtualmachineid=vm.id)
+                            affinity_groups = host_affinity['affinitygroup']
+                        except:
+                            affinity_groups = []
+
+                        vm_on_dedicated_hv = False
+                        dedicated_affinity_id = None
+                        for affinity_group in affinity_groups:
+                            # Is VM on dedicated hypervisor
+                            if affinity_group['type'] == 'ExplicitDedication':
+                                vm_on_dedicated_hv = True
+                                dedicated_affinity_id = affinity_group['id']
+
+                        available_hosts = self.exoCsApi.findHostsForMigration(virtualmachineid=vm.id)
+                        available_hosts = sorted(available_hosts['host'], key=lambda k: k['memoryallocated'], reverse=False)
+
+                        for available_host in available_hosts:
+                            # Skip hosts that require storage migration
+                            if available_host['requiresStorageMotion']:
+                                if self.DEBUG == 1:
+                                    print "Note: Skipping %s because need storage_migration is %s" \
+                                          % (available_host['name'], available_host['requiresStorageMotion'])
+                                continue
+
+                            # Only from the same cluster
+                            if available_host['clusterid'] != current_host['clusterid']:
+                                if self.DEBUG == 1:
+                                    print "Note: Skipping %s because part of another cluster" % available_host['name']
+                                continue
+
+                            # Only suitable hosts
+                            if not available_host['suitableformigration']:
+                                if self.DEBUG == 1:
+                                    print "Note: Skipping %s because is not suitable" % available_host['name']
+                                continue
+
+                            # Check dedication
+                            if vm_on_dedicated_hv:
+                                # VM is on dedicated HV, check to see if it is the right group
+                                if 'affinitygroupid' in available_host and available_host['affinitygroupid'] != dedicated_affinity_id:
+                                    print "Note: Skipping %s because host does not match dedication group of VM" % available_host['name']
+                                    continue
+                            else:
+                                # VM is not dedicated: skip dedicated HVs
+                                if 'affinitygroupid' in available_host:
+                                    print "Note: Skipping %s because hv is dedicated and VM is not" % available_host['name']
+                                    continue
+
+                            print "Note: Selecting %s" % available_host['name']
+                            break
+
+                        if not available_host:
                             print "\nError: No hosts with enough capacity to migrate vm's to. Please migrate manually to another cluster."
                             sys.exit(1)
+
+                        # Use findHostsForMigration to select host to migrate to
                         try:
-                            message = "Live migrating vm %s to host %s" % (vm.name, migrationHost.name)
+                            message = "Live migrating vm %s to host %s" % (vm.name, available_host['name'])
                             self.print_message(message=message, message_type="Note", to_slack=to_slack)
 
                             # Systemvm or instance
                             if bool(re.search('[rvs]-([\d])*-', vm.name)):
                                 vmresult = self.migrateSystemVm({
                                     'vmid': vm.id,
-                                    'hostid': migrationHost.id
+                                    'hostid': available_host['id']
                                 })
                                 instance = vm.name
                             else:
@@ -1886,7 +1938,7 @@ class CloudStackOps(CloudStackOpsBase):
                                     self.detach_iso(vm.id)
                                 vmresult = self.migrateVirtualMachine(
                                     vm.id,
-                                    migrationHost.id)
+                                    available_host['id'])
                                 instance = vm.instancename
                         except:
                             vmresult = 1
@@ -1900,13 +1952,14 @@ class CloudStackOps(CloudStackOpsBase):
                                     instance +
                                     "..), ")
                                 sys.stdout.flush()
-                                if foundHostData.hypervisor == "XenServer":
+                                if current_host.hypervisor == "XenServer":
                                     xapiresult, xapioutput = self.ssh.migrateVirtualMachineViaXapi(
-                                        {'hostname': hostname, 'desthostname': migrationHost.name, 'vmname': instance})
+                                        {'hostname': hostname, 'desthostname': available_host['name'], 'vmname': instance})
                                     if self.DEBUG == 1:
                                         print "Debug: Output: " + str(xapioutput) + " code " + str(xapiresult)
-                                if foundHostData.hypervisor == "KVM":
+                                if current_host.hypervisor == "KVM":
                                     pass
+
                             elif self.DEBUG == 1:
                                 print "Debug: VM " + vm.name + " migrated OK"
                         except:
