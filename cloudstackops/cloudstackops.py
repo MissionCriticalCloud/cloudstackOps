@@ -59,7 +59,7 @@ except:
     sys.exit(1)
 # Exoscale CS library
 try:
-    from cs import CloudStack
+    from cs import CloudStack, CloudStackException
 except:
     print "Error: Please install cs library to talk to Cosmic API:"
     print "       pip install cs"
@@ -837,12 +837,14 @@ class CloudStackOps(CloudStackOpsBase):
 
     # migrateVirtualMachine with Volumes
     def migrateVirtualMachineWithVolume(self, vmid, hostid):
-        apicall = migrateVirtualMachineWithVolume.migrateVirtualMachineWithVolumeCmd()
-        apicall.virtualmachineid = str(vmid)
-        apicall.hostid = str(hostid)
-
-        # Call CloudStack API
-        return self._callAPI(apicall)
+        # apicall = migrateVirtualMachineWithVolume.migrateVirtualMachineWithVolumeCmd()
+        # apicall.virtualmachineid = str(vmid)
+        # apicall.hostid = str(hostid)
+        #
+        # # Call CloudStack API
+        # return self._callAPI(apicall)
+        vmresult = self.exoCsApi.migrateVirtualMachineWithVolume(hostid=hostid, virtualmachineid=vmid)
+        return self.__waitforjob(vmresult['jobid'])
 
     # migrateSystemVm
     def migrateSystemVm(self, args):
@@ -2065,8 +2067,16 @@ class CloudStackOps(CloudStackOpsBase):
         while True:
             if retries < 0:
                 break
-            # jobstatus 0 = Job still running
-            jobstatus = self.exoCsApi.queryAsyncJobResult(jobid=jobid)
+            # TODO: @FIXME Temporary fix for Cosmic serialization problem
+            try:
+                # jobstatus: 0 = Job still running
+                #            1 = Job done successfully
+                #            2 = Job has an error
+                jobstatus = self.exoCsApi.queryAsyncJobResult(jobid=jobid) if not self.DRYRUN else {'jobstatus': 1}
+            except CloudStackException as e:
+                if "multiple JSON fields named jobstatus" not in str(e):
+                    raise e
+
             # jobstatus 1 = Job done successfully
             if int(jobstatus['jobstatus']) == 1:
                 return True

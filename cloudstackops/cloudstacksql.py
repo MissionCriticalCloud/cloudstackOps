@@ -457,6 +457,26 @@ class CloudStackSQL(CloudStackOpsBase):
         except:
             return False
 
+    # Return instance_id
+    def get_affinity_group_id_from_name(self, affinity_group_name):
+        if not self.conn:
+            return False
+        if not affinity_group_name:
+            return False
+
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT id FROM affinity_group WHERE name ='" + affinity_group_name + "';")
+        if self.DEBUG == 1:
+            print "DEBUG: Executed SQL: " + cursor.statement
+
+        result = cursor.fetchall()
+        cursor.close()
+
+        try:
+            return result[0][0]
+        except:
+            return False
+
     # Set instance to KVM in the db
     def update_instance_to_kvm(self, instance_name, vm_template_name, to_storage_pool_name,
                                guest_os_name="Other PV (64-bit)"):
@@ -1296,6 +1316,133 @@ WHERE
             if self.DEBUG == 1:
                 print "DEBUG: Executed SQL: " + cursor.statement
 
+        except mysql.connector.Error as err:
+            print("Error: MySQL: {}".format(err))
+            print cursor.statement
+            cursor.close()
+            return False
+
+        cursor.close()
+        return True
+
+
+    def get_disk_offering_id(self, disk_offering_name):
+            query = """
+                SELECT id FROM disk_offering_view WHERE removed IS NULL AND domain_name='Cust' AND `name` = '%(disk_offering_name)s';
+    """ % dict(disk_offering_name=disk_offering_name)
+
+            cursor = self.conn.cursor()
+            cursor.execute(query)
+
+            if self.DEBUG == 1:
+                print "DEBUG: Executed SQL: " + cursor.statement
+
+            result = cursor.fetchall()
+
+            if len(result) is not 1:
+                print "Couldn't find disk offering!"
+                print result
+                exit(1)
+
+            cursor.close()
+
+            return result[0][0]
+
+    # Set ZWPS disks to CWPS
+    def update_zwps_to_cwps(self, instance_name, disk_offering_name):
+
+        cursor = self.conn.cursor()
+
+        disk_offering_id = self.get_disk_offering_id(disk_offering_name=disk_offering_name)
+        instance_id = self.get_istance_id_from_name(instance_name)
+
+        query = """
+            UPDATE volumes SET disk_offering_id=%(disk_offering_id)s WHERE volume_type='DATADISK' AND instance_id=%(instance_id)s;
+                    """ % dict(disk_offering_id=disk_offering_id, instance_id=instance_id)
+
+        try:
+            if self.DRYRUN == 0:
+                cursor.execute(query)
+                print "Note: Executed: %s" % cursor.statement
+            else:
+                print "Note: Would have executed: %s" % query
+        except mysql.connector.Error as err:
+            print("Error: MySQL: {}".format(err))
+            print cursor.statement
+            cursor.close()
+            return False
+
+        cursor.close()
+        return True
+
+    # Get size
+    def get_volume_size(self, path):
+        if not self.conn:
+            return 1
+        if not path:
+            return 1
+
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT volumes.name, volumes.path, volumes.uuid, volumes.volume_type as voltype, volumes.size" +
+                       " FROM volumes" +
+                       " WHERE volumes.removed IS NULL AND volumes.state = 'Ready'" +
+                       " AND path='" + path + "';")
+        result = cursor.fetchall()
+        if self.DEBUG == 1:
+            print "DEBUG: Executed SQL: " + cursor.statement
+
+        cursor.close()
+
+        return result[0]
+
+   # Set ZWPS disks to CWPS
+    def update_volume_size(self, instance_name, path, size):
+
+        cursor = self.conn.cursor()
+        instance_id = self.get_istance_id_from_name(instance_name)
+
+        query = """
+            UPDATE volumes SET size=%(size)s WHERE path="%(path)s" AND instance_id=%(instance_id)s;
+                    """ % dict(size=size, path=path, instance_id=instance_id)
+
+        try:
+
+            if self.DRYRUN == 0:
+                cursor.execute(query)
+                print "Note: Executed: %s" % cursor.statement
+            else:
+                print "Note: Would have executed: %s" % query
+        except mysql.connector.Error as err:
+            print("Error: MySQL: {}".format(err))
+            print cursor.statement
+            cursor.close()
+            return False
+
+        cursor.close()
+        return True
+
+    def add_vm_to_affinity_group(self, instance_name, affinity_group_name):
+        cursor = self.conn.cursor()
+        instance_id = self.get_istance_id_from_name(instance_name=instance_name)
+        affinity_group_id = self.get_affinity_group_id_from_name(affinity_group_name=affinity_group_name)
+
+        # Did we get a valid integer response?
+        try:
+            affinity_group_id = int(affinity_group_id)
+        except:
+            return False
+
+        query = """
+            INSERT IGNORE INTO affinity_group_vm_map (instance_id, affinity_group_id) VALUES (%(instance_id)s, %(affinity_group_id)s);
+                    """ % dict(instance_id=instance_id, affinity_group_id=affinity_group_id)
+
+        try:
+
+            if self.DRYRUN == 0:
+                cursor.execute(query)
+                print "Note: Executed: %s" % cursor.statement
+            else:
+                print "Note: Would have executed: %s" % query
         except mysql.connector.Error as err:
             print("Error: MySQL: {}".format(err))
             print cursor.statement
