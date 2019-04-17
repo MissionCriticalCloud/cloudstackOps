@@ -278,7 +278,7 @@ for path, disk_info in libvirt_disk_info.iteritems():
 
     if int(size) < int(disk_info['size']):
         print "Warning: looks like size in DB (%s) is less than libvirt reports (%s)" % (size, disk_info['size'])
-        print "Note: Setting size of disk %s to %s" % (path, size)
+        print "Note: Setting size of disk %s to %s" % (path, int(disk_info['size']))
         s.update_volume_size(instance_name=vm.instancename, path=path, size=disk_info['size'])
     else:
         print "OK: looks like size in DB (%s) is >= libvirt reports (%s)" % (size, disk_info['size'])
