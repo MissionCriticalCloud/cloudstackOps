@@ -292,7 +292,7 @@ message = "Starting migration of %s to %s on cluster %s" % (vm.name, migrationHo
 c.print_message(message=message, message_type="Note", to_slack=to_slack)
 
 result = c.migrateVirtualMachineWithVolume(vm.id, migrationHost.id)
-if result == 1:
+if not result:
     message= "Migrate vm %s failed -- exiting." % vm.name
     c.print_message(message=message, message_type="Error", to_slack=to_slack)
     sys.exit(1)

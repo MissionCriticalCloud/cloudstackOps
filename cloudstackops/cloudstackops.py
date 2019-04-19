@@ -837,12 +837,6 @@ class CloudStackOps(CloudStackOpsBase):
 
     # migrateVirtualMachine with Volumes
     def migrateVirtualMachineWithVolume(self, vmid, hostid):
-        # apicall = migrateVirtualMachineWithVolume.migrateVirtualMachineWithVolumeCmd()
-        # apicall.virtualmachineid = str(vmid)
-        # apicall.hostid = str(hostid)
-        #
-        # # Call CloudStack API
-        # return self._callAPI(apicall)
         vmresult = self.exoCsApi.migrateVirtualMachineWithVolume(hostid=hostid, virtualmachineid=vmid)
         return self.__waitforjob(vmresult['jobid'])
 
