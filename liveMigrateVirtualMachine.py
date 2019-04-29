@@ -25,6 +25,8 @@
 import sys
 import getopt
 from cloudstackops import cloudstackops
+from cloudstackops import cloudstacksql
+from cloudstackops import kvm
 import os.path
 from datetime import datetime
 import time
@@ -47,6 +49,14 @@ def handleArguments(argv):
     isProjectVm = 0
     global force
     force = 0
+    global mysqlHost
+    mysqlHost = ''
+    global mysqlPasswd
+    mysqlPasswd = ''
+    global zwps2cwps
+    zwps2cwps = False
+    global affinityGroupToAdd
+    affinityGroupToAdd = ''
 
     # Usage message
     help = "Usage: ./" + os.path.basename(__file__) + ' [options] ' + \
@@ -54,14 +64,19 @@ def handleArguments(argv):
         '\n  --vmname -n <name>\t\t\tMigrate VM with this name (only allowed when unique, otherwise use -i)' + \
         '\n  --instance-name -i <instancename>\tStop/Start VM with this instance name (i-123-12345-VM)' + \
         '\n  --tocluster -t <clustername>\t\tMigrate router to this cluster' + \
+        '\n  --mysqlserver -s <mysql hostname>\tSpecify MySQL server config section name' + \
+        '\n  --mysqlpassword <passwd>\t\tSpecify password to cloud MySQL user' + \
+        '\n  --zwps2cwps\t\t\t\tMigrate ZWPS to CWPS' + \
+        '\n  --affinity-group-to-add\t\tAdd this affinity group to the VM after migration' + \
         '\n  --is-projectvm\t\t\tThis VMs belongs to a project' + \
         '\n  --debug\t\t\t\tEnable debug mode' + \
         '\n  --exec\t\t\t\tExecute for real'
 
     try:
         opts, args = getopt.getopt(
-            argv, "hc:n:i:t:p", [
-                "config-profile=", "vmname=", "instance-name=", "tocluster=", "debug", "exec", "is-projectvm", "force"])
+            argv, "hc:n:i:t:s:p", [
+                "config-profile=", "vmname=", "instance-name=", "tocluster=", "zwps2cwps", "mysqlserver=", "debug",
+                "affinity-group-to-add=", "exec", "is-projectvm", "force"])
     except getopt.GetoptError as e:
         print "Error: " + str(e)
         print help
@@ -78,6 +93,10 @@ def handleArguments(argv):
             vmname = arg
         elif opt in ("-t", "--tocluster"):
             toCluster = arg
+        elif opt in ("-s", "--mysqlserver"):
+            mysqlHost = arg
+        elif opt in ("-p", "--mysqlpassword"):
+            mysqlPasswd = arg
         elif opt in ("--debug"):
             DEBUG = 1
         elif opt in ("--exec"):
@@ -86,6 +105,10 @@ def handleArguments(argv):
             isProjectVm = 1
         elif opt in ("--force"):
             force = 1
+        elif opt in ("--zwps2cwps"):
+            zwps2cwps = True
+        elif opt in ("--affinity-group-to-add"):
+            affinityGroupToAdd = arg
 
     # Default to cloudmonkey default config file
     if len(configProfileName) == 0:
@@ -94,6 +117,11 @@ def handleArguments(argv):
     # We need at least these vars
     if len(vmname) == 0 or len(toCluster) == 0:
         print help
+        sys.exit()
+
+    # If ZWPS conversion we need the SQL stuff
+    if zwps2cwps and len(mysqlHost) == 0:
+        print("When --zwps2cwps flag is used, you need to specify --mysqlserver to make the change")
         sys.exit()
 
 # Parse arguments
@@ -158,8 +186,10 @@ if vmdata is None:
     print "Error: Could not find vm " + vmname + "!"
     sys.exit(1)
 vm = vmdata[0]
-c.instance_name = vm.name
+c.instance_name = vm.instancename
 c.slack_custom_value = vm.domain
+c.vm_name = vm.name
+c.zone_name = vm.zonename
 
 snapshotData = c.listVMSnapshot(vm.id)
 snapshot_found = False
@@ -191,14 +221,67 @@ if hostData.clusterid == toClusterID:
     c.print_message(message=message, message_type="Error", to_slack=to_slack)
     sys.exit(1)
 
+# Init SQL class
+s = cloudstacksql.CloudStackSQL(DEBUG, DRYRUN)
+
+# Connect MySQL
+result = s.connectMySQL(mysqlHost, mysqlPasswd)
+
+# Do ZWPS to CWPS conversion before finding migration hosts or else it will return none
+if zwps2cwps:
+    message = "Switching any ZWPS volume of vm %s to CWPS so they will move along with the VM" % vm.name
+    c.print_message(message=message, message_type="Note", to_slack=to_slack)
+    if result > 0:
+        message = "MySQL connection failed"
+        c.print_message(message=message, message_type="Error", to_slack=to_slack)
+        sys.exit(1)
+    elif DEBUG == 1:
+        print "DEBUG: MySQL connection successful"
+        print s.conn
+
+    if not s.update_zwps_to_cwps(instance_name=vm.instancename, disk_offering_name="MCC_v1.CWPS"):
+        message = "Switching disk offerings to CWPS failed. Halting"
+        c.print_message(message=message, message_type="Error", to_slack=to_slack)
+        sys.exit(1)
+
+# Detach any isos
+if vm.isoid is not None:
+    print "Note: Detaching any connected ISO from vm %s" % vm.name
+    c.detach_iso(vm.id)
+else:
+    print "Note: No ISOs connected to detach"
+
 # Get hosts that belong to toCluster
 toClusterHostsData = c.getHostsFromCluster(toClusterID)
 migrationHost = c.findBestMigrationHost(toClusterID, vm.hostname, vm.memory)
+currentHostname=vm.hostname
 
 if not migrationHost:
     message = "No hosts with enough capacity to migrate %s to. Please migrate manually to another cluster." % vm.name
     c.print_message(message=message, message_type="Error", to_slack=to_slack)
     sys.exit(1)
+
+
+# Init KVM class
+k = kvm.Kvm()
+k.DRYRUN = DRYRUN
+k.PREPARE = False
+c.kvm = k
+
+# Libvirt disk info
+libvirt_disk_info = c.kvm.libvirt_get_disks(vmname=vm.instancename, hypervisor_fqdn=vm.hostname)
+
+for path, disk_info in libvirt_disk_info.iteritems():
+    print("Note: Disk %s on pool %s has size %s" % (disk_info['path'], disk_info['pool'], disk_info['size']))
+
+    name, path, uuid, voltype, size = s.get_volume_size(path=disk_info['path'])
+
+    if int(size) < int(disk_info['size']):
+        print "Warning: looks like size in DB (%s) is less than libvirt reports (%s)" % (size, disk_info['size'])
+        print "Note: Setting size of disk %s to %s" % (path, int(disk_info['size']))
+        s.update_volume_size(instance_name=vm.instancename, path=path, size=disk_info['size'])
+    else:
+        print "OK: looks like size in DB (%s) is >= libvirt reports (%s)" % (size, disk_info['size'])
 
 if DRYRUN == 1:
     message = "Would have migrated %s to %s on cluster %s" % (vm.name, migrationHost.name, toCluster)
@@ -209,17 +292,40 @@ message = "Starting migration of %s to %s on cluster %s" % (vm.name, migrationHo
 c.print_message(message=message, message_type="Note", to_slack=to_slack)
 
 result = c.migrateVirtualMachineWithVolume(vm.id, migrationHost.id)
-if result == 1:
+if not result:
     message= "Migrate vm %s failed -- exiting." % vm.name
     c.print_message(message=message, message_type="Error", to_slack=to_slack)
+    sys.exit(1)
 
-if result.virtualmachine.state == "Running":
-    message = "%s is migrated successfully" % result.virtualmachine.name
+# Hack
+while True:
+    vmdata = c.getVirtualmachineData(vmID)
+    if vmdata is None:
+        print "Error: Could not find vm " + vmname + "!"
+        sys.exit(1)
+    vm = vmdata[0]
+
+    if vm.state == "Running":
+        break
+    time.sleep(60)
+    print("Vm %s is in %s state and not Running. Sleeping." % (vm.name, vm.state))
+
+result = True
+if currentHostname == vm.hostname:
+    result = False
 
 # End time
 message = "Finished @ " + time.strftime("%Y-%m-%d %H:%M")
 c.print_message(message=message, message_type="Note", to_slack=False)
 elapsed_time = datetime.now() - start_time
 
-message = "VM %s is successfully migrated to %s on cluster %s in %s seconds" % (vm.name, migrationHost.name, toCluster, elapsed_time.total_seconds())
-c.print_message(message=message, message_type="Note", to_slack=to_slack)
+if result:
+    if len(affinityGroupToAdd) > 0:
+        message = "Adding affinity group %s to VM %s" % (affinityGroupToAdd, vm.name)
+        s.add_vm_to_affinity_group(affinity_group_name=affinityGroupToAdd, instance_name=vm.instancename)
+
+    message = "VM %s is successfully migrated to %s on cluster %s in %s seconds" % (vm.name, migrationHost.name, toCluster, elapsed_time.total_seconds())
+    c.print_message(message=message, message_type="Note", to_slack=to_slack)
+else:
+    message = "VM %s is failed to migrate to %s on cluster %s in %s seconds" % (vm.name, migrationHost.name, toCluster, elapsed_time.total_seconds())
+    c.print_message(message=message, message_type="Warning", to_slack=to_slack)

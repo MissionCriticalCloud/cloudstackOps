@@ -36,6 +36,10 @@ from fabric.api import (
     settings
 )
 
+import sys
+import libvirt
+from xml.etree import ElementTree
+
 import hypervisor
 
 # Set user/passwd for fabric ssh
@@ -70,6 +74,7 @@ class Kvm(hypervisor.hypervisor):
         self.os_family = None
         self.DRYRUN = True
         self.PREPARE = False
+        self.conn = None
 
     def prepare_kvm(self, kvmhost, storage_pool_uuid):
         if self.DRYRUN:
@@ -441,3 +446,42 @@ class Kvm(hypervisor.hypervisor):
             except:
                 return False
         return return_string
+
+
+    def libvirt_connect(self, hypervisor_fqdn):
+        self.conn = libvirt.openReadOnly("qemu+tcp://%s/system" % hypervisor_fqdn)
+
+
+    def libvirt_get_disks(self, hypervisor_fqdn, vmname):
+        if self.conn is None:
+            self.libvirt_connect(hypervisor_fqdn=hypervisor_fqdn)
+
+        domain = self.conn.lookupByName(vmname)
+
+        tree = ElementTree.fromstring(domain.XMLDesc())
+        blockDevs = tree.findall('devices/disk')
+
+        disk_data = {}
+
+        for disk in blockDevs:
+            if disk.get('device') <> 'disk':
+                continue
+
+            dev = disk.find('target').get('dev')
+            full_path = disk.find('source').get('file')
+            _, _, pool, path = full_path.split('/')
+
+            size, _, _ = domain.blockInfo(dev)
+
+            disk_data[path] = {
+                'dev': dev,
+                'pool': pool,
+                'path': path,
+                'size': size
+            }
+
+            # print("Note: Disk %s on pool %s has size %s" % (path, pool, size))
+        return disk_data
+
+    def libvirt_close(self):
+        self.conn.close()
