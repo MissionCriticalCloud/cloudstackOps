@@ -20,8 +20,6 @@
 #      under the License.
 
 import socket
-import subprocess
-import sys
 import time
 # We depend on these
 import uuid
