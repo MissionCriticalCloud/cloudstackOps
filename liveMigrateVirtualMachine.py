@@ -226,18 +226,20 @@ s = cloudstacksql.CloudStackSQL(DEBUG, DRYRUN)
 
 # Connect MySQL
 result = s.connectMySQL(mysqlHost, mysqlPasswd)
+if result > 0:
+    message = "MySQL connection failed"
+    c.print_message(message=message, message_type="Error", to_slack=to_slack)
+    sys.exit(1)
+elif DEBUG == 1:
+    print
+    "DEBUG: MySQL connection successful"
+    print
+    s.conn
 
 # Do ZWPS to CWPS conversion before finding migration hosts or else it will return none
 if zwps2cwps:
     message = "Switching any ZWPS volume of vm %s to CWPS so they will move along with the VM" % vm.name
     c.print_message(message=message, message_type="Note", to_slack=to_slack)
-    if result > 0:
-        message = "MySQL connection failed"
-        c.print_message(message=message, message_type="Error", to_slack=to_slack)
-        sys.exit(1)
-    elif DEBUG == 1:
-        print "DEBUG: MySQL connection successful"
-        print s.conn
 
     if not s.update_zwps_to_cwps(instance_name=vm.instancename, disk_offering_name="MCC_v1.CWPS"):
         message = "Switching disk offerings to CWPS failed. Halting"
