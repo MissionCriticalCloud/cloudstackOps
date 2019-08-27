@@ -1920,6 +1920,9 @@ class CloudStackOps(CloudStackOpsBase):
                         # Use findHostsForMigration to select host to migrate to
                         try:
                             message = "Live migrating vm %s to host %s" % (vm.name, available_host['name'])
+                            self.instance_name = vm.instancename
+                            self.vm_name = vm.name
+                            self.zone_name = vm.zonename
                             self.print_message(message=message, message_type="Note", to_slack=to_slack)
 
                             # Systemvm or instance
