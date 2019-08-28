@@ -187,6 +187,7 @@ c.task = "KVM Rolling Reboot"
 c.slack_custom_title = "Hypervisor"
 c.slack_custom_value = ""
 c.instance_name = "N/A"
+c.vm_name = "N/A"
 c.cluster = clustername
 
 # Init XenServer class
@@ -298,6 +299,8 @@ start_time = datetime.now()
 # Then the other hypervisors, one-by-one
 for host in cluster_hosts:
     c.slack_custom_value = host.name
+    c.zone_name = host.zonename
+
     if host.name in ignoreHosts:
         message = "Skipping %s due to --ignore-hosts setting" % host.name
         c.print_message(message=message, message_type="Warning", to_slack=False)
