@@ -284,6 +284,9 @@ else:
         max_iops = 1000
     k.set_iops_limit_for_vm_disks(host=hostData, vm_name=vm.instancename, iops_limit=max_iops)
 
+    print("Note: Merging backing files into disks")
+    k.merge_backing_file_of_disks(host=hostData, vm_name=vm.instancename)
+
 # Loop all volumes from vm_instance
 voldata = c.getVirtualmachineVolumes(vm.id, projectParam)
 

@@ -498,3 +498,14 @@ class Kvm(hypervisor.hypervisor):
         except Exception as e:
             print("Exception: %s" % str(e))
             return False
+
+    def merge_backing_file_of_disks(self, host, vm_name):
+        try:
+            with settings(host_string=self.ssh_user + "@" + host.ipaddress, use_sudo=True):
+                command = "for i in `virsh domblklist --details %s | grep disk | grep file | awk '{print $3}'`;" \
+                          " do echo \"virsh blockpull %s $i --wait --verbose\"; done" % vm_name
+                print("Note: Running command %s on host %s" % (command, host.name))
+                return fab.run(command)
+        except Exception as e:
+            print("Exception: %s" % str(e))
+            return False
