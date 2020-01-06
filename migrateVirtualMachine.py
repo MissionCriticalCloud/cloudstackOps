@@ -190,6 +190,10 @@ if sodata is not None:
 # Volumes
 voldata = c.getVirtualmachineVolumes(vm.id, projectParam)
 
+# Get user data to e-mail
+adminData = c.getDomainAdminUserData(vm.domainid)
+adminData.email = None
+
 # Migrate its volumes
 volcount = 0
 volIDs = []
@@ -213,39 +217,40 @@ for vol in voldata:
     volcount = volcount + 1
 
 if volcount > 0:
-    # Get user data to e-mail
-    adminData = c.getDomainAdminUserData(vm.domainid)
     if DRYRUN == 1:
-        print "Note: Not sending notification e-mails due to DRYRUN setting. Would have e-mailed " + adminData.email
+        if not adminData.email:
+            print "Warning: Skipping mailing due to missing e-mail address."
+        else:
+            print "Note: Not sending notification e-mails due to DRYRUN setting. Would have e-mailed " + adminData.email
     else:
 
         if not adminData.email:
             print "Warning: Skipping mailing due to missing e-mail address."
+        else:
+            templatefile = open(
+                "email_template/migrateVirtualMachine_start.txt",
+                "r")
+            emailbody = templatefile.read()
+            emailbody = emailbody.replace("FIRSTNAME", adminData.firstname)
+            emailbody = emailbody.replace("LASTNAME", adminData.lastname)
+            emailbody = emailbody.replace("DOMAIN", vm.domain)
+            emailbody = emailbody.replace("VMNAME", vm.name)
+            emailbody = emailbody.replace("STATE", vm.state)
+            emailbody = emailbody.replace("INSTANCENAME", vm.instancename)
+            emailbody = emailbody.replace("TOCLUSTER", toCluster)
+            emailbody = emailbody.replace("ORGANIZATION", c.organization)
+            templatefile.close()
 
-        templatefile = open(
-            "email_template/migrateVirtualMachine_start.txt",
-            "r")
-        emailbody = templatefile.read()
-        emailbody = emailbody.replace("FIRSTNAME", adminData.firstname)
-        emailbody = emailbody.replace("LASTNAME", adminData.lastname)
-        emailbody = emailbody.replace("DOMAIN", vm.domain)
-        emailbody = emailbody.replace("VMNAME", vm.name)
-        emailbody = emailbody.replace("STATE", vm.state)
-        emailbody = emailbody.replace("INSTANCENAME", vm.instancename)
-        emailbody = emailbody.replace("TOCLUSTER", toCluster)
-        emailbody = emailbody.replace("ORGANIZATION", c.organization)
-        templatefile.close()
+            # Notify user
+            msgSubject = 'Starting maintenance for VM ' + \
+                vm.name + ' / ' + vm.instancename
+            c.sendMail(c.mail_from, adminData.email, msgSubject, emailbody)
 
-        # Notify user
-        msgSubject = 'Starting maintenance for VM ' + \
-            vm.name + ' / ' + vm.instancename
-        c.sendMail(c.mail_from, adminData.email, msgSubject, emailbody)
+            # Notify admin
+            c.sendMail(c.mail_from, c.errors_to, msgSubject, emailbody)
 
-        # Notify admin
-        c.sendMail(c.mail_from, c.errors_to, msgSubject, emailbody)
-
-        if DEBUG == 1:
-            print emailbody
+            if DEBUG == 1:
+                print emailbody
 
     # Stop this vm if it was running
     if needToStop == "true":
@@ -348,8 +353,6 @@ if volcount > 0:
 
             if result.virtualmachine.state == "Running":
                 print "Note: " + result.virtualmachine.name + " is started successfully "
-                # Get user data to e-mail
-                adminData = c.getDomainAdminUserData(vm.domainid)
                 if DRYRUN == 1:
                     print "Note: Not sending notification e-mails due to DRYRUN setting. Would have e-mailed " + adminData.email
                 else:
@@ -408,44 +411,45 @@ if volcount > 0:
 
     else:
         print "Warning: Not starting " + vm.name + " automatically!"
-        # Get user data to e-mail
-        adminData = c.getDomainAdminUserData(vm.domainid)
         if DRYRUN == 1:
-            print "Note: Not sending notification e-mails due to DRYRUN setting. Would have e-mailed " + adminData.email
+            if not adminData.email:
+                print "Warning: Skipping mailing due to missing e-mail address."
+            else:
+                print "Note: Not sending notification e-mails due to DRYRUN setting. Would have e-mailed " + adminData.email
         else:
 
             if not adminData.email:
                 print "Warning: Skipping mailing due to missing e-mail address."
+            else:
+                # Tell the user how to start the VM manually
+                cloudmonkeyCmd = "cloudmonkey start virtualmachine id=" + \
+                    vm.id + " hostid=" + toHostData.id
 
-            # Tell the user how to start the VM manually
-            cloudmonkeyCmd = "cloudmonkey start virtualmachine id=" + \
-                vm.id + " hostid=" + toHostData.id
+                templatefile = open(
+                    "email_template/migrateVirtualMachine_done_nostart.txt",
+                    "r")
+                emailbody = templatefile.read()
+                emailbody = emailbody.replace("FIRSTNAME", adminData.firstname)
+                emailbody = emailbody.replace("LASTNAME", adminData.lastname)
+                emailbody = emailbody.replace("DOMAIN", vm.domain)
+                emailbody = emailbody.replace("VMNAME", vm.name)
+                emailbody = emailbody.replace("STATE", vm.state)
+                emailbody = emailbody.replace("INSTANCENAME", vm.instancename)
+                emailbody = emailbody.replace("CLOUDMONKEYCMD", cloudmonkeyCmd)
+                emailbody = emailbody.replace("TOCLUSTER", toCluster)
+                emailbody = emailbody.replace("ORGANIZATION", c.organization)
+                templatefile.close()
 
-            templatefile = open(
-                "email_template/migrateVirtualMachine_done_nostart.txt",
-                "r")
-            emailbody = templatefile.read()
-            emailbody = emailbody.replace("FIRSTNAME", adminData.firstname)
-            emailbody = emailbody.replace("LASTNAME", adminData.lastname)
-            emailbody = emailbody.replace("DOMAIN", vm.domain)
-            emailbody = emailbody.replace("VMNAME", vm.name)
-            emailbody = emailbody.replace("STATE", vm.state)
-            emailbody = emailbody.replace("INSTANCENAME", vm.instancename)
-            emailbody = emailbody.replace("CLOUDMONKEYCMD", cloudmonkeyCmd)
-            emailbody = emailbody.replace("TOCLUSTER", toCluster)
-            emailbody = emailbody.replace("ORGANIZATION", c.organization)
-            templatefile.close()
+                # Notify user
+                msgSubject = 'Finished maintenance for VM ' + \
+                    vm.name + ' / ' + vm.instancename
+                c.sendMail(c.mail_from, adminData.email, msgSubject, emailbody)
 
-            # Notify user
-            msgSubject = 'Finished maintenance for VM ' + \
-                vm.name + ' / ' + vm.instancename
-            c.sendMail(c.mail_from, adminData.email, msgSubject, emailbody)
+                # Notify mon-cloud
+                c.sendMail(c.mail_from, c.errors_to, msgSubject, emailbody)
 
-            # Notify mon-cloud
-            c.sendMail(c.mail_from, c.errors_to, msgSubject, emailbody)
-
-            if DEBUG == 1:
-                print emailbody
+                if DEBUG == 1:
+                    print emailbody
 
 elif vm.state == "Running":
     print "Note: Nothing to do at all. Volumes are already on the desired storage pool."

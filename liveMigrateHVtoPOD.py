@@ -19,7 +19,7 @@
 #      specific language governing permissions and limitations
 #      under the License.
 
-# Script to empty/live migrate a HV to other HV in the same cluster
+# Script to empty/live migrate a HV to another cluster
 # Daan de Goede
 
 import sys
@@ -42,22 +42,29 @@ def handleArguments(argv):
     DRYRUN = 1
     global fromHV
     fromHV = ''
+    global toCluster
+    toCluster = ''
     global configProfileName
     configProfileName = ''
     global force
     force = 0
+    global zwps2cwps
+    zwps2cwps = False
+    global affinityGroupToAdd
+    affinityGroupToAdd = ''
 
     # Usage message
     help = "Usage: ./" + os.path.basename(__file__) + ' [options] ' + \
         '\n  --config-profile -c <profilename>\tSpecify the CloudMonkey profile name to get the credentials from (or specify in ./config file)' + \
         '\n  --hypervisor -h <name>\t\tHypervisor to migrate' + \
+        '\n  --tocluster -t <clustername>\t\tMigrate router to this cluster' + \
         '\n  --debug\t\t\t\tEnable debug mode' + \
         '\n  --exec\t\t\t\tExecute for real'
 
     try:
         opts, args = getopt.getopt(
-            argv, "c:h:", [
-                "config-profile=", "hypervisor=", "debug", "exec", "force"])
+            argv, "c:h:t:", [
+                "config-profile=", "hypervisor=", "tocluster=", "debug", "exec", "force"])
     except getopt.GetoptError as e:
         print "Error: " + str(e)
         print help
@@ -70,6 +77,8 @@ def handleArguments(argv):
             configProfileName = arg
         elif opt in ("-h", "--hypervisor"):
             fromHV = arg
+        elif opt in ("-t", "--tocluster"):
+            toCluster = arg
         elif opt in ("--debug"):
             DEBUG = 1
         elif opt in ("--exec"):
@@ -82,19 +91,19 @@ def handleArguments(argv):
         configProfileName = "config"
 
     # We need at least these vars
-    if len(fromHV) == 0:
+    if len(fromHV) == 0 or len(toCluster) == 0:
         print help
         sys.exit()
 
-def emptyHV(DEBUG=0, DRYRUN=1, fromHV='', configProfileName='', force=0):
+def liveMigrateHVtoPOD(DEBUG=0, DRYRUN=1, fromHV='', toCluster='', configProfileName='', force=0):
     # Init our class
     c = cloudstackops.CloudStackOps(DEBUG, DRYRUN)
-    c.task = "empty HV"
+    c.task = "Live Migrate HV to new POD"
     c.slack_custom_title = "Domain"
     c.slack_custom_value = ""
 
     # Start time
-    print "Note: Starting @ %s" % time.strftime("%Y-%m-%d %H:%M")
+    print "Note: Starting @ %s" % time.strftime("%Y-%m-%d %H:%M migration HV to POD")
     start_time = datetime.now()
 
     if DEBUG == 1:
@@ -129,39 +138,48 @@ def emptyHV(DEBUG=0, DRYRUN=1, fromHV='', configProfileName='', force=0):
     hostid = host['host'][0]['id']
     listVMs = c.listVirtualMachines({'hostid': hostid, 'listall': 'true'})
     listProjectVMs = c.listVirtualMachines({'hostid': hostid, 'listall': 'true', 'projectid': -1})
-    listRouterVMs = c.listRouters({'hostid': hostid, 'listall': 'true'})
-
-    userVMs = {}
-    userVMs['count'] = listVMs.get('count',0) + listProjectVMs.get('count',0)
-    userVMs['virtualmachine'] = listVMs.get('virtualmachine',[]) + listProjectVMs.get('virtualmachine',[])
+    
+    VMs = {}
+    VMs['count'] = listVMs.get('count',0) + listProjectVMs.get('count',0)
+    VMs['virtualmachine'] = listVMs.get('virtualmachine',[]) + listProjectVMs.get('virtualmachine',[])
     if DEBUG == 1:
-        print userVMs
-        print listRouterVMs
+        print VMs
     vmCount = 1
-    vmTotal = userVMs.get('count',0)
-    print "found " + str(vmTotal) + " virtualmachines and " + str(listRouterVMs.get('count',0)) + " routerVMs on hypervisor: " + fromHV
-    c.emptyHypervisor(hostid)
+    vmTotal = VMs.get('count',0)
+    print "found " + str(vmTotal) + " virtualmachines on hypervisor: " + fromHV
+    for vm in VMs.get('virtualmachine',[]):
+        print "=================================================== Migrating vm %s of %s ===" % (vmCount, vmTotal)
+        print "Virtualmachine: " + vm['name']
+        if DEBUG == 1:
+            print vm
+        isProjectVm = 0
+        if 'projectid' in vm.keys():
+            isProjectVm = 1
+        # perform the actual migration of a VM to the new cluster
+        lmvm.liveMigrateVirtualMachine(c, DEBUG, DRYRUN, vm['instancename'], toCluster, configProfileName, isProjectVm, force, zwps2cwps, affinityGroupToAdd, multirun=True)
+        vmCount += 1
 
     result = True
     listVMs = c.listVirtualMachines({'hostid': hostid, 'listall': 'true'})
     listProjectVMs = c.listVirtualMachines({'hostid': hostid, 'listall': 'true', 'projectid': -1})
-    listRouterVMs = c.listRouters({'hostid': hostid, 'listall': 'true'})
     
-    vmCount = listVMs.get('count',0) + listProjectVMs.get('count',0) + listRouterVMs.get('count',0)
+    vmCount = listVMs.get('count',0) + listProjectVMs.get('count',0)
+    if DEBUG == 1:
+        print VMs
     if vmCount > 0:
         result = False
 
     # End time
-    message = "Finished @ " + time.strftime("%Y-%m-%d %H:%M")
+    message = "Finished @ " + time.strftime("%Y-%m-%d %H:%M migration HV to POD")
     c.print_message(message=message, message_type="Note", to_slack=False)
     elapsed_time = datetime.now() - start_time
 
     if result:
-        print "HV %s is successfully migrated in %s seconds" % (fromHV, elapsed_time.total_seconds())
+        print "HV %s is successfully migrated to cluster %s in %s seconds" % (fromHV, toCluster, elapsed_time.total_seconds())
     else:
-        print "HV %s has failed to migrate in %s seconds, %s of %s remaining." % (fromHV, elapsed_time.total_seconds(), vmCount, vmTotal)
+        print "HV %s has failed to migrate to cluster %s in %s seconds, %s of %s remaining." % (fromHV, toCluster, elapsed_time.total_seconds(), vmCount, vmTotal)
 
 # Parse arguments
 if __name__ == "__main__":
     handleArguments(sys.argv[1:])
-    emptyHV(DEBUG, DRYRUN, fromHV, configProfileName, force)
+    liveMigrateHVtoPOD(DEBUG, DRYRUN, fromHV, toCluster, configProfileName, force)
