@@ -486,6 +486,17 @@ class CloudStackOps(CloudStackOpsBase):
 
         return data
 
+    # Find storagePool for Cluster based on name
+    def getStoragePool(self, poolName):
+        apicall = listStoragePools.listStoragePoolsCmd()
+        apicall.name = str(poolName)
+        apicall.listAll = "true"
+
+        # Call CloudStack API
+        data = self._callAPI(apicall)
+
+        return data
+
     # Find storagePool for Cluster with most free space
     def getStoragePoolWithMostFreeSpace(self, clusterID):
         apicall = listStoragePools.listStoragePoolsCmd()
@@ -883,10 +894,12 @@ class CloudStackOps(CloudStackOpsBase):
         return self._callAPI(apicall)
 
     # migrate volume
-    def migrateVolume(self, volid, storageid):
+    def migrateVolume(self, volid, storageid, live=False):
         apicall = migrateVolume.migrateVolumeCmd()
         apicall.volumeid = str(volid)
         apicall.storageid = str(storageid)
+        if live:
+            apicall.livemigrate = "true"
 
         # Call CloudStack API
         return self._callAPI(apicall)
@@ -1936,6 +1949,9 @@ class CloudStackOps(CloudStackOpsBase):
                         # Use findHostsForMigration to select host to migrate to
                         try:
                             message = "Live migrating vm %s to host %s" % (vm.name, available_host['name'])
+                            self.instance_name = vm.instancename
+                            self.vm_name = vm.name
+                            self.zone_name = vm.zonename
                             self.print_message(message=message, message_type="Note", to_slack=to_slack)
 
                             # Systemvm or instance

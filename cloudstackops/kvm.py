@@ -445,10 +445,8 @@ class Kvm(hypervisor.hypervisor):
                 return False
         return return_string
 
-
     def libvirt_connect(self, hypervisor_fqdn):
         self.conn = libvirt.openReadOnly("qemu+tcp://%s/system" % hypervisor_fqdn)
-
 
     def libvirt_get_disks(self, hypervisor_fqdn, vmname):
         if self.conn is None:
@@ -483,3 +481,29 @@ class Kvm(hypervisor.hypervisor):
 
     def libvirt_close(self):
         self.conn.close()
+
+    def set_iops_limit_for_vm_disks(self, host, vm_name, iops_limit):
+        try:
+            with settings(host_string=self.ssh_user + "@" + host.ipaddress, use_sudo=True):
+                command = "for i in `/usr/bin/virsh domblklist --details %s | grep disk | grep file | /usr/bin/awk '{print $3}'`; " \
+                          "do /usr/bin/virsh blkdeviotune %s $i --total-iops-sec %s --live ; done" % (
+                                vm_name,
+                                vm_name,
+                                iops_limit
+                            )
+                print("Note: Running command %s on host %s" % (command, host.name))
+                return fab.run(command)
+        except Exception as e:
+            print("Exception: %s" % str(e))
+            return False
+
+    def merge_backing_file_of_disks(self, host, vm_name):
+        try:
+            with settings(host_string=self.ssh_user + "@" + host.ipaddress, use_sudo=True):
+                command = "for i in `virsh domblklist --details %s | grep disk | grep file | awk '{print $3}'`;" \
+                          " do echo \"virsh blockpull %s $i --wait --verbose\"; done" % vm_name
+                print("Note: Running command %s on host %s" % (command, host.name))
+                return fab.run(command)
+        except Exception as e:
+            print("Exception: %s" % str(e))
+            return False
