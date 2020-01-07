@@ -53,6 +53,8 @@ def handleArguments(argv):
     zwps2cwps = False
     global affinityGroupToAdd
     affinityGroupToAdd = ''
+    global destination_dc_name
+    destination_dc_name = ''
 
     # Usage message
     help = "Usage: ./" + os.path.basename(__file__) + ' [options] ' + \
@@ -62,15 +64,16 @@ def handleArguments(argv):
         '\n  --tocluster -t <clustername>\t\tMigrate router to this cluster' + \
         '\n  --zwps2cwps\t\t\t\tMigrate ZWPS to CWPS' + \
         '\n  --affinity-group-to-add\t\tAdd this affinity group to the VM after migration' + \
+        '\n  --destinationdc -d <DC name>\t\tSpecify name of DC to migrate to' + \
         '\n  --is-projectvm\t\t\tThis VMs belongs to a project' + \
         '\n  --debug\t\t\t\tEnable debug mode' + \
         '\n  --exec\t\t\t\tExecute for real'
 
     try:
         opts, args = getopt.getopt(
-            argv, "hc:n:i:t:", [
+            argv, "hc:n:i:t:d:", [
                 "config-profile=", "vmname=", "instance-name=", "tocluster=", "zwps2cwps", "debug",
-                "affinity-group-to-add=", "exec", "is-projectvm", "force"])
+                "affinity-group-to-add=", "exec", "is-projectvm", "force", "destinationdc="])
     except getopt.GetoptError as e:
         print "Error: " + str(e)
         print help
@@ -99,6 +102,8 @@ def handleArguments(argv):
             zwps2cwps = True
         elif opt in ("--affinity-group-to-add"):
             affinityGroupToAdd = arg
+        elif opt in ("-d", "--destinationdc"):
+            destination_dc_name = arg
 
     # Default to cloudmonkey default config file
     if len(configProfileName) == 0:
@@ -109,7 +114,8 @@ def handleArguments(argv):
         print help
         sys.exit()
 
-def liveMigrateVirtualMachine(c = None, DEBUG=0, DRYRUN=1, vmname='', toCluster='', configProfileName='', isProjectVm=0, force=0, zwps2cwps=False, affinityGroupToAdd='', multirun = False):
+
+def liveMigrateVirtualMachine(c = None, DEBUG=0, DRYRUN=1, vmname='', toCluster='', configProfileName='', isProjectVm=0, force=0, zwps2cwps=False, destination_dc_name='', affinityGroupToAdd='', multirun = False):
     # Start time
     print "Note: Starting @ %s" % time.strftime("%Y-%m-%d %H:%M")
     start_time = datetime.now()
@@ -218,6 +224,26 @@ def liveMigrateVirtualMachine(c = None, DEBUG=0, DRYRUN=1, vmname='', toCluster=
             if multirun:
                 return True
             sys.exit(1)
+
+    # Do DC offering migrate before finding migration hosts or else it will return none
+    if len(destination_dc_name) > 0:
+        datacenters = ["SBP1", "EQXAMS2", "EVO"]
+        current_offering_name = vm.serviceofferingname
+
+        if destination_dc_name not in datacenters:
+            print("Unknown DC %s. Should be one of: %s" % (destination_dc_name, str(datacenters)))
+            sys.exit(1)
+
+        for dc_name in datacenters:
+            if dc_name == destination_dc_name:
+                continue
+            if dc_name in current_offering_name:
+                print("Note: replacing %s DC with %s" % (dc_name, destination_dc_name))
+                print("Note: current offering: %s" % current_offering_name)
+                new_offering_name = current_offering_name.replace(dc_name, destination_dc_name)
+                print("Note: new offering: %s" % new_offering_name)
+                s.update_service_offering_of_vm(instance_name=vm.instancename, service_offering_name=new_offering_name)
+                break
 
     # Detach any isos
     if vm.isoid is not None:
@@ -339,4 +365,4 @@ if __name__ == "__main__":
         print "ApiKey: " + c.apikey
         print "SecretKey: " + c.secretkey
 
-    liveMigrateVirtualMachine(c, DEBUG, DRYRUN, vmname, toCluster, configProfileName, isProjectVm, force, zwps2cwps, affinityGroupToAdd)
+    liveMigrateVirtualMachine(c, DEBUG, DRYRUN, vmname, toCluster, configProfileName, isProjectVm, force, zwps2cwps, destination_dc_name, affinityGroupToAdd)

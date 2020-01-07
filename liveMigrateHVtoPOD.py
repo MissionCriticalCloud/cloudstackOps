@@ -52,19 +52,22 @@ def handleArguments(argv):
     zwps2cwps = False
     global affinityGroupToAdd
     affinityGroupToAdd = ''
+    global destination_dc_name
+    destination_dc_name = ''
 
     # Usage message
     help = "Usage: ./" + os.path.basename(__file__) + ' [options] ' + \
         '\n  --config-profile -c <profilename>\tSpecify the CloudMonkey profile name to get the credentials from (or specify in ./config file)' + \
         '\n  --hypervisor -h <name>\t\tHypervisor to migrate' + \
         '\n  --tocluster -t <clustername>\t\tMigrate router to this cluster' + \
+        '\n  --destinationdc -d <DC name>\t\tSpecify name of DC to migrate to' + \
         '\n  --debug\t\t\t\tEnable debug mode' + \
         '\n  --exec\t\t\t\tExecute for real'
 
     try:
         opts, args = getopt.getopt(
-            argv, "c:h:t:", [
-                "config-profile=", "hypervisor=", "tocluster=", "debug", "exec", "force"])
+            argv, "c:h:t:d:", [
+                "config-profile=", "hypervisor=", "tocluster=", "debug", "exec", "force", "destinationdc="])
     except getopt.GetoptError as e:
         print "Error: " + str(e)
         print help
@@ -85,6 +88,8 @@ def handleArguments(argv):
             DRYRUN = 0
         elif opt in ("--force"):
             force = 1
+        elif opt in ("-d", "--destinationdc"):
+            destination_dc_name = arg
 
     # Default to cloudmonkey default config file
     if len(configProfileName) == 0:
@@ -156,7 +161,7 @@ def liveMigrateHVtoPOD(DEBUG=0, DRYRUN=1, fromHV='', toCluster='', configProfile
         if 'projectid' in vm.keys():
             isProjectVm = 1
         # perform the actual migration of a VM to the new cluster
-        lmvm.liveMigrateVirtualMachine(c, DEBUG, DRYRUN, vm['instancename'], toCluster, configProfileName, isProjectVm, force, zwps2cwps, affinityGroupToAdd, multirun=True)
+        lmvm.liveMigrateVirtualMachine(c, DEBUG, DRYRUN, vm['instancename'], toCluster, configProfileName, isProjectVm, force, zwps2cwps, destination_dc_name, affinityGroupToAdd, multirun=True)
         vmCount += 1
 
     result = True
