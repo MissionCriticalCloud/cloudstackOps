@@ -1451,3 +1451,70 @@ WHERE
 
         cursor.close()
         return True
+
+    def get_service_offering_id(self, service_offering_name):
+        query = """
+        SELECT `id`
+        FROM `service_offering_view`
+        WHERE
+        (
+          `name` = '%(service_offering_name)s'
+          AND
+          `removed` IS NULL
+          AND `domain_path` = '/Cust/' 
+        );
+        """ % dict(service_offering_name=service_offering_name)
+
+        cursor = self.conn.cursor()
+        cursor.execute(query)
+
+        if self.DEBUG == 1:
+            print "DEBUG: Executed SQL: " + cursor.statement
+
+        result = cursor.fetchall()
+
+        if len(result) is not 1:
+            print "Couldn't find vpc offering!"
+            print result
+            exit(1)
+
+        cursor.close()
+
+        return result[0][0]
+
+    # Update db volumes table
+    def update_service_offering_of_vm(self, instance_name, service_offering_name):
+        if not self.conn:
+            return 1
+        if not instance_name or not service_offering_name:
+            return 1
+
+        instance_id = self.get_istance_id_from_name(instance_name)
+        to_service_offering_id = self.get_service_offering_id(service_offering_name)
+
+        cursor = self.conn.cursor()
+
+        try:
+            cursor.execute("""
+               UPDATE vm_instance
+               SET service_offering_id=%s
+               WHERE id=%s
+               LIMIT 1
+            """, (to_service_offering_id, instance_id))
+
+            if self.DRYRUN == 0:
+                self.conn.commit()
+            else:
+                print "Note: Would have executed: %s" % cursor.statement
+
+            if self.DEBUG == 1:
+                print "DEBUG: Executed SQL: " + cursor.statement
+
+        except mysql.connector.Error as err:
+            print("Error: MySQL: {}".format(err))
+            print cursor.statement
+            cursor.close()
+            return False
+
+        cursor.close()
+        return True
