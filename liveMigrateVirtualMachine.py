@@ -114,7 +114,8 @@ def handleArguments(argv):
         print help
         sys.exit()
 
-def liveMigrateVirtualMachine(c = None, DEBUG=0, DRYRUN=1, vmname='', toCluster='', configProfileName='', isProjectVm=0, force=0, zwps2cwps=False, affinityGroupToAdd='', multirun = False):
+
+def liveMigrateVirtualMachine(c = None, DEBUG=0, DRYRUN=1, vmname='', toCluster='', configProfileName='', isProjectVm=0, force=0, zwps2cwps=False, destination_dc_name='', affinityGroupToAdd='', multirun = False):
     # Start time
     print "Note: Starting @ %s" % time.strftime("%Y-%m-%d %H:%M")
     start_time = datetime.now()
@@ -364,4 +365,4 @@ if __name__ == "__main__":
         print "ApiKey: " + c.apikey
         print "SecretKey: " + c.secretkey
 
-    liveMigrateVirtualMachine(c, DEBUG, DRYRUN, vmname, toCluster, configProfileName, isProjectVm, force, zwps2cwps, affinityGroupToAdd)
+    liveMigrateVirtualMachine(c, DEBUG, DRYRUN, vmname, toCluster, configProfileName, isProjectVm, force, zwps2cwps, destination_dc_name, affinityGroupToAdd)
