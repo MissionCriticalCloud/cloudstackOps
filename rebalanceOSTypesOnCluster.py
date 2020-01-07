@@ -186,8 +186,8 @@ for family in osFamilies:
       print "# Memory of this host: " + str(fromHostData.memorytotal)
 
     # Get all vm's: project and non project
-    vmdata_non_project = c.listVirtualmachines({'hostid': fromHostData.id, 'isProjectVm': 'false' })
-    vmdata_project = c.listVirtualmachines({'hostid': fromHostData.id, 'isProjectVm': 'true' })
+    vmdata_non_project = c.deprecatedListVirtualMachines({'hostid': fromHostData.id, 'isProjectVm': 'false' })
+    vmdata_project = c.deprecatedListVirtualMachines({'hostid': fromHostData.id, 'isProjectVm': 'true' })
 
     if vmdata_project is None and vmdata_non_project is None:
       print "Note: No vm's of type " + family  + " found on " + fromHostData.name
