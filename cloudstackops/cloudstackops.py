@@ -406,6 +406,9 @@ class CloudStackOps(CloudStackOpsBase):
 
         found_counter = 0
         try:
+            if self.DEBUG == 1:
+                print "DEBUG: making marvin request:"
+            
             data = self.cloudstack.marvin_request(apicall)
             if (data is None or len(data) == 0) and self.DEBUG == 1:
                 print "Warning: Received None object from CloudStack API"
@@ -593,7 +596,15 @@ class CloudStackOps(CloudStackOpsBase):
         return self._callAPI(apicall)
 
     # Generic listVirtualMachines function
-    def listVirtualmachines(self, args):
+    def listVirtualMachines(self, args):
+        return self.exoCsApi.listVirtualMachines(**args)
+
+    # Generic listRouters function
+    def listRouters(self, args):
+        return self.exoCsApi.listRouters(**args)
+
+    # Generic listVirtualMachines function - DEPRECATED
+    def deprecatedListVirtualMachines(self, args):
         args = self.remove_empty_values(args)
 
         apicall = listVirtualMachines.listVirtualMachinesCmd()
@@ -1741,8 +1752,8 @@ class CloudStackOps(CloudStackOpsBase):
     # Check vm's still running on this host
     def getVirtualMachinesRunningOnHost(self, hostID):
         all_vmdata = ()
-        vms = self.listVirtualmachines({'hostid': hostID, 'listAll': 'true'}) or []
-        pvms = tuple([self.listVirtualmachines({'hostid': hostID, 'listAll': 'true', 'isProjectVm': 'true'})] or [])
+        vms = self.deprecatedListVirtualMachines({'hostid': hostID, 'listAll': 'true'}) or []
+        pvms = tuple([self.deprecatedListVirtualMachines({'hostid': hostID, 'listAll': 'true', 'isProjectVm': 'true'})] or [])
         routers = tuple([self.getRouterData({'hostid': hostID, 'listAll': 'true'})] or [])
         prouters = tuple([self.getRouterData({'hostid': hostID, 'listAll': 'true', 'isProjectVm': 'true'})] or [])
         svms = tuple([[svm for svm in self.getSystemVmData({'hostid': hostID}) or []]])
@@ -1828,6 +1839,11 @@ class CloudStackOps(CloudStackOpsBase):
                         memoryavailable) + " but there are already better (or equal) candidates so skipping this one"
 
         return migrationHost
+
+    # get Host by name
+    def getHostByName(self, name=None):
+        # Host data
+        return self.exoCsApi.listHosts(name=name)
 
     # Migrate all vm's and empty hypervisor
     def emptyHypervisor(self, hostID):
@@ -2073,7 +2089,9 @@ class CloudStackOps(CloudStackOpsBase):
                 system_vm.memory = 1024
         return int(system_vm.memory) * 1024 * 1024
 
-    def __waitforjob(self, jobid=None, retries=120):
+    def __waitforjob(self, jobid=None, retries=10):
+        char = 0
+        outputchar = '|/-\\'
         while True:
             if retries < 0:
                 break
@@ -2084,15 +2102,27 @@ class CloudStackOps(CloudStackOpsBase):
                 #            2 = Job has an error
                 jobstatus = self.exoCsApi.queryAsyncJobResult(jobid=jobid) if not self.DRYRUN else {'jobstatus': 1}
             except CloudStackException as e:
-                if "multiple JSON fields named jobstatus" not in str(e):
+                if 'multiple JSON fields named jobstatus' not in str(e):
                     raise e
+                retries -= 1
+            except requests.exceptions.ConnectionError as e:
+                if 'Connection aborted' not in str(e):
+                    raise e
+                print e
+                retries -= 1
 
+            
             # jobstatus 1 = Job done successfully
             if int(jobstatus['jobstatus']) == 1:
+                sys.stdout.write('\r')
                 return True
             # jobstatus 2 = Job has an error
             if int(jobstatus['jobstatus']) == 2:
+                sys.stdout.write('\r')
                 break
-            retries -= 1
+            
+            sys.stdout.write('\r' + outputchar[char % 4])
+            sys.stdout.flush()
+            char +=1
             time.sleep(1)
         return False
