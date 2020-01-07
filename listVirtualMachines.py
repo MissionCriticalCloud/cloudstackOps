@@ -388,7 +388,7 @@ if nonAdminCredentials == 1:
     ])
     t.align["VM"] = "l"
 
-    vmdata = c.listVirtualmachines({'listAll': 'false'})
+    vmdata = c.deprecatedListVirtualMachines({'listAll': 'false'})
     printVirtualmachine({'vmdata': vmdata, 'ignoreDomains': ignoreDomains})
     print
     print t
@@ -486,7 +486,7 @@ for clusterid, clustername in clusters.items():
         # Get all vms of the domainid running on this host
         if onlyDisplayRouters < 1:
 
-            vmdata = c.listVirtualmachines({
+            vmdata = c.deprecatedListVirtualMachines({
                 'hostid': fromHostData.id,
                 'domainid': domainnameID,
                 'isProjectVm': projectParam,
