@@ -324,11 +324,14 @@ class Kvm(hypervisor.hypervisor):
                 if len(self.post_reboot_script) > 0:
                     put(self.post_reboot_script,
                         '/tmp/' + self.post_reboot_script.split('/')[-1], mode=0755, use_sudo=True)
-                put('kvm_check_bonds.sh',
-                    '/tmp/kvm_check_bonds.sh', mode=0755, use_sudo=True)
+                try:
+                    put('kvm_check_bonds.sh',
+                        '/tmp/kvm_check_bonds.sh', mode=0755, use_sudo=True)
+                except Exception as e:
+                    print("Warning: kvm_check_bonds.sh failed to upload. Ignorning.")
             return True
-        except:
-            print "Error: Could not upload check scripts to host " + host.name + "."
+        except Exception as e:
+            print("Error: Could not upload check scripts to host " + host.name + " due to: " + str(e))
             return False
 
     # Get bond status
