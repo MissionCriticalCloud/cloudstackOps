@@ -1906,6 +1906,7 @@ class CloudStackOps(CloudStackOpsBase):
 
                         available_hosts = self.exoCsApi.findHostsForMigration(virtualmachineid=vm.id)
                         available_hosts = sorted(available_hosts['host'], key=lambda k: k['memoryallocated'], reverse=False)
+                        migration_host = None
 
                         for available_host in available_hosts:
                             # Skip hosts that require storage migration
@@ -1940,15 +1941,16 @@ class CloudStackOps(CloudStackOpsBase):
                                     continue
 
                             print "Note: Selecting %s" % available_host['name']
+                            migration_host = available_host
                             break
 
-                        if not available_host:
+                        if not migration_host:
                             print "\nError: No hosts with enough capacity to migrate vm's to. Please migrate manually to another cluster."
                             sys.exit(1)
 
                         # Use findHostsForMigration to select host to migrate to
                         try:
-                            message = "Live migrating vm %s to host %s" % (vm.name, available_host['name'])
+                            message = "Live migrating vm %s to host %s" % (vm.name, migration_host['name'])
                             self.instance_name = vm.instancename
                             self.vm_name = vm.name
                             self.zone_name = vm.zonename
@@ -1958,7 +1960,7 @@ class CloudStackOps(CloudStackOpsBase):
                             if bool(re.search('[rvs]-([\d])*-', vm.name)):
                                 vmresult = self.migrateSystemVm({
                                     'vmid': vm.id,
-                                    'hostid': available_host['id']
+                                    'hostid': migration_host['id']
                                 })
                                 instance = vm.name
                             else:
@@ -1966,7 +1968,7 @@ class CloudStackOps(CloudStackOpsBase):
                                     self.detach_iso(vm.id)
                                 vmresult = self.migrateVirtualMachine(
                                     vm.id,
-                                    available_host['id'])
+                                    migration_host['id'])
                                 instance = vm.instancename
                         except:
                             vmresult = 1
@@ -1982,7 +1984,7 @@ class CloudStackOps(CloudStackOpsBase):
                                 sys.stdout.flush()
                                 if current_host.hypervisor == "XenServer":
                                     xapiresult, xapioutput = self.ssh.migrateVirtualMachineViaXapi(
-                                        {'hostname': hostname, 'desthostname': available_host['name'], 'vmname': instance})
+                                        {'hostname': hostname, 'desthostname': migration_host['name'], 'vmname': instance})
                                     if self.DEBUG == 1:
                                         print "Debug: Output: " + str(xapioutput) + " code " + str(xapiresult)
                                 if current_host.hypervisor == "KVM":
