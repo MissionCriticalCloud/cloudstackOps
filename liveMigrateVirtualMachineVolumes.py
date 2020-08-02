@@ -83,12 +83,12 @@ def handleArguments(argv):
                 "config-profile=", "vmname=", "instance-name=", "tostoragepool=", "fromstoragepool=", "zwps2cwps", "mysqlserver=", "debug",
                 "exec", "is-projectvm", "force", "maxiops="])
     except getopt.GetoptError as e:
-        print "Error: " + str(e)
-        print help
+        print("Error: " + str(e))
+        print(help)
         sys.exit(2)
     for opt, arg in opts:
         if opt == '-h':
-            print help
+            print(help)
             sys.exit()
         elif opt in ("-c", "--config-profile"):
             configProfileName = arg
@@ -124,7 +124,7 @@ def handleArguments(argv):
 
     # We need at least these vars
     if len(vmname) == 0 or len(toStoragePool) == 0:
-        print help
+        print(help)
         sys.exit()
 
     # If ZWPS conversion we need the SQL stuff
@@ -144,14 +144,14 @@ c.slack_custom_title = "Domain"
 c.slack_custom_value = ""
 
 # Start time
-print "Note: Starting @ %s" % time.strftime("%Y-%m-%d %H:%M")
+print("Note: Starting @ %s" % time.strftime("%Y-%m-%d %H:%M"))
 start_time = datetime.now()
 
 if DEBUG == 1:
-    print "Warning: Debug mode is enabled!"
+    print("Warning: Debug mode is enabled!")
 
 if DRYRUN == 1:
-    print "Warning: dry-run mode is enabled, not running any commands!"
+    print("Warning: dry-run mode is enabled, not running any commands!")
 
 # make credentials file known to our class
 c.configProfileName = configProfileName
@@ -160,13 +160,13 @@ c.configProfileName = configProfileName
 c.initCloudStackAPI()
 
 if DEBUG == 1:
-    print "API address: " + c.apiurl
-    print "ApiKey: " + c.apikey
-    print "SecretKey: " + c.secretkey
+    print("API address: " + c.apiurl)
+    print("ApiKey: " + c.apikey)
+    print("SecretKey: " + c.secretkey)
 
 # Check cloudstack IDs
 if DEBUG == 1:
-    print "Note: Checking CloudStack IDs of provided input.."
+    print("Note: Checking CloudStack IDs of provided input..")
 
 if isProjectVm == 1:
     projectParam = "true"
@@ -186,13 +186,13 @@ toStoragePoolID = c.checkCloudStackName(
     {'csname': toStoragePool, 'csApiCall': 'listStoragePools'})
 
 if toStoragePoolID == 1 or toStoragePoolID is None:
-    print "Error: Storage Pool with name '" + toStoragePool + "' can not be found! Halting!"
+    print("Error: Storage Pool with name '" + toStoragePool + "' can not be found! Halting!")
     sys.exit(1)
 
 # Get data from vm
 vmdata = c.getVirtualmachineData(vmID)
 if vmdata is None:
-    print "Error: Could not find vm " + vmname + "!"
+    print("Error: Could not find vm " + vmname + "!")
     sys.exit(1)
 vm = vmdata[0]
 c.instance_name = vm.instancename
@@ -203,12 +203,12 @@ c.zone_name = vm.zonename
 snapshotData = c.listVMSnapshot(vm.id)
 snapshot_found = False
 if snapshotData == 1:
-    print "Error: Could not list VM snapshots"
+    print("Error: Could not list VM snapshots")
 elif snapshotData is None:
-    print "Note: No VM snapshots found for this vm."
+    print("Note: No VM snapshots found for this vm.")
 else:
     for snapshot in snapshotData:
-        print "Note: Found VM snapshot %s, unable to live migrate. Please remove VM snapshots first. " % snapshot.displayname
+        print("Note: Found VM snapshot %s, unable to live migrate. Please remove VM snapshots first. " % snapshot.displayname)
         snapshot_found = True
 
 if snapshot_found:
@@ -240,8 +240,8 @@ if zwps2cwps:
         c.print_message(message=message, message_type="Error", to_slack=to_slack)
         sys.exit(1)
     elif DEBUG == 1:
-        print "DEBUG: MySQL connection successful"
-        print s.conn
+        print("DEBUG: MySQL connection successful")
+        print(s.conn)
 
     if not s.update_zwps_to_cwps(instance_name=vm.instancename, disk_offering_name="MCC_v1.CWPS"):
         message = "Switching disk offerings to CWPS failed. Halting"
@@ -264,11 +264,11 @@ for path, disk_info in libvirt_disk_info.iteritems():
     name, path, uuid, voltype, size = s.get_volume_size(path=disk_info['path'])
 
     if int(size) < int(disk_info['size']):
-        print "Warning: looks like size in DB (%s) is less than libvirt reports (%s)" % (size, disk_info['size'])
-        print "Note: Setting size of disk %s to %s" % (path, int(disk_info['size']))
+        print("Warning: looks like size in DB (%s) is less than libvirt reports (%s)" % (size, disk_info['size']))
+        print("Note: Setting size of disk %s to %s" % (path, int(disk_info['size'])))
         s.update_volume_size(instance_name=vm.instancename, path=path, size=disk_info['size'])
     else:
-        print "OK: looks like size in DB (%s) is >= libvirt reports (%s)" % (size, disk_info['size'])
+        print("OK: looks like size in DB (%s) is >= libvirt reports (%s)" % (size, disk_info['size']))
 
 
 # Select storage pool
@@ -299,43 +299,43 @@ for vol in voldata:
         {'csname': vol.storage, 'csApiCall': 'listStoragePools'})
 
     if currentStorageID == targetStoragePoolData[0].id:
-        print "Warning: No need to migrate volume %s -- already on the desired storage pool. Skipping." % vol.name
+        print("Warning: No need to migrate volume %s -- already on the desired storage pool. Skipping." % vol.name)
         continue
 
     currentStorageData = c.getStoragePoolData(currentStorageID)[0]
     if currentStorageData.scope in ("Host", "ZONE"):
-        print "Note: No need to migrate volume %s -- scope of this volume is HOST / ZONE. Skipping." % vol.name
+        print("Note: No need to migrate volume %s -- scope of this volume is HOST / ZONE. Skipping." % vol.name)
         continue
 
     # Check for snapshots
     snapshotData = c.listSnapshots(vol.id, projectParam)
     if snapshotData == 1:
-        print "Error: Could not list snapshots"
+        print("Error: Could not list snapshots")
     elif snapshotData is None:
-        print "Note: No snapshots found for this volume."
+        print("Note: No snapshots found for this volume.")
     else:
         for snapshot in snapshotData:
-            print "Note: Found snapshot '" + snapshot.name + "' with state " + snapshot.state + ". Looks OK."
+            print("Note: Found snapshot '" + snapshot.name + "' with state " + snapshot.state + ". Looks OK.")
             if snapshot.state != 'BackedUp':
-                print "Error: migration of '" + snapshot.volumename + "' will fail because of non 'BackedUp' state of snapshot. Fix manually first."
+                print("Error: migration of '" + snapshot.volumename + "' will fail because of non 'BackedUp' state of snapshot. Fix manually first.")
                 sys.exit(1)
-        print "Warning: Snapshots will be lost after migration due to bug CLOUDSTACK-6538."
+        print("Warning: Snapshots will be lost after migration due to bug CLOUDSTACK-6538.")
 
     if DRYRUN == 1:
-        print "Note: Would have migrated volume %s to storage %s (%s)" % (vol.id, toStoragePool, targetStoragePoolData[0].id)
+        print("Note: Would have migrated volume %s to storage %s (%s)" % (vol.id, toStoragePool, targetStoragePoolData[0].id))
     else:
-        print "Executing: migrate volume %s to storage %s" % (vol.id, targetStoragePoolData[0].id)
+        print("Executing: migrate volume %s to storage %s" % (vol.id, targetStoragePoolData[0].id))
         result = c.migrateVolume(volid=vol.id, storageid=targetStoragePoolData[0].id, live=True)
         if result == 1:
-            print "Migrate volume %s (%s) failed -- exiting." % (vol.name, vol.id)
-            print "Error: investegate manually!"
+            print("Migrate volume %s (%s) failed -- exiting." % (vol.name, vol.id))
+            print("Error: investegate manually!")
             continue
 
         # Hack - Check when state of volume returns to Ready state
         while True:
             voldata = c.getVolumeData(volumeid=vol.id)
             if voldata is None:
-                print "Error: Could not find volume " + vol.name + "!"
+                print("Error: Could not find volume " + vol.name + "!")
                 sys.exit(1)
             vol_check = voldata[0]
 
