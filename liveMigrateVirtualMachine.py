@@ -352,7 +352,7 @@ def liveMigrateVirtualMachine(c=None, DEBUG=0, DRYRUN=1, vmname='', toCluster=''
     voldata = c.getVirtualmachineVolumes(vm.id, projectParam)
     for vol in voldata:
         # ROOT disk has no offering info so we cannot detect ZWPS
-        if 'POD012' in vol.storage or vol.storage in 'POD022':
+        if 'POD012' in vol.storage or 'POD022' in vol.storage:
             # Migrate ZWPS without disks
             migrate_with_volume_required = False
 
