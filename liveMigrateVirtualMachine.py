@@ -340,19 +340,37 @@ def liveMigrateVirtualMachine(c=None, DEBUG=0, DRYRUN=1, vmname='', toCluster=''
         else:
             print("OK: looks like size in DB (%s) is >= libvirt reports (%s)" % (size, disk_info['size']))
 
+    # Do we need liveMigrate or liveMigrateWithVolume
+    migrate_with_volume_required = False
+    voldata = c.getVirtualmachineVolumes(vm.id, projectParam)
+    for vol in voldata:
+        # ROOT disk has no offering info so we cannot detect ZWPS
+        if vol.storage in ('POD012', 'POD022'):
+            migrate_with_volume_required = True
+
+    migration_method = 'live'
+    if migrate_with_volume_required:
+        migration_method = 'liveWithVolume'
+
     if DRYRUN == 1:
-        message = "Would have migrated %s to %s on cluster %s" % (vm.name, migrationHost.name, toCluster)
+        message = "Would have migrated (%s) %s to %s on cluster %s"\
+                  % (migration_method, vm.name, migrationHost.name, toCluster)
         c.print_message(message=message, message_type="Note", to_slack=False)
         if multirun:
             return True
         sys.exit(1)
 
-    message = "Starting migration of %s to %s on cluster %s" % (vm.name, migrationHost.name, toCluster)
+    message = "Starting migration (%s) of %s to %s on cluster %s"\
+              % (migration_method, vm.name, migrationHost.name, toCluster)
     c.print_message(message=message, message_type="Note", to_slack=to_slack)
 
-    result = c.migrateVirtualMachineWithVolume(vm.id, migrationHost.id)
+    if migrate_with_volume_required:
+        result = c.migrateVirtualMachineWithVolume(vm.id, migrationHost.id)
+    else:
+        result = c.migrateVirtualMachine(vm.id, migrationHost.id)
+
     if not result:
-        message = "Migrate vm %s failed -- exiting." % vm.name
+        message = "Migrate (%s) vm %s failed -- exiting." % (migration_method, vm.name)
         c.print_message(message=message, message_type="Error", to_slack=to_slack)
         if multirun:
             return True
@@ -374,10 +392,14 @@ def liveMigrateVirtualMachine(c=None, DEBUG=0, DRYRUN=1, vmname='', toCluster=''
         print("Vm %s is in %s state and not Running. Sleeping." % (vm.name, vm.state))
 
     if zwps_found:
-        message = "Root disk %s went from CWPS to ZWPS -- move it back to CWPS now" % root_disk.name
+        message = "Note: Making sure root disk %s is on CWPS" % root_disk.name
         c.print_message(message=message, message_type="Note", to_slack=to_slack)
         # Select storage pool
-        target_storage = c.getStoragePoolWithMostFreeSpace(toCluster)
+        target_storage = c.getStoragePoolWithMostFreeSpace(toClusterID)
+        if target_storage == 1 or target_storage is None:
+            print("Error: Storage Pool with id '" + toClusterID + "' can not be found! Halting!")
+            sys.exit(1)
+
         result = c.migrateVolume(volid=root_disk.id, storageid=target_storage.id, live=True)
         if result == 1:
             message = "Migrate volume %s (%s) failed -- exiting." % (root_disk.name, root_disk.id)
@@ -386,7 +408,7 @@ def liveMigrateVirtualMachine(c=None, DEBUG=0, DRYRUN=1, vmname='', toCluster=''
                 return True
             sys.exit(1)
 
-        message = "Root disk %s migrated from pool %s to %s" % (root_disk.name, zwps_name, target_storage.name)
+        message = "Note: Root disk %s migrated to pool %s" % (root_disk.name, target_storage.name)
         c.print_message(message=message, message_type="Note", to_slack=to_slack)
 
     result = True
