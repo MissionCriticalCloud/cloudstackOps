@@ -272,7 +272,7 @@ for path, disk_info in libvirt_disk_info.iteritems():
 
 
 # Select storage pool
-targetStoragePoolData = c.getStoragePool(poolName=toStoragePool)
+targetStoragePoolData = c.getStoragePoolByName(poolName=toStoragePool)
 storagepooltags = targetStoragePoolData[0].tags
 
 if DRYRUN == 1:

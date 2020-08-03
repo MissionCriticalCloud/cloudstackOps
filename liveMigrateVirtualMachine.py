@@ -289,7 +289,7 @@ def liveMigrateVirtualMachine(c=None, DEBUG=0, DRYRUN=1, vmname='', toCluster=''
 
             message = "Migrating ROOT disk of %s VM %s to ZWPS pool %s" % (root_disk.name, vm.instancename, zwps_name)
             c.print_message(message=message, message_type="Note", to_slack=to_slack)
-            target_storage_pool_data = c.getStoragePool(poolName=zwps_name)
+            target_storage_pool_data = c.getStoragePoolByName(poolName=zwps_name)
             result = c.migrateVolume(volid=root_disk.id, storageid=target_storage_pool_data[0].id, live=True)
             if result == 1:
                 message = "Migrate volume %s (%s) failed -- exiting." % (root_disk.name, root_disk.id)
@@ -408,14 +408,33 @@ def liveMigrateVirtualMachine(c=None, DEBUG=0, DRYRUN=1, vmname='', toCluster=''
             print("Error: Storage Pool with id '" + toClusterID + "' can not be found! Halting!")
             sys.exit(1)
 
+        # Migrate
         result = c.migrateVolume(volid=root_disk.id, storageid=target_storage.id, live=True)
         if result == 1:
-            message = "Migrate volume %s (%s) failed -- exiting." % (root_disk.name, root_disk.id)
-            c.print_message(message=message, message_type="Error", to_slack=to_slack)
-            if multirun:
-                return True
-            sys.exit(1)
+            message = "Migrate volume %s (%s) failed -- retrying." % (root_disk.name, root_disk.id)
+            c.print_message(message=message, message_type="Warning", to_slack=to_slack)
 
+            target_storage_name = target_storage.name
+            retry_target_storage_name = None
+            if 'CS01' in target_storage_name:
+                retry_target_storage_name = target_storage_name.replace('CS01', 'CS02')
+            if 'CS02' in target_storage_name:
+                retry_target_storage_name = target_storage_name.replace('CS02', 'CS01')
+            if retry_target_storage_name is not None:
+                target_storage = c.getStoragePoolByname(poolName=retry_target_storage_name)
+                if target_storage == 1 or target_storage is None:
+                    print("Error: Storage Pool with name '" + retry_target_storage_name + "' can not be found! Halting!")
+                    if multirun:
+                        return True
+                    sys.exit(1)
+                # Migrate
+                result = c.migrateVolume(volid=root_disk.id, storageid=target_storage.id, live=True)
+                if result == 1:
+                    message = "Migrate volume %s (%s) failed again -- halting." % (root_disk.name, root_disk.id)
+                    c.print_message(message=message, message_type="Error", to_slack=to_slack)
+                    if multirun:
+                        return True
+                    sys.exit(1)
         message = "Note: Root disk %s migrated to pool %s" % (root_disk.name, target_storage.name)
         c.print_message(message=message, message_type="Note", to_slack=to_slack)
 
