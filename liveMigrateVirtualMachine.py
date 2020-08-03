@@ -275,24 +275,28 @@ def liveMigrateVirtualMachine(c=None, DEBUG=0, DRYRUN=1, vmname='', toCluster=''
               (root_disk.name, zwps_name))
         print("Note: then migrate the VM and its disks and finally move ROOT disk to a CWPS pool at %s" % toCluster)
 
-    if DRYRUN == 1:
-        message = "Would have migrated ROOT disk %s of VM %s to ZWPS pool %s" %\
-                  (root_disk.name, vm.instancename, zwps_name)
-        c.print_message(message=message, message_type="Note", to_slack=to_slack)
-        if multirun:
-            return True
-        sys.exit(1)
+    # Check if volume is already on correct storage
+    if root_disk.storage == zwps_name:
+        print("Warning: No need to migrate volume %s -- already on the desired storage pool. Skipping." % root_disk.name)
+    else:
+        if DRYRUN == 1:
+            message = "Would have migrated ROOT disk %s of VM %s to ZWPS pool %s" % \
+                      (root_disk.name, vm.instancename, zwps_name)
+            c.print_message(message=message, message_type="Note", to_slack=to_slack)
+            if multirun:
+                return True
+            sys.exit(1)
 
-    message = "Migrating ROOT disk of %s VM %s to ZWPS pool %s" % (root_disk.name, vm.instancename, zwps_name)
-    c.print_message(message=message, message_type="Note", to_slack=to_slack)
-    target_storage_pool_data = c.getStoragePool(poolName=zwps_name)
-    result = c.migrateVolume(volid=root_disk.id, storageid=target_storage_pool_data[0].id, live=True)
-    if result == 1:
-        message = "Migrate volume %s (%s) failed -- exiting." % (root_disk.name, root_disk.id)
-        c.print_message(message=message, message_type="Error", to_slack=to_slack)
-        if multirun:
-            return True
-        sys.exit(1)
+        message = "Migrating ROOT disk of %s VM %s to ZWPS pool %s" % (root_disk.name, vm.instancename, zwps_name)
+        c.print_message(message=message, message_type="Note", to_slack=to_slack)
+        target_storage_pool_data = c.getStoragePool(poolName=zwps_name)
+        result = c.migrateVolume(volid=root_disk.id, storageid=target_storage_pool_data[0].id, live=True)
+        if result == 1:
+            message = "Migrate volume %s (%s) failed -- exiting." % (root_disk.name, root_disk.id)
+            c.print_message(message=message, message_type="Error", to_slack=to_slack)
+            if multirun:
+                return True
+            sys.exit(1)
 
     # VM now runs with root disk at ZWPS
 
