@@ -275,28 +275,28 @@ def liveMigrateVirtualMachine(c=None, DEBUG=0, DRYRUN=1, vmname='', toCluster=''
               (root_disk.name, zwps_name))
         print("Note: then migrate the VM and its disks and finally move ROOT disk to a CWPS pool at %s" % toCluster)
 
-    # Check if volume is already on correct storage
-    if root_disk.storage == zwps_name:
-        print("Warning: No need to migrate volume %s -- already on the desired storage pool. Skipping." % root_disk.name)
-    else:
-        if DRYRUN == 1:
-            message = "Would have migrated ROOT disk %s of VM %s to ZWPS pool %s" % \
-                      (root_disk.name, vm.instancename, zwps_name)
-            c.print_message(message=message, message_type="Note", to_slack=to_slack)
-            if multirun:
-                return True
-            sys.exit(1)
+        # Check if volume is already on correct storage
+        if root_disk.storage == zwps_name:
+            print("Warning: No need to migrate volume %s -- already on the desired storage pool. Skipping." % root_disk.name)
+        else:
+            if DRYRUN == 1:
+                message = "Would have migrated ROOT disk %s of VM %s to ZWPS pool %s" % \
+                          (root_disk.name, vm.instancename, zwps_name)
+                c.print_message(message=message, message_type="Note", to_slack=to_slack)
+                if multirun:
+                    return True
+                sys.exit(1)
 
-        message = "Migrating ROOT disk of %s VM %s to ZWPS pool %s" % (root_disk.name, vm.instancename, zwps_name)
-        c.print_message(message=message, message_type="Note", to_slack=to_slack)
-        target_storage_pool_data = c.getStoragePool(poolName=zwps_name)
-        result = c.migrateVolume(volid=root_disk.id, storageid=target_storage_pool_data[0].id, live=True)
-        if result == 1:
-            message = "Migrate volume %s (%s) failed -- exiting." % (root_disk.name, root_disk.id)
-            c.print_message(message=message, message_type="Error", to_slack=to_slack)
-            if multirun:
-                return True
-            sys.exit(1)
+            message = "Migrating ROOT disk of %s VM %s to ZWPS pool %s" % (root_disk.name, vm.instancename, zwps_name)
+            c.print_message(message=message, message_type="Note", to_slack=to_slack)
+            target_storage_pool_data = c.getStoragePool(poolName=zwps_name)
+            result = c.migrateVolume(volid=root_disk.id, storageid=target_storage_pool_data[0].id, live=True)
+            if result == 1:
+                message = "Migrate volume %s (%s) failed -- exiting." % (root_disk.name, root_disk.id)
+                c.print_message(message=message, message_type="Error", to_slack=to_slack)
+                if multirun:
+                    return True
+                sys.exit(1)
 
     # VM now runs with root disk at ZWPS
 
@@ -326,27 +326,37 @@ def liveMigrateVirtualMachine(c=None, DEBUG=0, DRYRUN=1, vmname='', toCluster=''
     c.kvm = k
 
     # Libvirt disk info
-    libvirt_disk_info = c.kvm.libvirt_get_disks(vmname=vm.instancename, hypervisor_fqdn=vm.hostname)
+    try:
+        libvirt_disk_info = c.kvm.libvirt_get_disks(vmname=vm.instancename, hypervisor_fqdn=vm.hostname)
 
-    for path, disk_info in libvirt_disk_info.iteritems():
-        print("Note: Disk %s on pool %s has size %s" % (disk_info['path'], disk_info['pool'], disk_info['size']))
+        for path, disk_info in libvirt_disk_info.iteritems():
+            print("Note: Disk %s on pool %s has size %s" % (disk_info['path'], disk_info['pool'], disk_info['size']))
 
-        name, path, uuid, voltype, size = s.get_volume_size(path=disk_info['path'])
+            name, path, uuid, voltype, size = s.get_volume_size(path=disk_info['path'])
 
-        if int(size) < int(disk_info['size']):
-            print("Warning: looks like size in DB (%s) is less than libvirt reports (%s)" % (size, disk_info['size']))
-            print("Note: Setting size of disk %s to %s" % (path, int(disk_info['size'])))
-            s.update_volume_size(instance_name=vm.instancename, path=path, size=disk_info['size'])
-        else:
-            print("OK: looks like size in DB (%s) is >= libvirt reports (%s)" % (size, disk_info['size']))
+            if int(size) < int(disk_info['size']):
+                print("Warning: looks like size in DB (%s) is less than libvirt reports (%s)" % (size, disk_info['size']))
+                print("Note: Setting size of disk %s to %s" % (path, int(disk_info['size'])))
+                s.update_volume_size(instance_name=vm.instancename, path=path, size=disk_info['size'])
+            else:
+                print("OK: looks like size in DB (%s) is >= libvirt reports (%s)" % (size, disk_info['size']))
+    except Exception as e:
+        message = "Error: Unable to read disk sizes from hypervisor. Is VM running?: %s" % str(e)
+        c.print_message(message=message, message_type="Error", to_slack=to_slack)
+        if multirun:
+            return True
+        sys.exit(1)
 
     # Do we need liveMigrate or liveMigrateWithVolume
     migrate_with_volume_required = False
     voldata = c.getVirtualmachineVolumes(vm.id, projectParam)
-    for vol in voldata:
-        # ROOT disk has no offering info so we cannot detect ZWPS
-        if vol.storage in ('POD012', 'POD022'):
-            migrate_with_volume_required = True
+    if len(voldata) == 1:
+        migrate_with_volume_required = True
+    else:
+        for vol in voldata:
+            # ROOT disk has no offering info so we cannot detect ZWPS
+            if vol.storage in ('POD012', 'POD022'):
+                migrate_with_volume_required = True
 
     migration_method = 'live'
     if migrate_with_volume_required:
@@ -430,6 +440,7 @@ def liveMigrateVirtualMachine(c=None, DEBUG=0, DRYRUN=1, vmname='', toCluster=''
     else:
         message = "VM %s is failed to migrate to %s on cluster %s in %s seconds" % (vm.name, migrationHost.name, toCluster, elapsed_time.total_seconds())
         c.print_message(message=message, message_type="Warning", to_slack=to_slack)
+        print("Hint: Due to a known cleanup issue this might be because the disk already exists at the destination.")
 
 # Parse arguments
 if __name__ == "__main__":
