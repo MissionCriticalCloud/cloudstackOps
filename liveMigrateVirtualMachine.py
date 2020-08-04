@@ -421,7 +421,7 @@ def liveMigrateVirtualMachine(c=None, DEBUG=0, DRYRUN=1, vmname='', toCluster=''
             if 'CS02' in target_storage_name:
                 retry_target_storage_name = target_storage_name.replace('CS02', 'CS01')
             if retry_target_storage_name is not None:
-                target_storage = c.getStoragePoolByname(poolName=retry_target_storage_name)
+                target_storage = c.getStoragePoolByName(poolName=retry_target_storage_name)
                 if target_storage == 1 or target_storage is None:
                     print("Error: Storage Pool with name '" + retry_target_storage_name + "' can not be found! Halting!")
                     if multirun:

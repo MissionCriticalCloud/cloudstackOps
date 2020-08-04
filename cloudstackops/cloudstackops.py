@@ -487,7 +487,7 @@ class CloudStackOps(CloudStackOpsBase):
         return data
 
     # Find storagePool for Cluster based on name
-    def getStoragePoolByname(self, poolName):
+    def getStoragePoolByName(self, poolName):
         apicall = listStoragePools.listStoragePoolsCmd()
         apicall.name = str(poolName)
         apicall.listAll = "true"
