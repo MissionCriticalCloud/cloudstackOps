@@ -211,6 +211,35 @@ def liveMigrateVirtualMachine(c=None, DEBUG=0, DRYRUN=1, vmname='', toCluster=''
         print("DEBUG: MySQL connection successful")
         print(s.conn)
 
+
+    # Init KVM class
+    k = kvm.Kvm()
+    k.DRYRUN = DRYRUN
+    k.PREPARE = False
+    c.kvm = k
+
+    # Libvirt disk info
+    try:
+        libvirt_disk_info = c.kvm.libvirt_get_disks(vmname=vm.instancename, hypervisor_fqdn=vm.hostname)
+
+        for path, disk_info in libvirt_disk_info.iteritems():
+            print("Note: Disk %s on pool %s has size %s" % (disk_info['path'], disk_info['pool'], disk_info['size']))
+
+            name, path, uuid, voltype, size = s.get_volume_size(path=disk_info['path'])
+
+            if int(size) < int(disk_info['size']):
+                print("Warning: looks like size in DB (%s) is less than libvirt reports (%s)" % (size, disk_info['size']))
+                print("Note: Setting size of disk %s to %s" % (path, int(disk_info['size'])))
+                s.update_volume_size(instance_name=vm.instancename, path=path, size=disk_info['size'])
+            else:
+                print("OK: looks like size in DB (%s) is >= libvirt reports (%s)" % (size, disk_info['size']))
+    except Exception as e:
+        message = "Error: Unable to read disk sizes from hypervisor. Is VM running?: %s" % str(e)
+        c.print_message(message=message, message_type="Error", to_slack=to_slack)
+        if multirun:
+            return True
+        sys.exit(1)
+
     # Do ZWPS to CWPS conversion before finding migration hosts or else it will return none
     if zwps2cwps:
         message = "Switching any ZWPS volume of vm %s to CWPS so they will move along with the VM" % vm.name
@@ -314,34 +343,6 @@ def liveMigrateVirtualMachine(c=None, DEBUG=0, DRYRUN=1, vmname='', toCluster=''
 
     if not migrationHost:
         message = "No hosts with enough capacity to migrate %s to. Please migrate manually to another cluster." % vm.name
-        c.print_message(message=message, message_type="Error", to_slack=to_slack)
-        if multirun:
-            return True
-        sys.exit(1)
-
-    # Init KVM class
-    k = kvm.Kvm()
-    k.DRYRUN = DRYRUN
-    k.PREPARE = False
-    c.kvm = k
-
-    # Libvirt disk info
-    try:
-        libvirt_disk_info = c.kvm.libvirt_get_disks(vmname=vm.instancename, hypervisor_fqdn=vm.hostname)
-
-        for path, disk_info in libvirt_disk_info.iteritems():
-            print("Note: Disk %s on pool %s has size %s" % (disk_info['path'], disk_info['pool'], disk_info['size']))
-
-            name, path, uuid, voltype, size = s.get_volume_size(path=disk_info['path'])
-
-            if int(size) < int(disk_info['size']):
-                print("Warning: looks like size in DB (%s) is less than libvirt reports (%s)" % (size, disk_info['size']))
-                print("Note: Setting size of disk %s to %s" % (path, int(disk_info['size'])))
-                s.update_volume_size(instance_name=vm.instancename, path=path, size=disk_info['size'])
-            else:
-                print("OK: looks like size in DB (%s) is >= libvirt reports (%s)" % (size, disk_info['size']))
-    except Exception as e:
-        message = "Error: Unable to read disk sizes from hypervisor. Is VM running?: %s" % str(e)
         c.print_message(message=message, message_type="Error", to_slack=to_slack)
         if multirun:
             return True
