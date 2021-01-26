@@ -75,12 +75,12 @@ def handleArguments(argv):
                 "config-profile=", "vmname=", "instance-name=", "tocluster=", "zwps2cwps", "debug",
                 "affinity-group-to-add=", "exec", "is-projectvm", "force", "destinationdc="])
     except getopt.GetoptError as e:
-        print "Error: " + str(e)
-        print help
+        print("Error: " + str(e))
+        print(help)
         sys.exit(2)
     for opt, arg in opts:
         if opt == '-h':
-            print help
+            print(help)
             sys.exit()
         elif opt in ("-c", "--config-profile"):
             configProfileName = arg
@@ -111,18 +111,18 @@ def handleArguments(argv):
 
     # We need at least these vars
     if len(vmname) == 0 or len(toCluster) == 0:
-        print help
+        print(help)
         sys.exit()
 
 
-def liveMigrateVirtualMachine(c = None, DEBUG=0, DRYRUN=1, vmname='', toCluster='', configProfileName='', isProjectVm=0, force=0, zwps2cwps=False, destination_dc_name='', affinityGroupToAdd='', multirun = False):
+def liveMigrateVirtualMachine(c=None, DEBUG=0, DRYRUN=1, vmname='', toCluster='', configProfileName='', isProjectVm=0, force=0, zwps2cwps=False, destination_dc_name='', affinityGroupToAdd='', multirun = False):
     # Start time
-    print "Note: Starting @ %s" % time.strftime("%Y-%m-%d %H:%M")
+    print("Note: Starting @ %s" % time.strftime("%Y-%m-%d %H:%M"))
     start_time = datetime.now()
 
     # Check cloudstack IDs
     if DEBUG == 1:
-        print "Note: Checking CloudStack IDs of provided input.."
+        print("Note: Checking CloudStack IDs of provided input..")
 
     if isProjectVm == 1:
         projectParam = "true"
@@ -142,7 +142,7 @@ def liveMigrateVirtualMachine(c = None, DEBUG=0, DRYRUN=1, vmname='', toCluster=
         {'csname': toCluster, 'csApiCall': 'listClusters'})
 
     if toClusterID == 1 or toClusterID is None:
-        print "Error: Cluster with name '" + toCluster + "' can not be found! Halting!"
+        print("Error: Cluster with name '" + toCluster + "' can not be found! Halting!")
         if multirun:
             return True
         sys.exit(1)
@@ -150,7 +150,7 @@ def liveMigrateVirtualMachine(c = None, DEBUG=0, DRYRUN=1, vmname='', toCluster=
     # Get data from vm
     vmdata = c.getVirtualmachineData(vmID)
     if vmdata is None:
-        print "Error: Could not find vm " + vmname + "!"
+        print("Error: Could not find vm " + vmname + "!")
         if multirun:
             return True
         sys.exit(1)
@@ -163,12 +163,12 @@ def liveMigrateVirtualMachine(c = None, DEBUG=0, DRYRUN=1, vmname='', toCluster=
     snapshotData = c.listVMSnapshot(vm.id)
     snapshot_found = False
     if snapshotData == 1:
-        print "Error: Could not list VM snapshots"
+        print("Error: Could not list VM snapshots")
     elif snapshotData is None:
-        print "Note: No VM snapshots found for this vm."
+        print("Note: No VM snapshots found for this vm.")
     else:
         for snapshot in snapshotData:
-            print "Note: Found VM snapshot %s, unable to live migrate. Please remove VM snapshots first. " % snapshot.displayname
+            print("Note: Found VM snapshot %s, unable to live migrate. Please remove VM snapshots first. " % snapshot.displayname)
             snapshot_found = True
 
     if snapshot_found:
@@ -208,10 +208,37 @@ def liveMigrateVirtualMachine(c = None, DEBUG=0, DRYRUN=1, vmname='', toCluster=
             return True
         sys.exit(1)
     elif DEBUG == 1:
-        print
-        "DEBUG: MySQL connection successful"
-        print
-        s.conn
+        print("DEBUG: MySQL connection successful")
+        print(s.conn)
+
+
+    # Init KVM class
+    k = kvm.Kvm()
+    k.DRYRUN = DRYRUN
+    k.PREPARE = False
+    c.kvm = k
+
+    # Libvirt disk info
+    try:
+        libvirt_disk_info = c.kvm.libvirt_get_disks(vmname=vm.instancename, hypervisor_fqdn=vm.hostname)
+
+        for path, disk_info in libvirt_disk_info.iteritems():
+            print("Note: Disk %s on pool %s has size %s" % (disk_info['path'], disk_info['pool'], disk_info['size']))
+
+            name, path, uuid, voltype, size = s.get_volume_size(path=disk_info['path'])
+
+            if int(size) < int(disk_info['size']):
+                print("Warning: looks like size in DB (%s) is less than libvirt reports (%s)" % (size, disk_info['size']))
+                print("Note: Setting size of disk %s to %s" % (path, int(disk_info['size'])))
+                s.update_volume_size(instance_name=vm.instancename, path=path, size=disk_info['size'])
+            else:
+                print("OK: looks like size in DB (%s) is >= libvirt reports (%s)" % (size, disk_info['size']))
+    except Exception as e:
+        message = "Error: Unable to read disk sizes from hypervisor. Is VM running?: %s" % str(e)
+        c.print_message(message=message, message_type="Error", to_slack=to_slack)
+        if multirun:
+            return True
+        sys.exit(1)
 
     # Do ZWPS to CWPS conversion before finding migration hosts or else it will return none
     if zwps2cwps:
@@ -245,12 +272,69 @@ def liveMigrateVirtualMachine(c = None, DEBUG=0, DRYRUN=1, vmname='', toCluster=
                 s.update_service_offering_of_vm(instance_name=vm.instancename, service_offering_name=new_offering_name)
                 break
 
+    # Quick scan
+    zwps_found = False
+    zwps_name = None
+    root_disk = None
+    cwps_found = False
+    voldata = c.getVirtualmachineVolumes(vm.id, projectParam)
+    for vol in voldata:
+        if vol.type == 'DATADISK':
+            if 'CWPS' in vol.diskofferingname.upper():
+                cwps_found = True
+            if 'ZWPS' in vol.diskofferingname.upper():
+                zwps_found = True
+                zwps_name = vol.storage
+        elif vol.type == 'ROOT':
+            root_disk = vol
+
+    if cwps_found and zwps_found:
+        message = "This VM has both ZWPS and CWPS data disks attached. That is not currently handled by this script."
+        c.print_message(message=message, message_type="Error", to_slack=to_slack)
+        if multirun:
+            return True
+        sys.exit(1)
+
+    # Make sure we have no ZWPS and CWPS combi or else migrating will fail
+
+    # Root disk is also CWPS.
+    if zwps_found:
+        print("Note: ZWPS data disk attached!")
+        print("Note: For migration to work we need to migrate root disk %s to ZWPS pool %s first," %
+              (root_disk.name, zwps_name))
+        print("Note: then migrate the VM and its disks and finally move ROOT disk to a CWPS pool at %s" % toCluster)
+
+        # Check if volume is already on correct storage
+        if root_disk.storage == zwps_name:
+            print("Warning: No need to migrate volume %s -- already on the desired storage pool. Skipping." % root_disk.name)
+        else:
+            if DRYRUN == 1:
+                message = "Would have migrated ROOT disk %s of VM %s to ZWPS pool %s" % \
+                          (root_disk.name, vm.instancename, zwps_name)
+                c.print_message(message=message, message_type="Note", to_slack=to_slack)
+                if multirun:
+                    return True
+                sys.exit(1)
+
+            message = "Migrating ROOT disk of %s VM %s to ZWPS pool %s" % (root_disk.name, vm.instancename, zwps_name)
+            c.print_message(message=message, message_type="Note", to_slack=to_slack)
+            target_storage_pool_data = c.getStoragePoolByName(poolName=zwps_name)
+            result = c.migrateVolume(volid=root_disk.id, storageid=target_storage_pool_data[0].id, live=True)
+            if result == 1:
+                message = "Migrate volume %s (%s) failed -- exiting." % (root_disk.name, root_disk.id)
+                c.print_message(message=message, message_type="Error", to_slack=to_slack)
+                if multirun:
+                    return True
+                sys.exit(1)
+
+    # VM now runs with root disk at ZWPS
+
     # Detach any isos
     if vm.isoid is not None:
-        print "Note: Detaching any connected ISO from vm %s" % vm.name
+        print("Note: Detaching any connected ISO from vm %s" % vm.name)
         c.detach_iso(vm.id)
     else:
-        print "Note: No ISOs connected to detach"
+        print("Note: No ISOs connected to detach")
 
     # Get hosts that belong to toCluster
     toClusterHostsData = c.getHostsFromCluster(toClusterID)
@@ -264,51 +348,48 @@ def liveMigrateVirtualMachine(c = None, DEBUG=0, DRYRUN=1, vmname='', toCluster=
             return True
         sys.exit(1)
 
+    # Do we need liveMigrate or liveMigrateWithVolume
+    migrate_with_volume_required = True
+    voldata = c.getVirtualmachineVolumes(vm.id, projectParam)
+    for vol in voldata:
+        # ROOT disk has no offering info so we cannot detect ZWPS
+        if 'POD012' in vol.storage or 'POD022' in vol.storage:
+            # Migrate ZWPS without disks
+            migrate_with_volume_required = False
 
-    # Init KVM class
-    k = kvm.Kvm()
-    k.DRYRUN = DRYRUN
-    k.PREPARE = False
-    c.kvm = k
-
-    # Libvirt disk info
-    libvirt_disk_info = c.kvm.libvirt_get_disks(vmname=vm.instancename, hypervisor_fqdn=vm.hostname)
-
-    for path, disk_info in libvirt_disk_info.iteritems():
-        print("Note: Disk %s on pool %s has size %s" % (disk_info['path'], disk_info['pool'], disk_info['size']))
-
-        name, path, uuid, voltype, size = s.get_volume_size(path=disk_info['path'])
-
-        if int(size) < int(disk_info['size']):
-            print "Warning: looks like size in DB (%s) is less than libvirt reports (%s)" % (size, disk_info['size'])
-            print "Note: Setting size of disk %s to %s" % (path, int(disk_info['size']))
-            s.update_volume_size(instance_name=vm.instancename, path=path, size=disk_info['size'])
-        else:
-            print "OK: looks like size in DB (%s) is >= libvirt reports (%s)" % (size, disk_info['size'])
+    migration_method = 'live'
+    if migrate_with_volume_required:
+        migration_method = 'liveWithVolume'
 
     if DRYRUN == 1:
-        message = "Would have migrated %s to %s on cluster %s" % (vm.name, migrationHost.name, toCluster)
+        message = "Would have migrated (%s) %s to %s on cluster %s"\
+                  % (migration_method, vm.name, migrationHost.name, toCluster)
         c.print_message(message=message, message_type="Note", to_slack=False)
         if multirun:
             return True
         sys.exit(1)
 
-    message = "Starting migration of %s to %s on cluster %s" % (vm.name, migrationHost.name, toCluster)
+    message = "Starting migration (%s) of %s to %s on cluster %s"\
+              % (migration_method, vm.name, migrationHost.name, toCluster)
     c.print_message(message=message, message_type="Note", to_slack=to_slack)
 
-    result = c.migrateVirtualMachineWithVolume(vm.id, migrationHost.id)
+    if migrate_with_volume_required:
+        result = c.migrateVirtualMachineWithVolume(vm.id, migrationHost.id)
+    else:
+        result = c.migrateVirtualMachine(vm.id, migrationHost.id)
+
     if not result:
-        message= "Migrate vm %s failed -- exiting." % vm.name
+        message = "Migrate (%s) vm %s failed -- exiting." % (migration_method, vm.name)
         c.print_message(message=message, message_type="Error", to_slack=to_slack)
         if multirun:
             return True
         sys.exit(1)
 
-    # Hack
+    # Hack -- Is this still needed?
     while True:
         vmdata = c.getVirtualmachineData(vmID)
         if vmdata is None:
-            print "Error: Could not find vm " + vmname + "!"
+            print("Error: Could not find vm " + vmname + "!")
             if multirun:
                 return True
             sys.exit(1)
@@ -318,6 +399,45 @@ def liveMigrateVirtualMachine(c = None, DEBUG=0, DRYRUN=1, vmname='', toCluster=
             break
         time.sleep(60)
         print("Vm %s is in %s state and not Running. Sleeping." % (vm.name, vm.state))
+
+    if zwps_found:
+        message = "Note: Making sure root disk %s is on CWPS" % root_disk.name
+        c.print_message(message=message, message_type="Note", to_slack=to_slack)
+        # Select storage pool
+        target_storage = c.getStoragePoolWithMostFreeSpace(toClusterID)
+        if target_storage == 1 or target_storage is None:
+            print("Error: Storage Pool with id '" + toClusterID + "' can not be found! Halting!")
+            sys.exit(1)
+
+        # Migrate
+        result = c.migrateVolume(volid=root_disk.id, storageid=target_storage.id, live=True)
+        if result == 1:
+            message = "Migrate volume %s (%s) failed -- retrying." % (root_disk.name, root_disk.id)
+            c.print_message(message=message, message_type="Warning", to_slack=to_slack)
+
+            target_storage_name = target_storage.name
+            retry_target_storage_name = None
+            if 'CS01' in target_storage_name:
+                retry_target_storage_name = target_storage_name.replace('CS01', 'CS02')
+            if 'CS02' in target_storage_name:
+                retry_target_storage_name = target_storage_name.replace('CS02', 'CS01')
+            if retry_target_storage_name is not None:
+                target_storage = c.getStoragePoolByName(poolName=retry_target_storage_name)
+                if target_storage == 1 or target_storage is None:
+                    print("Error: Storage Pool with name '" + retry_target_storage_name + "' can not be found! Halting!")
+                    if multirun:
+                        return True
+                    sys.exit(1)
+                # Migrate
+                result = c.migrateVolume(volid=root_disk.id, storageid=target_storage.id, live=True)
+                if result == 1:
+                    message = "Migrate volume %s (%s) failed again -- halting." % (root_disk.name, root_disk.id)
+                    c.print_message(message=message, message_type="Error", to_slack=to_slack)
+                    if multirun:
+                        return True
+                    sys.exit(1)
+        message = "Note: Root disk %s migrated to pool %s" % (root_disk.name, target_storage.name)
+        c.print_message(message=message, message_type="Note", to_slack=to_slack)
 
     result = True
     if currentHostname == vm.hostname:
@@ -338,6 +458,7 @@ def liveMigrateVirtualMachine(c = None, DEBUG=0, DRYRUN=1, vmname='', toCluster=
     else:
         message = "VM %s is failed to migrate to %s on cluster %s in %s seconds" % (vm.name, migrationHost.name, toCluster, elapsed_time.total_seconds())
         c.print_message(message=message, message_type="Warning", to_slack=to_slack)
+        print("Hint: Due to a known cleanup issue this might be because the disk already exists at the destination.")
 
 # Parse arguments
 if __name__ == "__main__":
@@ -349,10 +470,10 @@ if __name__ == "__main__":
     c.slack_custom_value = ""
 
     if DEBUG == 1:
-        print "Warning: Debug mode is enabled!"
+        print("Warning: Debug mode is enabled!")
 
     if DRYRUN == 1:
-        print "Warning: dry-run mode is enabled, not running any commands!"
+        print("Warning: dry-run mode is enabled, not running any commands!")
 
     # make credentials file known to our class
     c.configProfileName = configProfileName
@@ -361,8 +482,8 @@ if __name__ == "__main__":
     c.initCloudStackAPI()
 
     if DEBUG == 1:
-        print "API address: " + c.apiurl
-        print "ApiKey: " + c.apikey
-        print "SecretKey: " + c.secretkey
+        print("API address: " + c.apiurl)
+        print("ApiKey: " + c.apikey)
+        print("SecretKey: " + c.secretkey)
 
     liveMigrateVirtualMachine(c, DEBUG, DRYRUN, vmname, toCluster, configProfileName, isProjectVm, force, zwps2cwps, destination_dc_name, affinityGroupToAdd)

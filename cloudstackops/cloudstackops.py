@@ -487,7 +487,7 @@ class CloudStackOps(CloudStackOpsBase):
         return data
 
     # Find storagePool for Cluster based on name
-    def getStoragePool(self, poolName):
+    def getStoragePoolByName(self, poolName):
         apicall = listStoragePools.listStoragePoolsCmd()
         apicall.name = str(poolName)
         apicall.listAll = "true"
@@ -510,6 +510,10 @@ class CloudStackOps(CloudStackOpsBase):
         data = None
 
         for pool_data in pools:
+            if pool_data.scope != 'CLUSTER':
+                if self.DEBUG == 1:
+                    print('Skipping pool %s with scope %s' % (pool_data.name, pool_data.scope))
+                continue
             try:
                 pool_utilisation = float(pool_data.disksizeused) / float(pool_data.disksizetotal)
             except:
