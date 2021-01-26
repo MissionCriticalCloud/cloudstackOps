@@ -30,6 +30,7 @@ from cloudstackops import kvm
 import os.path
 from datetime import datetime
 import time
+import getpass
 
 # Function to handle our arguments
 
@@ -213,7 +214,7 @@ def liveMigrateVirtualMachine(c=None, DEBUG=0, DRYRUN=1, vmname='', toCluster=''
 
 
     # Init KVM class
-    k = kvm.Kvm()
+    k = kvm.Kvm(ssh_user=getpass.getuser())
     k.DRYRUN = DRYRUN
     k.PREPARE = False
     c.kvm = k
@@ -308,6 +309,29 @@ def liveMigrateVirtualMachine(c=None, DEBUG=0, DRYRUN=1, vmname='', toCluster=''
         if root_disk.storage == zwps_name:
             print("Warning: No need to migrate volume %s -- already on the desired storage pool. Skipping." % root_disk.name)
         else:
+            target_storage_pool_data = c.getStoragePoolByName(poolName=zwps_name)
+
+            # Check if file exists
+            volume_path = "/mnt/%s/%s" % (target_storage_pool_data[0].id, root_disk.path)
+            destination_file_exists, destination_file_details = k.does_file_exist(kvmhost=hostData, volume_path=volume_path)
+            if destination_file_exists:
+                last_changed = "%s %s %s" % (destination_file_details[-4], destination_file_details[-3], destination_file_details[-2])
+                message = 'Cannot migrate: Disk %s already exists at destination pool %s. Last changed: %s' % (root_disk.name, volume_path, last_changed)
+                c.print_message(message=message, message_type="Error", to_slack=False)
+                if DRYRUN == 1:
+                    sys.exit(1)
+                else:
+                    message = 'Moving away existing disk %s at destination pool %s.' % (root_disk.name, volume_path)
+                    c.print_message(message=message, message_type="Warning", to_slack=False)
+                    move_result = k.rename_existing_destination_file(kvmhost=hostData, volume_path=volume_path)
+                    if move_result:
+                        message = 'Successfully moved away existing disk %s at destination pool %s.' % (root_disk.name, volume_path)
+                        c.print_message(message=message, message_type="Note", to_slack=False)
+                    else:
+                        message = 'Cannot move away existing disk %s at destination pool %s.' % (root_disk.name, volume_path)
+                        c.print_message(message=message, message_type="Error", to_slack=False)
+                        sys.exit(1)
+
             if DRYRUN == 1:
                 message = "Would have migrated ROOT disk %s of VM %s to ZWPS pool %s" % \
                           (root_disk.name, vm.instancename, zwps_name)
@@ -318,7 +342,7 @@ def liveMigrateVirtualMachine(c=None, DEBUG=0, DRYRUN=1, vmname='', toCluster=''
 
             message = "Migrating ROOT disk of %s VM %s to ZWPS pool %s" % (root_disk.name, vm.instancename, zwps_name)
             c.print_message(message=message, message_type="Note", to_slack=to_slack)
-            target_storage_pool_data = c.getStoragePoolByName(poolName=zwps_name)
+
             result = c.migrateVolume(volid=root_disk.id, storageid=target_storage_pool_data[0].id, live=True)
             if result == 1:
                 message = "Migrate volume %s (%s) failed -- exiting." % (root_disk.name, root_disk.id)
