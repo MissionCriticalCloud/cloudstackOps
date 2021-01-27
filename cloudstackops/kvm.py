@@ -39,6 +39,7 @@ import libvirt
 from xml.etree import ElementTree
 
 import hypervisor
+from datetime import datetime
 
 # Set user/passwd for fabric ssh
 env.user = 'root'
@@ -509,4 +510,30 @@ class Kvm(hypervisor.hypervisor):
                 return fab.run(command)
         except Exception as e:
             print("Exception: %s" % str(e))
+            return False
+
+    def does_file_exist(self, kvmhost, volume_path):
+        print("Note: Checking if file %s exists on host %s" % (volume_path, kvmhost.name))
+        try:
+            with settings(host_string=self.ssh_user + "@" + kvmhost.ipaddress):
+                command = "ls -la %s" % volume_path
+                result = fab.run(command)
+                files = result.split()
+                return True, files
+        except:
+            return False
+
+    def rename_existing_destination_file(self, kvmhost, volume_path):
+        now = datetime.now()
+        magweg = 'magweg-migration-%s' % now.strftime("%d-%m-%Y-%H-%M-%S")
+        print("Note: Rename %s to %s.%s on host %s" % (volume_path, volume_path, magweg, kvmhost.name))
+        try:
+            with settings(host_string=self.ssh_user + "@" + kvmhost.ipaddress):
+                command = "sudo mv %s %s.%s" % (volume_path, volume_path, magweg)
+                print(command)
+                result = fab.run(command)
+                files = result.split()
+                print(files)
+                return True
+        except:
             return False
