@@ -277,17 +277,30 @@ def liveMigrateVirtualMachine(c=None, DEBUG=0, DRYRUN=1, vmname='', toCluster=''
     zwps_found = False
     zwps_name = None
     root_disk = None
+    hwps_name = None
     cwps_found = False
+    hwps_found = False
     voldata = c.getVirtualmachineVolumes(vm.id, projectParam)
     for vol in voldata:
         if vol.type == 'DATADISK':
-            if 'CWPS' in vol.diskofferingname.upper():
+            storagePoolData = c.getStoragePoolData(storagepoolID=vol.storageid)[0]
+            if storagePoolData.scope == 'CLUSTER':
                 cwps_found = True
-            if 'ZWPS' in vol.diskofferingname.upper():
+            if storagePoolData.scope == 'ZONE':
                 zwps_found = True
                 zwps_name = vol.storage
+            if storagePoolData.scope == 'HOST':
+                hwps_found = True
+                hwps_name = vol.storage
         elif vol.type == 'ROOT':
             root_disk = vol
+
+    if hwps_found:
+        message = "This VM has HWPS data disks attached. That is not currently handled by this script."
+        c.print_message(message=message, message_type="Error", to_slack=to_slack)
+        if multirun:
+            return True
+        sys.exit(1)
 
     if cwps_found and zwps_found:
         message = "This VM has both ZWPS and CWPS data disks attached. That is not currently handled by this script."
@@ -331,6 +344,10 @@ def liveMigrateVirtualMachine(c=None, DEBUG=0, DRYRUN=1, vmname='', toCluster=''
                         message = 'Cannot move away existing disk %s at destination pool %s.' % (root_disk.name, volume_path)
                         c.print_message(message=message, message_type="Error", to_slack=False)
                         sys.exit(1)
+
+            else:
+                message = 'Disk %s does not yet exist at destination pool %s' % (root_disk.name, volume_path)
+                c.print_message(message=message, message_type="Note", to_slack=False)
 
             if DRYRUN == 1:
                 message = "Would have migrated ROOT disk %s of VM %s to ZWPS pool %s" % \
