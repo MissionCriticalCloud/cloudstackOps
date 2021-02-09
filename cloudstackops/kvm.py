@@ -516,12 +516,16 @@ class Kvm(hypervisor.hypervisor):
     def does_file_exist(self, kvmhost, volume_path):
         print("Note: Checking if file %s exists on host %s" % (volume_path, kvmhost.name))
         try:
-            with hide('output','running','warnings'), settings(host_string=self.ssh_user + "@" + kvmhost.ipaddress):
+            with hide('output','running','warnings'), settings(host_string=self.ssh_user + "@" + kvmhost.ipaddress, warn_only=True):
                 command = "ls -la %s" % volume_path
-                result = fab.run(command, hide=True)
+                result = fab.run(command)
                 files = result.split()
+                print(result)
+                if 'No such file or directory' in result:
+                    return False, None
                 return True, files
-        except:
+        except Exception as e:
+            print("Exception: %s" % str(e))
             return False, None
 
     def rename_existing_destination_file(self, kvmhost, volume_path):
@@ -536,5 +540,6 @@ class Kvm(hypervisor.hypervisor):
                 files = result.split()
                 print(files)
                 return True
-        except:
+        except Exception as e:
+            print("Exception: %s" % str(e))
             return False

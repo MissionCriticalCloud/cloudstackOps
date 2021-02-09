@@ -338,7 +338,7 @@ def liveMigrateVirtualMachine(c=None, DEBUG=0, DRYRUN=1, vmname='', toCluster=''
                     c.print_message(message=message, message_type="Warning", to_slack=False)
                     move_result = k.rename_existing_destination_file(kvmhost=hostData, volume_path=volume_path)
                     if move_result:
-                        message = 'Successfully moved away existing disk %s at destination pool %s.' % (root_disk.name, volume_path)
+                        message = 'Successfully moved away existing disk'
                         c.print_message(message=message, message_type="Note", to_slack=False)
                     else:
                         message = 'Cannot move away existing disk %s at destination pool %s.' % (root_disk.name, volume_path)
